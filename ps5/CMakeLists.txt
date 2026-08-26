@@ -49,6 +49,10 @@ target_sources(common_fps_controller PRIVATE
 
     # GPL etaHEN source dependency for process/module enumeration.
     "${ETAHEN_FPS}/src/proc.cpp"
+
+    # GPL shsrv ptrace implementation:
+    # pt_attach(), pt_detach(), pt_copyout().
+    "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
 )
 
 target_include_directories(common_fps_controller PRIVATE
@@ -56,6 +60,7 @@ target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/src/ps5"
     "${ETAHEN_ROOT}/include"
     "${ETAHEN_FPS}/include"
+    "${COMMON_FPS_SHSRV_SOURCE}"
     "${SDK}"
     "${SDK}/include"
 )
