@@ -24,7 +24,7 @@ jobs:
             clang-18 lld-18 xxd
 
       - name: Prepare pinned PS5 source dependencies
-        run: ./scripts/prepare_ps5_deps.sh
+        run: bash ./scripts/prepare_ps5_deps.sh
 
       - name: Host regression tests
         run: |
@@ -33,7 +33,7 @@ jobs:
           ctest --test-dir build-host --output-on-failure
 
       - name: Build PS5 ELF and etaHEN plugin from source
-        run: ./scripts/ps5_source_build.sh
+        run: bash ./scripts/ps5_source_build.sh
 
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
