@@ -29,19 +29,12 @@
  */
 extern "C" {
 #include "proc.h"
+#include "pt.h"
 
 /*
- * For the final source-built integration these declarations should come
- * from the exact etaHEN/libhijacker headers pinned by the project.
+ * mdbg_copyout is supplied by the PS5 Payload SDK runtime.
+ * shsrv/pt.h supplies pt_attach(), pt_detach() and pt_copyout().
  */
-int pt_attach_proc(pid_t pid);
-int pt_detach_proc(pid_t pid, int signal);
-int pt_copyout(
-    pid_t pid,
-    std::uintptr_t remote,
-    void* local,
-    std::size_t size);
-
 int mdbg_copyout(
     pid_t pid,
     std::uintptr_t remote,
@@ -127,11 +120,11 @@ bool Ps5Platform::read_memory(
         return false;
 
     if (fw >= 0x840) {
-        if (pt_attach_proc(pid) < 0)
+        if (pt_attach(pid) < 0)
             return false;
 
         const int rc = pt_copyout(pid, address, out, size);
-        pt_detach_proc(pid, 0);
+        pt_detach(pid, 0);
         return rc >= 0;
     }
 
