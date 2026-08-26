@@ -21,8 +21,9 @@ endif()
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(SDK "$ENV{PS5_PAYLOAD_SDK}")
 
-set(ETAHEN_FPS "${COMMON_FPS_ETAHEN_SOURCE}/Source Code/fps_elf")
-set(ETAHEN_SHELLUI "${COMMON_FPS_ETAHEN_SOURCE}/Source Code/shellui")
+set(ETAHEN_ROOT "${COMMON_FPS_ETAHEN_SOURCE}/Source Code")
+set(ETAHEN_FPS "${ETAHEN_ROOT}/fps_elf")
+set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
 
 # ------------------------------------------------------------------
 # Controller/plugin ELF.
@@ -53,6 +54,7 @@ target_sources(common_fps_controller PRIVATE
 target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/include"
     "${ROOT}/src/ps5"
+    "${ETAHEN_ROOT}/include"
     "${ETAHEN_FPS}/include"
     "${SDK}"
     "${SDK}/include"
@@ -106,6 +108,7 @@ target_sources(common_fps_shellui PRIVATE
 target_include_directories(common_fps_shellui PRIVATE
     "${ROOT}/include"
     "${ROOT}/src/ps5/shellui_payload"
+    "${ETAHEN_ROOT}/include"
     "${ETAHEN_SHELLUI}/include"
     "${SDK}"
     "${SDK}/include"
