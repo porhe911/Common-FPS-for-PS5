@@ -1,0 +1,49 @@
+{
+  "public_release": "v1.0.0",
+  "internal_branch": "v0.28b Async Stable Init",
+  "elf": {
+    "filename": "Common_FPS_PS5_v1.0.0.elf",
+    "sha256": "6a66da88a99fa8757bf5c649e388d777a10768cd444d9f4cf82649e4592e292c",
+    "size": 1555144
+  },
+  "plugin": {
+    "filename": "Common_FPS_PS5_etaHEN_v1.0.0.plugin",
+    "sha256": "f1240511bfe3cb17a3db6f4d099cf3cd69be678d10901425a7b33911265195e1",
+    "size": 1555173,
+    "title_id": "CFPS00020",
+    "version_header": "0.28"
+  },
+  "ui": {
+    "corner": "bottom_left",
+    "font_size": 26,
+    "label": "FPS:",
+    "label_color": "#B366FF",
+    "value_color": "#FFFFFF",
+    "integer_only": true,
+    "moving_cursor": false
+  },
+  "lifecycle": {
+    "wait_for_eboot": true,
+    "reset_on_pid_exit": true,
+    "detect_new_pid": true,
+    "game_switch_without_restart": true
+  },
+  "fps": {
+    "read_only": true,
+    "game_hooks": false,
+    "module": "libSceVideoOut.sprx",
+    "probe_table_offset": "0x34980",
+    "probe_entries": 7,
+    "probe_entry_size": "0x18",
+    "counter_offset": "0x768",
+    "display_integer_only": true
+  },
+  "startup": {
+    "async_parent_return": true,
+    "full_stable_init_in_child": true,
+    "payload_args_required": true,
+    "scene_wait_required": true,
+    "do_not_use_zero_args_shortcut": true,
+    "do_not_split_attach_with_detach": true
+  }
+}

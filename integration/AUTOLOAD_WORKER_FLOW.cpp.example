@@ -1,0 +1,58 @@
+/*
+ * Common FPS for PS5
+ * Copyright (C) 2026 porhe911
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/*
+ * Integration example only.
+ *
+ * The final PS5 loader backend will implement AutoloadBackend using the
+ * source-built ShellUI injector.
+ */
+
+#include "common_fps/autoload_guard.hpp"
+#include "common_fps/lifecycle.hpp"
+
+void worker_loop(
+    common_fps::Platform& platform,
+    common_fps::AutoloadBackend& autoload_backend,
+    common_fps::Lifecycle& lifecycle) {
+
+    common_fps::AutoloadGuard guard(autoload_backend);
+
+    bool previously_ready = false;
+
+    for (;;) {
+        const bool ready =
+            guard.tick(platform.monotonic_us()) ==
+            common_fps::AutoloadState::Ready;
+
+        if (!ready) {
+            /*
+             * Critical autoload rule:
+             * do not attach/read the game while the renderer/runtime side is
+             * not healthy.
+             */
+            if (previously_ready)
+                lifecycle.reset();
+
+            previously_ready = false;
+            platform.sleep_ms(250);
+            continue;
+        }
+
+        previously_ready = true;
+
+        /*
+         * Only here enter the normal v1.0.0 lifecycle:
+         *
+         *   wait eboot.bin -> sample -> reset on exit -> next eboot.bin
+         */
+        const auto frame = lifecycle.tick();
+        (void)frame;
+
+        platform.sleep_ms(1000);
+    }
+}

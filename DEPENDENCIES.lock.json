@@ -1,0 +1,22 @@
+{
+  "project": "Common FPS for PS5",
+  "version": "1.1.0-rc1",
+  "license": "GPL-3.0-or-later",
+  "ps5_payload_sdk": {
+    "repository": "https://github.com/ps5-payload-dev/sdk",
+    "version": "v0.41",
+    "commit": "d2e2e58",
+    "purpose": "PS5 payload toolchain and system libraries"
+  },
+  "etahen": {
+    "repository": "https://github.com/etaHEN/etaHEN",
+    "version": "2.5B",
+    "commit": "5061a85312eb1d2da811269bcb9061e4b01302a1",
+    "purpose": "GPL reference/source for PS5 process and ShellUI/PUI integration"
+  },
+  "ps5_payload_shsrv": {
+    "repository": "https://github.com/ps5-payload-dev/shsrv",
+    "version": "v0.20",
+    "purpose": "GPL reference/source for ptrace ELF loader and payload-args contract"
+  }
+}

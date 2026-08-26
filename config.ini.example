@@ -1,0 +1,13 @@
+# Common FPS configuration
+#
+# v1.0.0 compatibility defaults:
+#   corner=bottom_left
+#   font_size=26
+#
+# A future source-built release may allow the user to change them.
+
+[overlay]
+corner=bottom_left
+font_size=26
+margin_x=10
+margin_y=10
