@@ -2,7 +2,7 @@
 
 A lightweight, open-source real-time FPS counter for PlayStation 5.
 
-> **Current source release:** `v1.1.0-rc1`  
+> **Current source release:** `v1.1.0
 > **Hardware-stable binary baseline:** `v1.0.0`  
 > **License:** GPL-3.0-or-later
 
