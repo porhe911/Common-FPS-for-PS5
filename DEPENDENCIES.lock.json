@@ -10,9 +10,9 @@
   },
   "etahen": {
     "repository": "https://github.com/etaHEN/etaHEN",
-    "version": "2.5B",
-    "commit": "5061a85312eb1d2da811269bcb9061e4b01302a1",
-    "purpose": "GPL reference/source for PS5 process and ShellUI/PUI integration"
+    "version": "2.4B",
+    "commit": "d47f99bd37f349ae59b3c4b66e09e93ba69f56cd",
+    "purpose": "Pinned GPL source baseline for PS5 process and ShellUI/PUI integration; 2.4B introduced Game Overlay and 8.40-10.01 fixes without the later 2.5B dumper/WebMAN IPC mismatch encountered by the Common FPS minimal renderer build."
   },
   "ps5_payload_shsrv": {
     "repository": "https://github.com/ps5-payload-dev/shsrv",
