@@ -128,6 +128,7 @@ target_compile_options(common_fps_shellui PRIVATE
     -O2
     -Wall
     -Wextra
+    -Wno-c++11-narrowing
 )
 
 target_link_libraries(common_fps_shellui PRIVATE
