@@ -103,6 +103,7 @@ target_sources(common_fps_shellui PRIVATE
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
+    "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_entry.cpp"
 
     "${ETAHEN_SHELLUI}/src/MonoUtils.cpp"
     "${ETAHEN_SHELLUI}/src/external_symbols.cpp"
