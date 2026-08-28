@@ -115,8 +115,10 @@ target_sources(common_fps_shellui PRIVATE
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_entry.cpp"
 
-    # Minimal etaHEN GPL support used by the source-built PUI path.
-    "${ETAHEN_FPS}/src/proc.cpp"
+    # Use etaHEN's ShellUI proc implementation/header as one coherent include
+    # family.  Mixing fps_elf/proc.h with ShellUI HookedFuncs.hpp duplicates
+    # external_symbols.hpp type definitions.
+    "${ETAHEN_SHELLUI}/src/proc.cpp"
     "${ETAHEN_SHELLUI}/src/MonoUtils.cpp"
     "${ETAHEN_SHELLUI}/src/external_symbols.cpp"
     "${ETAHEN_SHELLUI}/src/Detour.cpp"
@@ -127,7 +129,6 @@ target_include_directories(common_fps_shellui PRIVATE
     "${ROOT}/include"
     "${ROOT}/src/ps5/shellui_payload"
     "${ETAHEN_ROOT}/include"
-    "${ETAHEN_FPS}/include"
     "${ETAHEN_SHELLUI}/include"
     "${SDK}"
     "${SDK}/include"
