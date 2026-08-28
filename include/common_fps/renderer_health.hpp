@@ -15,6 +15,15 @@ namespace common_fps {
 inline constexpr std::uint32_t kRendererHealthMagic = 0x48504643U; // "CFPH"
 inline constexpr std::uint16_t kRendererHealthVersion = 1;
 inline constexpr std::uint16_t kRendererHealthPort = 39029;
+
+/*
+ * Bound by the injected ShellUI companion for the whole lifetime of the
+ * SceShellUI process.  Unlike the heartbeat this is deliberately persistent:
+ * if a controller is stopped and started again while the old injected code is
+ * still resident, a second injection is refused instead of re-hooking PUI.
+ */
+inline constexpr std::uint16_t kRendererSentinelPort = 39030;
+
 inline constexpr std::uint16_t kRendererHealthPacketSize = 24;
 
 enum class RendererHealthPhase : std::uint16_t {
