@@ -9,6 +9,7 @@
 #include "commonfps_shellui_bootstrap.hpp"
 #include "common_fps/renderer_health.hpp"
 
+#include <cerrno>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -18,6 +19,28 @@ namespace {
 int open_health_sender()
 {
     return socket(AF_INET, SOCK_DGRAM, 0);
+}
+
+int open_injection_sentinel()
+{
+    const int socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_fd < 0)
+        return -1;
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(common_fps::kRendererSentinelPort);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    if (bind(
+            socket_fd,
+            reinterpret_cast<sockaddr*>(&address),
+            sizeof(address)) < 0) {
+        close(socket_fd);
+        return -1;
+    }
+
+    return socket_fd;
 }
 
 void send_health(
@@ -52,6 +75,18 @@ void send_health(
 int main(int, const char**)
 {
     using namespace common_fps::ps5::shellui;
+
+    /*
+     * This port is a process-lifetime ownership marker.  A second injected
+     * copy in the same SceShellUI must exit before it can touch Mono/PUI.
+     * This specifically makes etaHEN Stop -> Run fail closed instead of
+     * installing another hook over resident Common FPS code.
+     */
+    const int sentinel_socket = open_injection_sentinel();
+    if (sentinel_socket < 0)
+        return 0;
+
+    (void)sentinel_socket; // kept open intentionally for SceShellUI lifetime
 
     /*
      * Keep all network receiving off the ShellUI main thread.  The visual
