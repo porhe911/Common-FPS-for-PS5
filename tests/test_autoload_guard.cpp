@@ -7,6 +7,7 @@
 
 #include "common_fps/autoload_guard.hpp"
 #include "common_fps/scene_guard.hpp"
+#include "common_fps/renderer_health.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -188,6 +189,21 @@ static void test_false_enabled_state_self_heals() {
     assert(b.installs == 2);
 }
 
+
+static void test_renderer_health_protocol() {
+    RendererHealthPacket packet{};
+
+    assert(valid_renderer_health_packet(packet));
+    assert(packet.size == kRendererHealthPacketSize);
+
+    packet.phase =
+        static_cast<std::uint16_t>(RendererHealthPhase::VisualReady);
+    assert(valid_renderer_health_packet(packet));
+
+    packet.magic = 0;
+    assert(!valid_renderer_health_packet(packet));
+}
+
 static void test_scene_one_shot_failure_retries() {
     MockScene b;
     ScenePolicy p;
@@ -236,6 +252,7 @@ int main() {
     test_autoload_does_not_install_too_early();
     test_failed_early_install_is_not_terminal();
     test_false_enabled_state_self_heals();
+    test_renderer_health_protocol();
     test_scene_one_shot_failure_retries();
 
     std::cout << "Common FPS safe autoload tests: PASS\n";

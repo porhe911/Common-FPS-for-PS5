@@ -31,3 +31,38 @@ The RC becomes stable only when:
 6. repeated game-switch lifecycle testing passes without KP.
 
 Until then the correct public version label is `v1.1.0-rc1`.
+
+## Safe Autoload integration status
+
+The production PS5 worker now uses `AutoloadGuard` through the real
+`Ps5AutoloadBackend`.
+
+Stage A implements:
+
+- stable `SceShellUI` + Mono readiness gating;
+- source companion loading with `elfldr_debug()`;
+- one continuous ptrace loader session;
+- no `elfldr_exec()` / no intentional `SIGKILL` failure path;
+- receiver heartbeat and PID-aware health checking;
+- duplicate/retry throttling;
+- an additional `VisualReady` gate before any game lifecycle activity;
+- build-time embedding of the source-built ShellUI companion into the main
+  controller ELF.
+
+End-user deployment is therefore single-file:
+
+- etaHEN users install only `Common_FPS_PS5_etaHEN_v1.1.0.plugin` in
+  `/data/etaHEN/plugins/`;
+- standalone / YouTube Jailbreak autoload users use only
+  `Common_FPS_PS5_v1.1.0.elf` in their normal ELF/autoload location;
+- `/data/CommonFPS/` is not required to carry a renderer file.
+
+The separate `Common_FPS_ShellUI_v1.1.0.elf` remains in source-build artifacts
+only for diagnostics and source transparency.
+
+Stage A intentionally does **not** emit `VisualReady`. The source-built visual
+renderer still needs the Stage B Mono/PUI main-thread bootstrap. Until that is
+implemented and tested, Stage A is a safety probe rather than a functional FPS
+release.
+
+See `docs/AUTOLOAD_STAGE_A_HW_PROBE.md`.
