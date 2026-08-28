@@ -93,6 +93,31 @@ bool Ps5AutoloadBackend::open_health_socket() {
     return true;
 }
 
+bool Ps5AutoloadBackend::renderer_sentinel_present() const {
+    const int probe = socket(AF_INET, SOCK_DGRAM, 0);
+    if (probe < 0)
+        return false;
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(common_fps::kRendererSentinelPort);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    errno = 0;
+    const int rc = bind(
+        probe,
+        reinterpret_cast<sockaddr*>(&address),
+        sizeof(address));
+    const int bind_errno = errno;
+
+    close(probe);
+
+    if (rc == 0)
+        return false;
+
+    return bind_errno == EADDRINUSE;
+}
+
 void Ps5AutoloadBackend::reset_heartbeat_state(pid_t new_pid) {
     shellui_pid_ = new_pid;
     last_receiver_heartbeat_us_ = 0;
@@ -271,10 +296,23 @@ bool Ps5AutoloadBackend::install_renderer_once() {
         return false;
 
     /*
-     * If the companion is already running, never inject another copy.
+     * Fresh heartbeat means the resident companion is unquestionably alive.
      */
     if (renderer_alive())
         return true;
+
+    /*
+     * Strong fail-closed guard for etaHEN Stop -> Run.
+     *
+     * The controller process can be killed while code injected into SceShellUI
+     * remains resident.  Heartbeats can be temporarily absent during that
+     * transition, so they are not sufficient as the only duplicate guard.
+     * The injected companion owns a separate loopback port for the entire
+     * lifetime of SceShellUI.  If it is still owned, NEVER inject another copy
+     * into this PID. A ShellUI restart releases the port naturally.
+     */
+    if (renderer_sentinel_present())
+        return false;
 
     const std::uint64_t now = platform_.monotonic_us();
 
@@ -326,7 +364,7 @@ bool Ps5AutoloadBackend::install_renderer_once() {
 
     /*
      * The target resumes only after pt_detach(). Give the injected entry point
-     * a short bounded window to bind its receiver and emit a heartbeat.
+     * a short bounded window to bind its sentinel/receiver and emit heartbeat.
      */
     for (unsigned i = 0; i < 60; ++i) {
         platform_.sleep_ms(50);
