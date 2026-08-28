@@ -9,6 +9,7 @@
 
 #include "common_fps/autoload_guard.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <sys/types.h>
 
