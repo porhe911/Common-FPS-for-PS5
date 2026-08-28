@@ -27,7 +27,9 @@ class Ps5Platform;
  *   - inject with one continuous ptrace session;
  *   - use elfldr_debug(), not elfldr_exec(), so an injector failure never
  *     SIGKILLs SceShellUI;
- *   - confirm the injected renderer by loopback heartbeat.
+ *   - confirm the injected renderer by loopback heartbeat;
+ *   - never inject a second renderer while the process-lifetime sentinel from
+ *     an earlier copy is still owned by the same live SceShellUI process.
  */
 class Ps5AutoloadBackend final : public common_fps::AutoloadBackend {
 public:
@@ -58,6 +60,7 @@ private:
     bool refresh_shellui();
     bool mono_runtime_present(pid_t pid);
     bool open_health_socket();
+    bool renderer_sentinel_present() const;
     void reset_heartbeat_state(pid_t new_pid);
     void drain_health();
     bool heartbeat_fresh(std::uint64_t timestamp_us) const;
