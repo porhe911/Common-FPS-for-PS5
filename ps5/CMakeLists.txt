@@ -155,9 +155,45 @@ target_link_libraries(common_fps_shellui PRIVATE
 )
 
 # ------------------------------------------------------------------
+# Embed the source-built ShellUI companion in the controller.
+#
+# This makes runtime deployment a single-file operation:
+#   etaHEN:  Common_FPS_PS5_etaHEN_v1.1.0.plugin -> /data/etaHEN/plugins/
+#   ELF:     Common_FPS_PS5_v1.1.0.elf -> the user's normal ELF/autoload path
+#
+# No /data/CommonFPS renderer file is required.  The standalone companion is
+# still emitted to dist/ for diagnostics and source-build transparency.
+# ------------------------------------------------------------------
+set(EMBEDDED_SHELLUI_CPP
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/commonfps_shellui_blob.cpp"
+)
+
+add_custom_command(
+    OUTPUT "${EMBEDDED_SHELLUI_CPP}"
+    COMMAND python3
+            "${ROOT}/tools/embed_binary.py"
+            "$<TARGET_FILE:common_fps_shellui>"
+            "${EMBEDDED_SHELLUI_CPP}"
+    DEPENDS
+        common_fps_shellui
+        "${ROOT}/tools/embed_binary.py"
+    COMMENT "Embedding source-built ShellUI companion into controller"
+    VERBATIM
+)
+
+set_source_files_properties(
+    "${EMBEDDED_SHELLUI_CPP}"
+    PROPERTIES GENERATED TRUE
+)
+
+target_sources(common_fps_controller PRIVATE
+    "${EMBEDDED_SHELLUI_CPP}"
+)
+
+# ------------------------------------------------------------------
 # Package controller as etaHEN .plugin.
-# The renderer ELF remains a source-built companion artifact until the
-# controller-side loader embedding step is validated.
+# The renderer is embedded in the controller; the separate renderer artifact
+# below is developer/diagnostic output only.
 # ------------------------------------------------------------------
 add_custom_command(
     TARGET common_fps_controller
