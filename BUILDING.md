@@ -25,6 +25,22 @@ Common_FPS_ShellUI_v1.1.0.elf
 
 as workflow artifacts.
 
+The ShellUI ELF is built first and then embedded byte-for-byte into the main
+controller ELF. Therefore the separate `Common_FPS_ShellUI_v1.1.0.elf` is a
+developer/diagnostic artifact only; end users do not install it separately.
+
+Runtime deployment is single-file:
+
+```text
+etaHEN:
+/data/etaHEN/plugins/Common_FPS_PS5_etaHEN_v1.1.0.plugin
+
+standalone / YouTube Jailbreak autoload:
+Common_FPS_PS5_v1.1.0.elf
+```
+
+No `/data/CommonFPS/` renderer directory is required.
+
 ## Host tests
 
 On a normal C++17 environment:
