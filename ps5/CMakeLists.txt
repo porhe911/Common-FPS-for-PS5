@@ -98,9 +98,9 @@ target_link_libraries(common_fps_controller PRIVATE
 # ------------------------------------------------------------------
 # Source-only ShellUI renderer target.
 #
-# This target intentionally contains no PHU binary blob. The Common FPS
-# renderer source is compiled together with etaHEN's GPL ShellUI support
-# source. The exact minimal set can be reduced further after FW 9.60 tests.
+# Stage B resolves only the Mono/PUI symbols required for Common FPS, finds the
+# ShellUI Game container scene and uses PUI Application.Update as the sole
+# main-thread rendering callback.  The full etaHEN prx.cpp is not linked.
 # ------------------------------------------------------------------
 add_executable(common_fps_shellui)
 
@@ -112,8 +112,11 @@ target_sources(common_fps_shellui PRIVATE
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
+    "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_entry.cpp"
 
+    # Minimal etaHEN GPL support used by the source-built PUI path.
+    "${ETAHEN_FPS}/src/proc.cpp"
     "${ETAHEN_SHELLUI}/src/MonoUtils.cpp"
     "${ETAHEN_SHELLUI}/src/external_symbols.cpp"
     "${ETAHEN_SHELLUI}/src/Detour.cpp"
@@ -124,6 +127,7 @@ target_include_directories(common_fps_shellui PRIVATE
     "${ROOT}/include"
     "${ROOT}/src/ps5/shellui_payload"
     "${ETAHEN_ROOT}/include"
+    "${ETAHEN_FPS}/include"
     "${ETAHEN_SHELLUI}/include"
     "${SDK}"
     "${SDK}/include"
@@ -149,6 +153,7 @@ target_link_options(common_fps_shellui PRIVATE
 
 target_link_libraries(common_fps_shellui PRIVATE
     kernel_sys
+    SceLibcInternal
     SceNet
     SceSysmodule
     SceSystemService
