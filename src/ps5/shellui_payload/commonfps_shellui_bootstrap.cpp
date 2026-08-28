@@ -14,7 +14,11 @@
 #include "proc.h"
 
 #include <atomic>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <machine/param.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 /*
@@ -38,6 +42,10 @@ std::atomic_bool g_hook_installed{false};
 std::atomic_bool g_visual_ready{false};
 UpdateFn g_update_original = nullptr;
 MonoThread* g_bootstrap_thread = nullptr;
+
+constexpr std::uint8_t kAbsoluteIndirectJumpPrefix[6] = {
+    0xFF, 0x25, 0x00, 0x00, 0x00, 0x00
+};
 
 bool resolve_mono_symbols()
 {
@@ -173,19 +181,118 @@ bool game_root_ready()
 void application_update_hook(MonoObject* instance)
 {
     /*
-     * This callback is our only PUI execution point.  It is reached from the
-     * real ShellUI Application.Update path, matching etaHEN's proven overlay
-     * architecture and avoiding PUI mutation from the injected worker thread.
+     * Preserve an existing etaHEN render hook first.  etaHEN 2.4B already
+     * detours this exact Application.Update method, so Common FPS must chain
+     * through it rather than replacing/bypassing it.
+     */
+    UpdateFn original = g_update_original;
+    if (original)
+        original(instance);
+
+    /*
+     * This callback is our only PUI execution point.  PUI mutation remains on
+     * the real ShellUI Application.Update thread.
      */
     if (!g_visual_ready.load(std::memory_order_relaxed) && game_root_ready())
         g_visual_ready.store(true, std::memory_order_release);
 
     if (g_visual_ready.load(std::memory_order_acquire))
         apply_latest_state();
+}
 
-    UpdateFn original = g_update_original;
-    if (original)
-        original(instance);
+bool decode_existing_absolute_jump(
+    std::uint64_t address,
+    std::uint64_t* destination)
+{
+    if (!address || !destination)
+        return false;
+
+    const auto* code =
+        reinterpret_cast<const std::uint8_t*>(address);
+
+    if (std::memcmp(
+            code,
+            kAbsoluteIndirectJumpPrefix,
+            sizeof(kAbsoluteIndirectJumpPrefix)) != 0) {
+        return false;
+    }
+
+    std::uint64_t target = 0;
+    std::memcpy(&target, code + 6, sizeof(target));
+    if (!target)
+        return false;
+
+    *destination = target;
+    return true;
+}
+
+bool make_code_page_writable(std::uint64_t address)
+{
+    const std::uint64_t page =
+        address & ~(static_cast<std::uint64_t>(PAGE_SIZE) - 1ULL);
+
+    return kernel_mprotect(
+               getpid(),
+               page,
+               PAGE_SIZE,
+               PROT_EXEC | PROT_READ | PROT_WRITE) == 0;
+}
+
+bool chain_over_existing_hook(
+    std::uint64_t update_address,
+    std::uint64_t existing_destination)
+{
+    if (!update_address || !existing_destination)
+        return false;
+
+    const auto ours =
+        reinterpret_cast<std::uint64_t>(&application_update_hook);
+
+    if (existing_destination == ours) {
+        g_hook_installed.store(true, std::memory_order_release);
+        return true;
+    }
+
+    if (!make_code_page_writable(update_address))
+        return false;
+
+    /*
+     * etaHEN's WriteJump layout is:
+     *   FF 25 00 00 00 00
+     *   <8-byte absolute destination>
+     *
+     * Do not run DetourFunction over that already-detoured 14-byte sequence.
+     * Keep its opcode intact, remember etaHEN's destination, and only replace
+     * the destination pointer with Common FPS. The call chain becomes:
+     *
+     * Application.Update -> Common FPS -> etaHEN OnRender_Hook
+     *                    -> etaHEN trampoline -> original Update
+     */
+    g_update_original =
+        reinterpret_cast<UpdateFn>(existing_destination);
+
+    std::memcpy(
+        reinterpret_cast<void*>(update_address + 6),
+        &ours,
+        sizeof(ours));
+
+    __builtin___clear_cache(
+        reinterpret_cast<char*>(update_address),
+        reinterpret_cast<char*>(update_address + 14));
+
+    std::uint64_t verify = 0;
+    if (!decode_existing_absolute_jump(update_address, &verify) ||
+        verify != ours) {
+        std::memcpy(
+            reinterpret_cast<void*>(update_address + 6),
+            &existing_destination,
+            sizeof(existing_destination));
+        g_update_original = nullptr;
+        return false;
+    }
+
+    g_hook_installed.store(true, std::memory_order_release);
+    return true;
 }
 
 bool install_application_update_hook()
@@ -206,6 +313,20 @@ bool install_application_update_hook()
 
     if (!update_address)
         return false;
+
+    /*
+     * etaHEN 2.4B already hooks the same method with its FF25 absolute jump.
+     * Chain safely when that hook is present. Standalone ELF mode, where no
+     * hook is present yet, falls back to the ordinary source DetourFunction.
+     */
+    std::uint64_t existing_destination = 0;
+    if (decode_existing_absolute_jump(
+            update_address,
+            &existing_destination)) {
+        return chain_over_existing_hook(
+            update_address,
+            existing_destination);
+    }
 
     void* trampoline =
         DetourFunction(
