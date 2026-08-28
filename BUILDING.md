@@ -20,6 +20,7 @@ When the cross-build target succeeds, the workflow uploads:
 ```text
 Common_FPS_PS5_v1.1.0.elf
 Common_FPS_PS5_etaHEN_v1.1.0.plugin
+Common_FPS_ShellUI_v1.1.0.elf
 ```
 
 as workflow artifacts.
@@ -57,3 +58,5 @@ DEPENDENCIES.lock.json
 A successful compiler run is not enough to declare a stable PS5 release.
 
 The produced binaries must also pass `docs/HARDWARE_TEST_PLAN_FW960.md`.
+
+For the current Safe Autoload Stage A hardware procedure, see `docs/AUTOLOAD_STAGE_A_HW_PROBE.md`.
