@@ -31,9 +31,10 @@ Therefore the expected Stage A hardware result is:
 
 Do not publish Stage A as v1.1.0 stable.
 
-## Files
+## Single-file deployment
 
-The source build still produces:
+The source build still emits all three artifacts for transparency and
+diagnostics:
 
 ```text
 Common_FPS_PS5_v1.1.0.elf
@@ -41,38 +42,44 @@ Common_FPS_PS5_etaHEN_v1.1.0.plugin
 Common_FPS_ShellUI_v1.1.0.elf
 ```
 
-The controller currently loads the companion from the first existing path:
+However, the ShellUI companion is embedded into the controller at build time.
+The separate `Common_FPS_ShellUI_v1.1.0.elf` is **not** an end-user install
+requirement.
 
-```text
-/data/CommonFPS/Common_FPS_ShellUI_v1.1.0.elf
-/data/etaHEN/plugins/Common_FPS_ShellUI_v1.1.0.elf
-```
-
-Recommended test placement:
+For etaHEN users, install only:
 
 ```text
 /data/etaHEN/plugins/Common_FPS_PS5_etaHEN_v1.1.0.plugin
-/data/CommonFPS/Common_FPS_ShellUI_v1.1.0.elf
 ```
 
-Create `/data/CommonFPS/` if it does not exist.
+For standalone / YouTube Jailbreak autoload users, use only:
+
+```text
+Common_FPS_PS5_v1.1.0.elf
+```
+
+in the same ELF/autoload location they normally use.
+
+No `/data/CommonFPS/` directory is required for the renderer. If that directory
+is absent, the plugin simply uses its compiled default configuration.
 
 ## Test sequence
 
-1. Keep the known-good public v1.0.0 files backed up.
-2. Copy the Stage A `.plugin` and companion ELF to the paths above.
-3. Enable Common FPS in etaHEN Autoload.
-4. Reboot the console.
-5. Start etaHEN.
-6. Do not manually Stop/Run Common FPS.
-7. Launch one known-good PS4 or PS5 test game soon after etaHEN has loaded.
-8. Observe only:
+1. Keep the known-good public v1.0.0 file backed up.
+2. For etaHEN, replace only the Common FPS `.plugin` in `/data/etaHEN/plugins/`.
+3. Do **not** copy the standalone ShellUI ELF anywhere on the console.
+4. Enable Common FPS in etaHEN Autoload.
+5. Reboot the console.
+6. Start etaHEN.
+7. Do not manually Stop/Run Common FPS.
+8. Launch one known-good PS4 or PS5 test game soon after etaHEN has loaded.
+9. Observe only:
    - whether the game starts normally;
    - whether there is a system/application error;
    - whether there is a Kernel Panic;
    - whether etaHEN remains usable after closing the game.
-9. Close the first game and launch a second game.
-10. Again record stability only.
+10. Close the first game and launch a second game.
+11. Again record stability only.
 
 ## Expected Stage A result
 
@@ -81,7 +88,7 @@ autoload enabled
 -> etaHEN starts
 -> Common FPS parent returns immediately
 -> worker waits for stable SceShellUI + Mono
--> source renderer companion is injected
+-> embedded source renderer companion is injected
 -> ReceiverReady heartbeat confirmed
 -> controller waits for VisualReady
 -> game lifecycle remains untouched
@@ -94,6 +101,7 @@ turn `VisualReady` on only after the actual overlay scene is usable.
 
 ## Safety decisions preserved
 
+- single-file deployment for the end user;
 - no `elfldr_exec()` against SceShellUI;
 - no `SIGKILL` fallback;
 - one `pt_attach -> elfldr_debug -> pt_detach(pid, 0)` loader session;
