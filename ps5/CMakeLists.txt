@@ -44,15 +44,18 @@ target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/core/wire.cpp"
 
     "${ROOT}/src/ps5/ps5_platform.cpp"
+    "${ROOT}/src/ps5/ps5_autoload_backend.cpp"
     "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp"
 
     # GPL etaHEN source dependency for process/module enumeration.
     "${ETAHEN_FPS}/src/proc.cpp"
 
-    # GPL shsrv ptrace implementation:
-    # pt_attach(), pt_detach(), pt_copyout().
+    # GPL shsrv ptrace + source ELF loader implementation.
+    # We call elfldr_debug() under our own attach/detach policy so a failed
+    # Common FPS renderer install never SIGKILLs SceShellUI.
     "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
+    "${COMMON_FPS_SHSRV_SOURCE}/elfldr.c"
 )
 
 target_include_directories(common_fps_controller PRIVATE
@@ -74,6 +77,12 @@ target_compile_options(common_fps_controller PRIVATE
     -O2
     -Wall
     -Wextra
+    -ffunction-sections
+    -fdata-sections
+)
+
+target_link_options(common_fps_controller PRIVATE
+    -Wl,--gc-sections
 )
 
 target_link_libraries(common_fps_controller PRIVATE
