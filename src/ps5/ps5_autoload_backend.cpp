@@ -8,6 +8,7 @@
 #include "ps5_autoload_backend.hpp"
 
 #include "common_fps/renderer_health.hpp"
+#include "embedded_shellui.hpp"
 #include "ps5_platform.hpp"
 
 #include <cerrno>
@@ -15,12 +16,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <fstream>
-#include <iterator>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <vector>
 
 extern "C" {
 #include "elfldr.h"
@@ -40,14 +38,10 @@ constexpr std::uint64_t kHeartbeatFreshUs = 2'500'000ULL;
  */
 constexpr std::uint64_t kSamePidInjectionCooldownUs = 10'000'000ULL;
 
-constexpr const char* kRendererPaths[] = {
-    "/data/CommonFPS/Common_FPS_ShellUI_v1.1.0.elf",
-    "/data/etaHEN/plugins/Common_FPS_ShellUI_v1.1.0.elf",
-};
-
-bool looks_like_elf(const std::vector<unsigned char>& data) {
+bool looks_like_elf(const unsigned char* data, std::size_t size) {
     return
-        data.size() >= 4 &&
+        data != nullptr &&
+        size >= 4 &&
         data[0] == 0x7f &&
         data[1] == 'E' &&
         data[2] == 'L' &&
@@ -246,36 +240,30 @@ bool Ps5AutoloadBackend::read_renderer_elf(
     *data = nullptr;
     *size = 0;
 
-    for (const char* path : kRendererPaths) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file)
-            continue;
+    const unsigned char* embedded_elf =
+        common_fps::ps5::embedded::kShellUIElf;
+    const std::size_t embedded_size =
+        common_fps::ps5::embedded::kShellUIElfSize;
 
-        std::vector<unsigned char> bytes(
-            (std::istreambuf_iterator<char>(file)),
-            std::istreambuf_iterator<char>());
-
-        /*
-         * Reject an empty/corrupt/implausibly large file before ptrace.
-         * The current companion is well below this ceiling.
-         */
-        if (!looks_like_elf(bytes) ||
-            bytes.size() > 8U * 1024U * 1024U) {
-            continue;
-        }
-
-        auto* copy = static_cast<unsigned char*>(
-            std::malloc(bytes.size()));
-        if (!copy)
-            return false;
-
-        std::memcpy(copy, bytes.data(), bytes.size());
-        *data = copy;
-        *size = bytes.size();
-        return true;
+    /*
+     * The companion is source-built first, converted to a generated C++ byte
+     * array, and linked directly into this controller. Therefore deployment is
+     * a single-file operation for both etaHEN .plugin and standalone .elf
+     * users; /data/CommonFPS is not required just to carry the renderer.
+     */
+    if (!looks_like_elf(embedded_elf, embedded_size) ||
+        embedded_size > 8U * 1024U * 1024U) {
+        return false;
     }
 
-    return false;
+    auto* copy = static_cast<unsigned char*>(std::malloc(embedded_size));
+    if (!copy)
+        return false;
+
+    std::memcpy(copy, embedded_elf, embedded_size);
+    *data = copy;
+    *size = embedded_size;
+    return true;
 }
 
 bool Ps5AutoloadBackend::install_renderer_once() {
