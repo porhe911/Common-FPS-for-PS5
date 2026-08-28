@@ -69,6 +69,30 @@ checks = [
      "src/ps5/shellui_payload/commonfps_shellui_entry.cpp",
      "RendererHealthPhase::ReceiverReady"),
 
+    ("renderer visual heartbeat",
+     "src/ps5/shellui_payload/commonfps_shellui_entry.cpp",
+     "RendererHealthPhase::VisualReady"),
+
+    ("minimal Mono root-domain bootstrap",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "mono_get_root_domain"),
+
+    ("source-built PUI assembly lookup",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     'Sce.PlayStation.PUI.dll'),
+
+    ("Game container scene lookup",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "FindContainerSceneByPath"),
+
+    ("ShellUI main-thread update hook",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "application_update_hook"),
+
+    ("PUI mutation only from update callback",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "apply_latest_state();"),
+
     ("scene self-heal",
      "src/core/scene_guard.cpp",
      "widgets_alive()"),
@@ -100,7 +124,12 @@ for forbidden in (
     )
     failed |= not ok
 
+cmake_text = (root / "ps5/CMakeLists.txt").read_text(encoding="utf-8")
+ok = "${ETAHEN_SHELLUI}/src/prx.cpp" not in cmake_text
+print(f"{'PASS' if ok else 'FAIL'}  full etaHEN prx.cpp not linked")
+failed |= not ok
+
 if failed:
     sys.exit(1)
 
-print("v1.0.0 + safe-autoload source gate: PASS")
+print("v1.0.0 + safe-autoload Stage B source gate: PASS")
