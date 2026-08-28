@@ -73,6 +73,14 @@ checks = [
      "src/ps5/shellui_payload/commonfps_shellui_entry.cpp",
      "RendererHealthPhase::VisualReady"),
 
+    ("persistent injection sentinel",
+     "src/ps5/shellui_payload/commonfps_shellui_entry.cpp",
+     "kRendererSentinelPort"),
+
+    ("controller refuses duplicate injection",
+     "src/ps5/ps5_autoload_backend.cpp",
+     "renderer_sentinel_present()"),
+
     ("minimal Mono root-domain bootstrap",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
      "mono_get_root_domain"),
@@ -88,6 +96,10 @@ checks = [
     ("ShellUI main-thread update hook",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
      "application_update_hook"),
+
+    ("etaHEN hook chaining",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "chain_over_existing_hook"),
 
     ("PUI mutation only from update callback",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
@@ -132,4 +144,4 @@ failed |= not ok
 if failed:
     sys.exit(1)
 
-print("v1.0.0 + safe-autoload Stage B source gate: PASS")
+print("v1.0.0 + safe-autoload Stage B2 source gate: PASS")
