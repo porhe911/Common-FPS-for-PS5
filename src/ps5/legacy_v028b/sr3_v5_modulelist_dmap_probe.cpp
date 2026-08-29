@@ -1,12 +1,13 @@
 /*
- * Common FPS v0.28b stable-source rebuild - SR3 v5 module-list + DMAP probe
+ * Common FPS v0.28b stable-source rebuild - SR4 v5 module-list + DMAP probe
  * Copyright (C) 2026 porhe911
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * SR3 keeps the hardware-stable SR2 lifecycle/auth window but replaces
- * kernel_dynlib_handle() with the exact module-list syscalls proven by the
- * FW 9.60 v5 debugger-auth probe: SYS_dl_get_list + SYS_dl_get_info_2.
- * Auth is restored before every DMAP table/root/counter read.
+ * SR4 keeps the hardware-stable SR2/SR3 lifecycle/auth window and fixes the
+ * FW 9.60 module-list size-query contract proven by v5: SYS_dl_get_list with
+ * a null/zero-capacity buffer returns rc=12 while still returning a valid
+ * module count. rc=12 + count>0 is therefore accepted and followed by the
+ * normal fill call. Auth is restored before every DMAP read.
  */
 
 #include "process_sysctl.hpp"
@@ -29,7 +30,7 @@ extern "C" {
 
 namespace {
 
-constexpr const char* kLogPath = "/data/CommonFPS_SR3_v5_modulelist_dmap.log";
+constexpr const char* kLogPath = "/data/CommonFPS_SR4_v5_modulelist_dmap.log";
 constexpr int kRuntimeSeconds = 300;
 constexpr int kDiscoveryDelaySeconds = 4;
 constexpr int kDiscoveryRetrySeconds = 5;
@@ -41,6 +42,7 @@ constexpr std::uintptr_t kAuthIdOffset = 0x58ULL;
 
 constexpr long kSysDlGetList = 0x217;
 constexpr long kSysDlGetInfo2 = 0x2cd;
+constexpr long kExpectedSizeQueryRc = 12;
 constexpr char kVideoOutModule[] = "libSceVideoOut.sprx";
 constexpr std::uintptr_t kProbeTableOffset = 0x34980ULL;
 constexpr std::size_t kProbeTableSize = 0xA8ULL;
@@ -96,7 +98,7 @@ void log_pid(const char* prefix, pid_t pid) noexcept {
 void log_auth(const char* tag, std::uint64_t value) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
-    std::fprintf(f, "SR3 %s auth=0x%016llx\n", tag,
+    std::fprintf(f, "SR4 %s auth=0x%016llx\n", tag,
                  static_cast<unsigned long long>(value));
     std::fclose(f);
 }
@@ -104,7 +106,7 @@ void log_auth(const char* tag, std::uint64_t value) noexcept {
 void log_list(const char* stage, long rc, std::size_t count) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
-    std::fprintf(f, "SR3 MODULE %s rc=%ld count=%zu\n", stage, rc, count);
+    std::fprintf(f, "SR4 MODULE %s rc=%ld count=%zu\n", stage, rc, count);
     std::fclose(f);
 }
 
@@ -112,7 +114,7 @@ void log_module(std::size_t index, const ModuleInfoCompat& info) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
     std::fprintf(f,
-                 "SR3 MODULE FOUND index=%zu name=%s handle=0x%llx base=0x%llx sdk=0x%llx\n",
+                 "SR4 MODULE FOUND index=%zu name=%s handle=0x%llx base=0x%llx sdk=0x%llx\n",
                  index,
                  info.filename,
                  static_cast<unsigned long long>(info.handle),
@@ -124,7 +126,7 @@ void log_module(std::size_t index, const ModuleInfoCompat& info) noexcept {
 void log_counter(pid_t pid, std::uintptr_t address) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
-    std::fprintf(f, "SR3 COUNTER READY pid=%d address=0x%llx\n",
+    std::fprintf(f, "SR4 COUNTER READY pid=%d address=0x%llx\n",
                  static_cast<int>(pid),
                  static_cast<unsigned long long>(address));
     std::fclose(f);
@@ -133,7 +135,7 @@ void log_counter(pid_t pid, std::uintptr_t address) noexcept {
 void log_table_entry(std::size_t index, std::uint32_t enabled, std::uint64_t pointer) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
-    std::fprintf(f, "SR3 TABLE active index=%zu enabled=%u pointer=0x%llx\n",
+    std::fprintf(f, "SR4 TABLE active index=%zu enabled=%u pointer=0x%llx\n",
                  index, enabled, static_cast<unsigned long long>(pointer));
     std::fclose(f);
 }
@@ -141,7 +143,7 @@ void log_table_entry(std::size_t index, std::uint32_t enabled, std::uint64_t poi
 void log_fps(pid_t pid, std::uint32_t tenths) noexcept {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f) return;
-    std::fprintf(f, "SR3 FPS pid=%d value=%u.%u\n",
+    std::fprintf(f, "SR4 FPS pid=%d value=%u.%u\n",
                  static_cast<int>(pid), tenths / 10U, tenths % 10U);
     std::fclose(f);
 }
@@ -154,34 +156,41 @@ std::int64_t elapsed_us(const timeval& before, const timeval& after) noexcept {
 std::optional<std::uintptr_t> find_videoout_base_v5(pid_t game_pid) noexcept {
     const std::uintptr_t self_ucred = kernel_get_proc_ucred(getpid());
     if (self_ucred == 0) {
-        log_line("SR3 AUTH failed: kernel_get_proc_ucred(self)=0");
+        log_line("SR4 AUTH failed: kernel_get_proc_ucred(self)=0");
         return std::nullopt;
     }
 
     std::uint64_t saved_auth = 0;
     if (kernel_copyout(self_ucred + kAuthIdOffset, &saved_auth, sizeof(saved_auth)) != 0) {
-        log_line("SR3 AUTH failed: read current Auth ID");
+        log_line("SR4 AUTH failed: read current Auth ID");
         return std::nullopt;
     }
     log_auth("AUTH saved", saved_auth);
 
     const std::uint64_t debug_auth = kDebuggerAuthId;
     if (kernel_copyin(&debug_auth, self_ucred + kAuthIdOffset, sizeof(debug_auth)) != 0) {
-        log_line("SR3 AUTH failed: set debugger Auth ID");
+        log_line("SR4 AUTH failed: set debugger Auth ID");
         return std::nullopt;
     }
-    log_line("SR3 AUTH debugger active for v5 module-list discovery only");
+    log_line("SR4 AUTH debugger active for v5 module-list discovery only");
 
     std::optional<std::uintptr_t> result;
     std::size_t count = 0;
     const long rc_size = syscall(kSysDlGetList, game_pid, nullptr, 0, &count);
     log_list("list-size", rc_size, count);
 
-    if (rc_size == 0 && count > 0 && count < 1024) {
+    const bool size_query_ok =
+        (rc_size == 0 || rc_size == kExpectedSizeQueryRc) &&
+        count > 0 && count < 1024;
+
+    if (size_query_ok) {
+        if (rc_size == kExpectedSizeQueryRc)
+            log_line("SR4 MODULE size-query rc=12 accepted as FW960 expected result");
+
         auto* handles = static_cast<std::uintptr_t*>(
             std::calloc(count, sizeof(std::uintptr_t)));
         if (!handles) {
-            log_line("SR3 MODULE calloc handles failed");
+            log_line("SR4 MODULE calloc handles failed");
         } else {
             std::size_t returned = count;
             const long rc_fill = syscall(kSysDlGetList, game_pid, handles, count, &returned);
@@ -206,16 +215,18 @@ std::optional<std::uintptr_t> find_videoout_base_v5(pid_t game_pid) noexcept {
             }
             std::free(handles);
         }
+    } else {
+        log_line("SR4 MODULE size-query rejected: unexpected rc/count");
     }
 
     if (kernel_copyin(&saved_auth, self_ucred + kAuthIdOffset, sizeof(saved_auth)) != 0) {
-        log_line("SR3 AUTH RESTORE FAILED");
+        log_line("SR4 AUTH RESTORE FAILED");
         return std::nullopt;
     }
-    log_line("SR3 AUTH restored before DMAP reads");
+    log_line("SR4 AUTH restored before DMAP reads");
 
     if (!result)
-        log_line("SR3 MODULE libSceVideoOut.sprx not found");
+        log_line("SR4 MODULE libSceVideoOut.sprx not found");
     return result;
 }
 
@@ -227,10 +238,10 @@ std::optional<std::uintptr_t> resolve_counter_from_base(
     std::array<std::uint8_t, kProbeTableSize> table{};
     const std::uintptr_t table_address = module_base + kProbeTableOffset;
     if (!proc_read(game_pid, table_address, table.data(), table.size())) {
-        log_line("SR3 DMAP table read FAILED");
+        log_line("SR4 DMAP table read FAILED");
         return std::nullopt;
     }
-    log_line("SR3 DMAP table read OK");
+    log_line("SR4 DMAP table read OK");
 
     for (std::size_t i = 0; i < kProbeEntryCount; ++i) {
         const auto* entry = table.data() + i * kProbeEntrySize;
@@ -245,34 +256,34 @@ std::optional<std::uintptr_t> resolve_counter_from_base(
 
         std::uint64_t root = 0;
         if (!proc_read(game_pid, static_cast<std::uintptr_t>(pointer), &root, sizeof(root))) {
-            log_line("SR3 DMAP root read FAILED");
+            log_line("SR4 DMAP root read FAILED");
             continue;
         }
         if (root == 0) {
-            log_line("SR3 DMAP root is zero");
+            log_line("SR4 DMAP root is zero");
             continue;
         }
 
         FILE* f = std::fopen(kLogPath, "a");
         if (f) {
-            std::fprintf(f, "SR3 DMAP root=0x%llx\n",
+            std::fprintf(f, "SR4 DMAP root=0x%llx\n",
                          static_cast<unsigned long long>(root));
             std::fclose(f);
         }
         return static_cast<std::uintptr_t>(root) + kCounterOffset;
     }
 
-    log_line("SR3 TABLE no usable active entry");
+    log_line("SR4 TABLE no usable active entry");
     return std::nullopt;
 }
 
 int run_probe() noexcept {
     using namespace common_fps::legacy_v028b;
 
-    log_pid("SR3 CHILD pid=", getpid());
-    log_line("SR3 START v5 module-list + recovered DMAP FPS probe");
-    log_line("SR3 NO ptrace / NO MDBG / NO renderer / NO ShellUI inject");
-    log_line("SR3 short debugger Auth only for SYS_dl_get_list/SYS_dl_get_info_2");
+    log_pid("SR4 CHILD pid=", getpid());
+    log_line("SR4 START v5 module-list rc12-fix + recovered DMAP FPS probe");
+    log_line("SR4 NO ptrace / NO MDBG / NO renderer / NO ShellUI inject");
+    log_line("SR4 short debugger Auth only for SYS_dl_get_list/SYS_dl_get_info_2");
 
     pid_t active_pid = -1;
     std::uintptr_t counter_address = 0;
@@ -292,7 +303,7 @@ int run_probe() noexcept {
             have_baseline = false;
             seconds_on_pid = 0;
             retry_countdown = 0;
-            log_pid("SR3 CHANGE eboot.bin pid=", active_pid);
+            log_pid("SR4 CHANGE eboot.bin pid=", active_pid);
         }
 
         if (active_pid <= 0) {
@@ -312,10 +323,10 @@ int run_probe() noexcept {
                 continue;
             }
 
-            log_line("SR3 DISCOVERY TRY exact v5 module-list path");
+            log_line("SR4 DISCOVERY TRY v5 module-list with FW960 rc=12 size-query fix");
             const auto module_base = find_videoout_base_v5(active_pid);
             if (!module_base) {
-                log_line("SR3 DISCOVERY module stage failed; retry in 5s");
+                log_line("SR4 DISCOVERY module stage failed; retry in 5s");
                 retry_countdown = kDiscoveryRetrySeconds;
                 sleep(1);
                 continue;
@@ -323,7 +334,7 @@ int run_probe() noexcept {
 
             const auto resolved = resolve_counter_from_base(active_pid, *module_base);
             if (!resolved) {
-                log_line("SR3 DISCOVERY DMAP counter stage failed; retry in 5s");
+                log_line("SR4 DISCOVERY DMAP counter stage failed; retry in 5s");
                 retry_countdown = kDiscoveryRetrySeconds;
                 sleep(1);
                 continue;
@@ -334,7 +345,7 @@ int run_probe() noexcept {
 
         std::uint32_t current_counter = 0;
         if (!proc_read(active_pid, counter_address, &current_counter, sizeof(current_counter))) {
-            log_line("SR3 COUNTER DMAP read failed; drop counter and rediscover later");
+            log_line("SR4 COUNTER DMAP read failed; drop counter and rediscover later");
             counter_address = 0;
             have_baseline = false;
             retry_countdown = kDiscoveryRetrySeconds;
@@ -348,7 +359,7 @@ int run_probe() noexcept {
             previous_counter = current_counter;
             previous_time = now;
             have_baseline = true;
-            log_line("SR3 BASELINE captured");
+            log_line("SR4 BASELINE captured");
             sleep(1);
             continue;
         }
@@ -364,7 +375,7 @@ int run_probe() noexcept {
             if (tenths <= kMaxTenthsFps)
                 log_fps(active_pid, tenths);
             else
-                log_line("SR3 FPS sanity reject >300.0");
+                log_line("SR4 FPS sanity reject >300.0");
         }
 
         previous_counter = current_counter;
@@ -372,23 +383,23 @@ int run_probe() noexcept {
         sleep(1);
     }
 
-    log_line("SR3 DONE clean return after 300s");
+    log_line("SR4 DONE clean return after 300s");
     return 0;
 }
 
 } // namespace
 
 extern "C" int main() {
-    log_pid("SR3 PARENT start pid=", getpid());
+    log_pid("SR4 PARENT start pid=", getpid());
 
     const pid_t child = fork();
     if (child > 0) {
-        log_pid("SR3 PARENT forked child=", child);
-        log_line("SR3 PARENT RETURN 0");
+        log_pid("SR4 PARENT forked child=", child);
+        log_line("SR4 PARENT RETURN 0");
         return 0;
     }
     if (child < 0)
-        log_line("SR3 fork failed; run in current process");
+        log_line("SR4 fork failed; run in current process");
 
     return run_probe();
 }
