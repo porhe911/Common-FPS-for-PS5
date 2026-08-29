@@ -37,6 +37,14 @@ checks = [
      "src/reconstruction/v1_stable_sampler.cpp",
      '"libSceVideoOut.sprx"'),
 
+    ("stable sysctl game discovery",
+     "src/ps5/v1_stable_ps5_platform.cpp",
+     "KERN_PROC_PROC"),
+
+    ("stable eboot process name",
+     "src/ps5/v1_stable_ps5_platform.cpp",
+     'find_process_sysctl("eboot.bin")'),
+
     ("stable DMAP read model",
      "src/reconstruction/v1_stable_memory.cpp",
      "proc_read_dmap"),
@@ -129,6 +137,17 @@ reconstruction_text = "\n".join(
 for forbidden in ("pt_attach(", "pt_copyout(", "pt_detach("):
     ok = forbidden not in reconstruction_text
     print(f"{'PASS' if ok else 'FAIL'}  no parity per-read ptrace: {forbidden}")
+    failed |= not ok
+
+# Hardware v2 probe proved that the clean rewrite's etaHEN allproc helper was
+# not equivalent to the stable line's process discovery. Keep the reconstructed
+# platform on sysctl/find_pid for game lookup/liveness.
+platform = (root / "src" / "ps5" / "v1_stable_ps5_platform.cpp").read_text(
+    encoding="utf-8"
+)
+for forbidden in ("base_.find_game_process()", "base_.process_alive("):
+    ok = forbidden not in platform
+    print(f"{'PASS' if ok else 'FAIL'}  no clean-rewrite process helper: {forbidden}")
     failed |= not ok
 
 if failed:
