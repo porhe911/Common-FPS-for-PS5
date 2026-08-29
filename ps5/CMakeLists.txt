@@ -192,7 +192,11 @@ add_executable(common_fps_v1_parity_probe
     "${ROOT}/src/ps5/ps5_platform.cpp"
     "${ROOT}/src/ps5/v1_parity_probe_main.cpp"
 
+    # Match etaHEN fps_elf's cross-process access setup: enumerate kernel proc
+    # state and temporarily switch this probe to DEBUG_AUTHID before dynlib
+    # queries against the game process.
     "${ETAHEN_FPS}/src/proc.cpp"
+    "${ETAHEN_FPS}/src/ucred.cpp"
     "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
 )
 
