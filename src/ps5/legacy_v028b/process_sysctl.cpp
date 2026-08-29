@@ -34,15 +34,18 @@ bool record_name_equals(
 
 } // namespace
 
-pid_t find_game_pid_sysctl() noexcept {
+pid_t find_process_pid_sysctl(const char* name) noexcept {
+    if (!name || !*name)
+        return -1;
+
     int mib[4] = {1, 14, 8, 0};
 
     std::size_t required = 0;
     if (sysctl(mib, 4, nullptr, &required, nullptr, 0) != 0 || required == 0)
         return -1;
 
-    // Exact v0.28b behavior: allocate the size returned by the first sysctl,
-    // then reuse that same size variable for the fill call.
+    // Exact v0.28b allocation behavior: use the size returned by the first
+    // KERN_PROC call without a persistent polling buffer.
     auto* buffer = static_cast<std::uint8_t*>(std::malloc(required));
     if (!buffer)
         return -1;
@@ -74,7 +77,7 @@ pid_t find_game_pid_sysctl() noexcept {
             break;
 
         if (record_size >= kPidOffset + sizeof(pid_t) &&
-            record_name_equals(ptr, record_size, kGameName)) {
+            record_name_equals(ptr, record_size, name)) {
             pid_t pid = -1;
             std::memcpy(&pid, ptr + kPidOffset, sizeof(pid));
             if (pid > 0 && pid != self)
@@ -86,6 +89,10 @@ pid_t find_game_pid_sysctl() noexcept {
 
     std::free(buffer);
     return result;
+}
+
+pid_t find_game_pid_sysctl() noexcept {
+    return find_process_pid_sysctl(kGameName);
 }
 
 } // namespace common_fps::legacy_v028b
