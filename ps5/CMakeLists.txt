@@ -10,13 +10,13 @@ endif()
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
-# RC5 intentionally builds a one-file no-op controller. No etaHEN source,
-# shsrv, renderer, process helpers, auth helpers, FPS backend, or networking
-# code is linked into this diagnostic binary.
+# RC6 intentionally builds a one-file fork-only resident worker probe.
+# No etaHEN source, shsrv, renderer, process helpers, auth helpers, FPS backend,
+# networking, or sysctl code is linked into this diagnostic binary.
 add_executable(common_fps_controller
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp")
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC5_NoOp.elf")
+    OUTPUT_NAME "Common_FPS_RC6_Fork_Only.elf")
 
 target_compile_options(common_fps_controller PRIVATE
     --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
@@ -28,8 +28,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC5_NoOp.elf"
+            "${ROOT}/dist/Common_FPS_RC6_Fork_Only.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC5_NoOp.elf"
-            "${ROOT}/dist/Common_FPS_RC5_NoOp_etaHEN.plugin"
-            --title-id CFPS00905 --version 9.05)
+            "${ROOT}/dist/Common_FPS_RC6_Fork_Only.elf"
+            "${ROOT}/dist/Common_FPS_RC6_Fork_Only_etaHEN.plugin"
+            --title-id CFPS00906 --version 9.06)
