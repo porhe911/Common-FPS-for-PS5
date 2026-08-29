@@ -36,7 +36,7 @@ void stage_log_pid(const char* prefix, int pid) {
  * This deliberately does NOT use etaHEN fps_elf/find_proc_by_name(),
  * KERNEL_ADDRESS_ALLPROC, kernel_copyout, ptrace, authid changes, or any
  * ShellUI injection. The raw offsets below are the same kinfo_proc fields
- * already used by etaHEN's own sysctl fallback: pid @ 72, tdname @ 447.
+ * used by the sysctl process-list layout: pid @ 72, name @ 447.
  */
 int safe_find_pid(const char* wanted) {
     int mib[4] = {1, 14, 8, 0};
@@ -93,9 +93,9 @@ int run_worker() {
 
     int last_shellui = -2;
     int last_game = -2;
-    unsigned heartbeat = 0;
 
-    for (;;) {
+    /* 240 * 500 ms = about 120 seconds, then exit cleanly. */
+    for (unsigned iteration = 0; iteration < 240U; ++iteration) {
         const int shellui = safe_find_pid("SceShellUI");
         const int game = safe_find_pid("eboot.bin");
 
@@ -108,11 +108,14 @@ int run_worker() {
             last_game = game;
         }
 
-        if ((heartbeat++ % 10U) == 0U)
+        if ((iteration % 10U) == 0U)
             stage_log("RC4 ALIVE");
 
         usleep(500000);
     }
+
+    stage_log("RC4 DONE worker exited cleanly");
+    return 0;
 }
 
 } // namespace
