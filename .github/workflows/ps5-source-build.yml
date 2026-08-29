@@ -34,16 +34,16 @@ jobs:
           cmake --build build-host -j2
           ctest --test-dir build-host --output-on-failure
 
-      - name: Build RC6 fork-only PS5 ELF and etaHEN plugin
+      - name: Build RC7 one-shot sysctl PS5 ELF and etaHEN plugin
         run: bash ./scripts/ps5_source_build.sh
 
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-RC6-Fork-Only
+          name: Common-FPS-RC7-Sysctl-Once
           path: |
-            dist/Common_FPS_RC6_Fork_Only.elf
-            dist/Common_FPS_RC6_Fork_Only_etaHEN.plugin
+            dist/Common_FPS_RC7_Sysctl_Once.elf
+            dist/Common_FPS_RC7_Sysctl_Once_etaHEN.plugin
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
