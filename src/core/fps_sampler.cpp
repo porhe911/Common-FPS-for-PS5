@@ -19,6 +19,15 @@ FpsSampler::FpsSampler(Platform& platform)
 bool FpsSampler::attach(ProcessId pid) {
     reset();
 
+    if (!platform_.begin_process_inspection(pid))
+        return false;
+
+    struct InspectionGuard {
+        Platform& platform;
+        ProcessId pid;
+        ~InspectionGuard() { platform.end_process_inspection(pid); }
+    } inspection_guard{platform_, pid};
+
     const auto module = platform_.find_module(pid, "libSceVideoOut.sprx");
     if (!module || module->base == 0)
         return false;
@@ -38,7 +47,7 @@ void FpsSampler::reset() {
     pid_ = -1;
     module_base_ = 0;
     counter_address_ = 0;
-    have_baseline_ = false;
+    warmup_stage_ = 0;
     previous_counter_ = 0;
     previous_time_us_ = 0;
 }
@@ -124,8 +133,16 @@ std::optional<int> FpsSampler::sample() {
 
     const std::uint64_t now_us = platform_.monotonic_us();
 
-    if (!have_baseline_) {
-        have_baseline_ = true;
+    /*
+     * FW 9.60 v11 hardware result:
+     *   sample 1 = baseline
+     *   sample 2 = discard first delta after attach
+     *   sample 3+ = normal FPS
+     *
+     * This removes the attach transient without imposing a 60 Hz ceiling.
+     */
+    if (warmup_stage_ < 2) {
+        ++warmup_stage_;
         previous_counter_ = current_counter;
         previous_time_us_ = now_us;
         return std::nullopt;
@@ -136,19 +153,8 @@ std::optional<int> FpsSampler::sample() {
         return std::nullopt;
 
     const std::uint32_t delta =
-        static_cast<std::uint32_t>(
-            current_counter - previous_counter_);
+        static_cast<std::uint32_t>(current_counter - previous_counter_);
 
-    /*
-     * Reconstruct stable v1.0.0 intermediate value in tenths:
-     *
-     *     tenths = delta * 10,000,000 / elapsed_us
-     *
-     * Example:
-     *     596 -> 59.6 FPS internally.
-     *
-     * But Common FPS intentionally exposes ONLY integer FPS.
-     */
     const std::uint64_t scaled =
         static_cast<std::uint64_t>(delta) * 10'000'000ULL;
 
@@ -161,16 +167,8 @@ std::optional<int> FpsSampler::sample() {
     if (tenths > kMaxTenthsFps)
         return std::nullopt;
 
-    /*
-     * Round to nearest integer without floating point:
-     *
-     * 59.4 -> 59
-     * 59.5 -> 60
-     * 59.6 -> 60
-     */
-    const int integer_fps =
-        static_cast<int>((tenths + 5U) / 10U);
-
+    /* 59.4 -> 59, 59.5 -> 60, 59.6 -> 60. */
+    const int integer_fps = static_cast<int>((tenths + 5U) / 10U);
     return integer_fps;
 }
 
