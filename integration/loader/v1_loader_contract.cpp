@@ -20,18 +20,19 @@ bool install_renderer_v1_compatible(
     if (!b.begin_loader_session())
         return false;
 
+    const auto image = b.load_renderer_image(elf, size);
+    if (!image || image->entry == 0) {
+        b.end_loader_session();
+        return false;
+    }
+
     const auto args = b.prepare_payload_args();
     if (!args) {
         b.end_loader_session();
         return false;
     }
 
-    if (!b.load_renderer(elf, size, args)) {
-        b.end_loader_session();
-        return false;
-    }
-
-    if (!b.continue_target()) {
+    if (!b.prepare_exec(image->entry, args)) {
         b.end_loader_session();
         return false;
     }
