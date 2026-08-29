@@ -1,5 +1,5 @@
 /*
- * Common FPS for PS5 - RC9 sparse lifecycle + v11 FPS backend probe
+ * Common FPS for PS5 - RC10 snapshot-gated v11 FPS backend probe
  * Copyright (C) 2026 porhe911
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -18,9 +18,11 @@
 
 namespace {
 
-constexpr const char* kLogPath = "/data/CommonFPS_RC9_fps_backend.log";
-constexpr int kRuntimeSeconds = 120;
+constexpr const char* kLogPath = "/data/CommonFPS_RC10_snapshot_gated.log";
+constexpr int kRuntimeSeconds = 180;
 constexpr int kSnapshotPeriodSeconds = 5;
+constexpr int kSnapshotCount = kRuntimeSeconds / kSnapshotPeriodSeconds;
+constexpr int kStableSnapshotsBeforeAttach = 2;
 
 void log_line(const char* text) {
     FILE* f = std::fopen(kLogPath, "a");
@@ -51,8 +53,7 @@ bool bounded_name_equals(const std::uint8_t* record,
         return false;
 
     const auto* name = record + kNameOffset;
-    return std::memcmp(name, wanted, wanted_len) == 0 &&
-           name[wanted_len] == 0;
+    return std::memcmp(name, wanted, wanted_len) == 0 && name[wanted_len] == 0;
 }
 
 struct SnapshotResult {
@@ -116,13 +117,14 @@ SnapshotResult take_snapshot() {
     return out;
 }
 
-void log_snapshot(int index, const SnapshotResult& s) {
+void log_snapshot(int index, const SnapshotResult& s, int stable_count) {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f)
         return;
     std::fprintf(f,
-                 "RC9 SNAPSHOT %d rc=%d records=%zu filled=%zu shellui=%d game=%d\n",
-                 index, s.rc, s.records, s.filled, s.shellui_pid, s.game_pid);
+                 "RC10 SNAPSHOT %d/%d rc=%d records=%zu filled=%zu shellui=%d game=%d stable=%d\n",
+                 index, kSnapshotCount, s.rc, s.records, s.filled,
+                 s.shellui_pid, s.game_pid, stable_count);
     std::fclose(f);
 }
 
@@ -130,7 +132,7 @@ void log_attach_ok(int pid, std::uintptr_t counter) {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f)
         return;
-    std::fprintf(f, "RC9 ATTACH OK pid=%d counter=0x%llx\n",
+    std::fprintf(f, "RC10 ATTACH OK pid=%d counter=0x%llx\n",
                  pid, static_cast<unsigned long long>(counter));
     std::fclose(f);
 }
@@ -139,78 +141,104 @@ void log_fps(int pid, int fps) {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f)
         return;
-    std::fprintf(f, "RC9 FPS pid=%d value=%d\n", pid, fps);
+    std::fprintf(f, "RC10 FPS pid=%d value=%d\n", pid, fps);
     std::fclose(f);
 }
 
 int run_child() {
-    log_pid("RC9 CHILD pid=", static_cast<int>(getpid()));
-    log_line("RC9 sparse lifecycle + v11 FPS backend; NO renderer / NO ShellUI inject");
-    log_line("RC9 process discovery = one combined sysctl snapshot every 5s");
-    log_line("RC9 temporary debugger auth ONLY during sampler attach/discovery");
+    log_pid("RC10 CHILD pid=", static_cast<int>(getpid()));
+    log_line("RC10 snapshot-gated v11 FPS backend; NO renderer / NO ShellUI inject");
+    log_line("RC10 one combined sysctl snapshot every 5s; ZERO FPS reads between snapshots");
+    log_line("RC10 new game PID must survive TWO consecutive snapshots before attach");
+    log_line("RC10 temporary debugger auth ONLY during sampler attach/discovery");
 
     common_fps::ps5::Ps5Platform platform;
     common_fps::FpsSampler sampler(platform);
 
-    int last_game = -2;
-    int current_game = -1;
-    int snapshot_index = 0;
+    int observed_game = -2;
+    int stable_count = 0;
 
-    for (int second = 0; second < kRuntimeSeconds; ++second) {
-        if ((second % kSnapshotPeriodSeconds) == 0) {
-            const SnapshotResult s = take_snapshot();
-            log_snapshot(++snapshot_index, s);
+    for (int index = 1; index <= kSnapshotCount; ++index) {
+        const SnapshotResult s = take_snapshot();
 
-            if (s.rc == 0) {
-                current_game = s.game_pid;
+        if (s.rc != 0) {
+            log_snapshot(index, s, stable_count);
+            log_line("RC10 SNAPSHOT FAIL; no ptrace/FPS operation this cycle");
+            sleep(kSnapshotPeriodSeconds);
+            continue;
+        }
 
-                if (current_game != last_game) {
-                    log_pid("RC9 CHANGE eboot.bin pid=", current_game);
-                    sampler.reset();
-                    last_game = current_game;
-                }
+        if (s.game_pid != observed_game) {
+            observed_game = s.game_pid;
+            stable_count = 1;
+            sampler.reset();
+            log_pid("RC10 CHANGE eboot.bin pid=", observed_game);
+        } else if (stable_count < 1000) {
+            ++stable_count;
+        }
 
-                if (current_game > 0 && !sampler.attached()) {
-                    log_pid("RC9 ATTACH TRY pid=", current_game);
-                    if (sampler.attach(current_game))
-                        log_attach_ok(current_game, sampler.counter_address());
-                    else
-                        log_line("RC9 ATTACH RETRY later");
-                }
+        log_snapshot(index, s, stable_count);
+
+        if (observed_game <= 0) {
+            // Critical transition rule: once sysctl no longer sees a game,
+            // never touch the previous PID again.
+            sampler.reset();
+            sleep(kSnapshotPeriodSeconds);
+            continue;
+        }
+
+        if (stable_count < kStableSnapshotsBeforeAttach) {
+            log_line("RC10 WAIT PID confirmation; no attach/sample this cycle");
+            sleep(kSnapshotPeriodSeconds);
+            continue;
+        }
+
+        if (!sampler.attached()) {
+            log_pid("RC10 ATTACH TRY confirmed pid=", observed_game);
+            if (sampler.attach(observed_game))
+                log_attach_ok(observed_game, sampler.counter_address());
+            else {
+                log_line("RC10 ATTACH RETRY on next confirmed snapshot");
+                sleep(kSnapshotPeriodSeconds);
+                continue;
             }
         }
 
-        if (sampler.attached()) {
-            const int sample_pid = sampler.pid();
+        // Exactly ONE sample immediately after the sysctl snapshot confirmed
+        // that the same PID still exists. There are no ptrace reads during
+        // the following 5-second sleep window.
+        if (sampler.attached() && sampler.pid() == observed_game) {
             const auto fps = sampler.sample();
             if (fps)
-                log_fps(sample_pid, *fps);
+                log_fps(observed_game, *fps);
             else if (!sampler.attached())
-                log_line("RC9 SAMPLE lost attachment; waiting for next sparse snapshot");
+                log_line("RC10 SAMPLE lost attachment; wait for next snapshot");
+            else
+                log_line("RC10 SAMPLE warmup/no-value");
         }
 
-        sleep(1);
+        sleep(kSnapshotPeriodSeconds);
     }
 
     sampler.reset();
-    log_line("RC9 CHILD DONE clean return");
+    log_line("RC10 CHILD DONE clean return");
     return 0;
 }
 
 } // namespace
 
 extern "C" int main() {
-    log_pid("RC9 PARENT start pid=", static_cast<int>(getpid()));
+    log_pid("RC10 PARENT start pid=", static_cast<int>(getpid()));
 
     const pid_t pid = fork();
     if (pid < 0) {
-        log_line("RC9 fork FAIL");
+        log_line("RC10 fork FAIL");
         return 1;
     }
 
     if (pid > 0) {
-        log_pid("RC9 PARENT forked child=", static_cast<int>(pid));
-        log_line("RC9 PARENT RETURN 0");
+        log_pid("RC10 PARENT forked child=", static_cast<int>(pid));
+        log_line("RC10 PARENT RETURN 0");
         return 0;
     }
 
