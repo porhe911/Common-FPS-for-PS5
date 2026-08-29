@@ -141,39 +141,39 @@ add_custom_command(
 )
 
 # ------------------------------------------------------------------
-# SR3 - hardware-proven SR2 lifecycle/auth timing, but module discovery uses
-# the exact v5 syscalls that exposed 61 modules on FW 9.60:
-# SYS_dl_get_list (0x217) + SYS_dl_get_info_2 (0x2cd).
-# Auth is restored before any DMAP table/root/counter read.
+# SR4 - hardware-proven SR2/SR3 lifecycle/auth timing plus exact v5 module
+# syscalls. FW 9.60 returns rc=12 for the zero-capacity size query while still
+# supplying a valid count; SR4 accepts that expected result, performs the fill,
+# restores Auth, then uses the recovered DMAP reader for table/root/counter.
 # ------------------------------------------------------------------
-add_executable(common_fps_v028b_sr3
+add_executable(common_fps_v028b_sr4
     "${ROOT}/src/ps5/legacy_v028b/sr3_v5_modulelist_dmap_probe.cpp"
 )
 
-set_target_properties(common_fps_v028b_sr3 PROPERTIES
-    OUTPUT_NAME "Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
+set_target_properties(common_fps_v028b_sr4 PROPERTIES
+    OUTPUT_NAME "Common_FPS_SR4_v028b_V5_RC12_DMAP.elf"
 )
 
-target_link_libraries(common_fps_v028b_sr3 PRIVATE
+target_link_libraries(common_fps_v028b_sr4 PRIVATE
     common_fps_v028b_backend
     kernel_sys
     SceLibcInternal
 )
 
-target_compile_options(common_fps_v028b_sr3 PRIVATE
+target_compile_options(common_fps_v028b_sr4 PRIVATE
     --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
     -Wall -Wextra -Werror -ffunction-sections -fdata-sections
 )
 
-target_link_options(common_fps_v028b_sr3 PRIVATE -Wl,--gc-sections)
+target_link_options(common_fps_v028b_sr4 PRIVATE -Wl,--gc-sections)
 
 add_custom_command(
-    TARGET common_fps_v028b_sr3 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist/v028b-sr3"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_v028b_sr3>"
-            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
+    TARGET common_fps_v028b_sr4 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist/v028b-sr4"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_v028b_sr4>"
+            "${ROOT}/dist/v028b-sr4/Common_FPS_SR4_v028b_V5_RC12_DMAP.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
-            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP_etaHEN.plugin"
-            --title-id CFPS00916 --version 9.16
+            "${ROOT}/dist/v028b-sr4/Common_FPS_SR4_v028b_V5_RC12_DMAP.elf"
+            "${ROOT}/dist/v028b-sr4/Common_FPS_SR4_v028b_V5_RC12_DMAP_etaHEN.plugin"
+            --title-id CFPS00917 --version 9.17
 )
