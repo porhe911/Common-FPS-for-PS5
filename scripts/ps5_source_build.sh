@@ -10,6 +10,10 @@ export COMMON_FPS_SHSRV_SOURCE="${COMMON_FPS_SHSRV_SOURCE:-${ROOT}/.deps/shsrv}"
 python3 "${ROOT}/tools/check_v1_source_gate.py"
 python3 "${ROOT}/tests/test_plugin_wrapper.py"
 
+# Do not let a stale pre-embedded companion look like a public artifact.
+mkdir -p "${ROOT}/dist"
+rm -f "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+
 # This CMake entry point is the canonical source-built PS5 target.
 "${PS5_PAYLOAD_SDK}/bin/prospero-cmake" \
   -S "${ROOT}/ps5" \
@@ -20,16 +24,21 @@ python3 "${ROOT}/tests/test_plugin_wrapper.py"
 
 cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
-mkdir -p "${ROOT}/dist"
-
 test -f "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
 test -f "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
-test -f "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+test -f "${ROOT}/build-ps5/Common_FPS_ShellUI_v1.1.0.elf"
+test ! -e "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+
+# Prove that the standalone ELF contains the exact renderer bytes and that the
+# etaHEN plugin contains that same self-contained controller ELF.
+python3 "${ROOT}/tools/verify_embedded_renderer.py" \
+  --controller "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
+  --plugin "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin" \
+  --renderer "${ROOT}/build-ps5/Common_FPS_ShellUI_v1.1.0.elf"
 
 sha256sum \
   "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
   "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin" \
-  "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf" \
   > "${ROOT}/dist/SHA256SUMS.txt"
 
 cat "${ROOT}/dist/SHA256SUMS.txt"
