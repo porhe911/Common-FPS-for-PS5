@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
 
