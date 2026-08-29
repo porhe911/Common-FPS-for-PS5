@@ -146,6 +146,106 @@ target_link_libraries(common_fps_shellui PRIVATE
 )
 
 # ------------------------------------------------------------------
+# Stable-v1 reconstruction compile check.
+#
+# This archive is deliberately NOT linked into the shipping controller yet.
+# Its purpose is to compile the reconstructed PHU-style DMAP read path with
+# the real PS5 toolchain while manual-run parity work is still in progress.
+# Building it cannot change the runtime ELF/plugin behavior.
+# ------------------------------------------------------------------
+add_library(common_fps_v1_ps5_reconstruction STATIC
+    "${ROOT}/src/reconstruction/v1_stable_memory.cpp"
+    "${ROOT}/src/ps5/v1_stable_dmap_backend.cpp"
+    "${ROOT}/src/ps5/v1_stable_ps5_platform.cpp"
+)
+
+target_include_directories(common_fps_v1_ps5_reconstruction PRIVATE
+    "${ROOT}/include"
+    "${ROOT}/src/ps5"
+    "${ETAHEN_ROOT}/include"
+    "${ETAHEN_FPS}/include"
+    "${SDK}"
+    "${SDK}/include"
+)
+
+target_compile_options(common_fps_v1_ps5_reconstruction PRIVATE
+    --target=x86_64-sie-ps5
+    -DPS5
+    -fPIC
+    -march=znver2
+    -O2
+    -Wall
+    -Wextra
+)
+
+# ------------------------------------------------------------------
+# FW 9.60 stable-v1 manual parity probe.
+#
+# Separate diagnostic ELF only. It exercises the reconstructed stable
+# Controller + Sampler + PHU-style DMAP backend and exits after the first
+# numeric FPS sample. It does not install ShellUI hooks and cannot replace the
+# shipping Common_FPS_PS5_v1.1.0.elf/plugin by accident.
+# ------------------------------------------------------------------
+add_executable(common_fps_v1_parity_probe
+    "${ROOT}/src/reconstruction/v1_stable_sampler.cpp"
+    "${ROOT}/src/reconstruction/v1_stable_controller.cpp"
+    "${ROOT}/src/ps5/ps5_platform.cpp"
+    "${ROOT}/src/ps5/v1_parity_probe_main.cpp"
+
+    # Match etaHEN fps_elf's cross-process access setup: enumerate kernel proc
+    # state and temporarily switch this probe to DEBUG_AUTHID before dynlib
+    # queries against the game process.
+    "${ETAHEN_FPS}/src/proc.cpp"
+    "${ETAHEN_FPS}/src/ucred.cpp"
+    "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
+)
+
+set_target_properties(common_fps_v1_parity_probe PROPERTIES
+    OUTPUT_NAME "Common_FPS_PS5_v1_parity_probe_FW960.elf"
+)
+
+target_include_directories(common_fps_v1_parity_probe PRIVATE
+    "${ROOT}/include"
+    "${ROOT}/src/ps5"
+    "${ETAHEN_ROOT}/include"
+    "${ETAHEN_FPS}/include"
+    "${COMMON_FPS_SHSRV_SOURCE}"
+    "${SDK}"
+    "${SDK}/include"
+)
+
+target_compile_options(common_fps_v1_parity_probe PRIVATE
+    --target=x86_64-sie-ps5
+    -DPS5
+    -fPIC
+    -fPIE
+    -march=znver2
+    -O2
+    -Wall
+    -Wextra
+)
+
+target_link_libraries(common_fps_v1_parity_probe PRIVATE
+    common_fps_v1_ps5_reconstruction
+    kernel_sys
+    SceLibcInternal
+    SceSystemService
+    SceNet
+    SceSysmodule
+    SceUserService
+    SceNetCtl
+)
+
+add_custom_command(
+    TARGET common_fps_v1_parity_probe
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "$<TARGET_FILE:common_fps_v1_parity_probe>"
+            "${ROOT}/dist/Common_FPS_PS5_v1_parity_probe_FW960.elf"
+)
+
+# ------------------------------------------------------------------
 # Package controller as etaHEN .plugin.
 # The renderer ELF remains a source-built companion artifact until the
 # controller-side loader embedding step is validated.

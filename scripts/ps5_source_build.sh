@@ -25,11 +25,13 @@ mkdir -p "${ROOT}/dist"
 test -f "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
 test -f "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
 test -f "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+test -f "${ROOT}/dist/Common_FPS_PS5_v1_parity_probe_FW960.elf"
 
 sha256sum \
   "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
   "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin" \
   "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf" \
+  "${ROOT}/dist/Common_FPS_PS5_v1_parity_probe_FW960.elf" \
   > "${ROOT}/dist/SHA256SUMS.txt"
 
 cat "${ROOT}/dist/SHA256SUMS.txt"
