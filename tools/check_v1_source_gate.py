@@ -17,6 +17,14 @@ checks = [
      "include/common_fps/v1_stable_wire.hpp",
      "sizeof(FpsPacket) == 0x420"),
 
+    ("DWARF last_ns field",
+     "include/common_fps/v1_stable_wire.hpp",
+     "last_ns"),
+
+    ("DWARF text field",
+     "include/common_fps/v1_stable_wire.hpp",
+     "char text[kTextCapacity]"),
+
     ("stable loading payload",
      "include/common_fps/v1_stable_wire.hpp",
      '"FPS\\tloading\\n"'),
@@ -28,6 +36,14 @@ checks = [
     ("stable VideoOut sampler",
      "src/reconstruction/v1_stable_sampler.cpp",
      '"libSceVideoOut.sprx"'),
+
+    ("stable DMAP read model",
+     "src/reconstruction/v1_stable_memory.cpp",
+     "proc_read_dmap"),
+
+    ("stable page-boundary chunking",
+     "src/reconstruction/v1_stable_memory.cpp",
+     "page_size - offset_in_page"),
 
     ("stable odd/even publisher",
      "src/reconstruction/v1_stable_hook_state.cpp",
@@ -52,6 +68,10 @@ checks = [
     ("single loader session",
      "docs/V1_0_0_PARITY_CONTRACT.md",
      "Do not break one loader session"),
+
+    ("DMAP parity documented",
+     "docs/V1_0_0_RECONSTRUCTED_SOURCE_MAP.md",
+     "prw::proc_read"),
 
     ("font 26",
      "include/common_fps/constants.hpp",
@@ -97,6 +117,19 @@ print(
     "no extra post-load continue_target"
 )
 failed |= not no_extra_continue
+
+# Stable v1.0.0 sampled game VideoOut through PHU's DMAP proc_read path.
+# Per-read ptrace was introduced only by the later clean rewrite. Keep ptrace
+# primitives completely out of the reconstructed parity core.
+reconstruction_dir = root / "src" / "reconstruction"
+reconstruction_text = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in reconstruction_dir.glob("*.cpp")
+)
+for forbidden in ("pt_attach(", "pt_copyout(", "pt_detach("):
+    ok = forbidden not in reconstruction_text
+    print(f"{'PASS' if ok else 'FAIL'}  no parity per-read ptrace: {forbidden}")
+    failed |= not ok
 
 if failed:
     sys.exit(1)
