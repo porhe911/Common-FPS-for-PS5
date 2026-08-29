@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
 #include <vector>
