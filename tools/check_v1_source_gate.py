@@ -47,7 +47,11 @@ checks = [
 
     ("stable dynlib module discovery",
      "src/ps5/v1_stable_ps5_platform.cpp",
-     "SYS_dl_get_list"),
+     "kSysDlGetList"),
+
+    ("minimal dynlib ABI isolated from kernel structs",
+     "src/ps5/v1_stable_dynlib.hpp",
+     "struct DynlibModuleInfo"),
 
     ("FW 9.60 module basename fallback",
      "src/ps5/v1_stable_ps5_platform.cpp",
