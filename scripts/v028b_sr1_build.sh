@@ -13,7 +13,7 @@ mkdir -p "${OUT}"
 rm -f "${OUT}/Common_FPS_SR1_v028b_Backend.elf" \
       "${OUT}/Common_FPS_SR1_v028b_Backend_etaHEN.plugin" \
       "${OUT}/SHA256SUMS.txt" \
-      "${OUT}/UNDEFINED_SYMBOLS.txt"
+      "${OUT}/SYMBOLS.txt"
 
 "${PS5_PAYLOAD_SDK}/bin/prospero-cmake" \
   -S "${ROOT}/ps5" \
@@ -36,12 +36,17 @@ if strings "${OUT}/Common_FPS_SR1_v028b_Backend.elf" | \
   exit 1
 fi
 
-nm -u "${OUT}/Common_FPS_SR1_v028b_Backend.elf" > "${OUT}/UNDEFINED_SYMBOLS.txt" || true
+nm -C "${OUT}/Common_FPS_SR1_v028b_Backend.elf" > "${OUT}/SYMBOLS.txt" || true
 
-# Required recovered-backend imports must remain visible in the final ELF.
-for sym in kernel_copyout kernel_dynlib_handle kernel_dynlib_mapbase_addr sysctl; do
-  if ! grep -q "${sym}" "${OUT}/UNDEFINED_SYMBOLS.txt"; then
-    echo "ERROR: SR1 missing required recovered-backend import: ${sym}"
+# Required recovered-backend functions must be linked into the final ELF.
+for sym in \
+  'common_fps::legacy_v028b::proc_read' \
+  'common_fps::legacy_v028b::translate' \
+  'common_fps::legacy_v028b::find_game_pid_sysctl' \
+  'common_fps::legacy_v028b::resolve_videoout_counter' \
+  'common_fps::legacy_v028b::read_videoout_counter'; do
+  if ! grep -Fq "${sym}" "${OUT}/SYMBOLS.txt"; then
+    echo "ERROR: SR1 missing recovered-backend symbol: ${sym}"
     exit 1
   fi
 done
@@ -52,5 +57,5 @@ sha256sum \
   > "${OUT}/SHA256SUMS.txt"
 
 cat "${OUT}/SHA256SUMS.txt"
-echo "--- undefined symbols ---"
-cat "${OUT}/UNDEFINED_SYMBOLS.txt"
+echo "--- recovered backend symbols ---"
+grep -F 'common_fps::legacy_v028b::' "${OUT}/SYMBOLS.txt" || true
