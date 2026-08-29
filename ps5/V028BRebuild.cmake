@@ -139,3 +139,41 @@ add_custom_command(
             "${ROOT}/dist/v028b-sr2/Common_FPS_SR2_v028b_Auth_DMAP_etaHEN.plugin"
             --title-id CFPS00915 --version 9.15
 )
+
+# ------------------------------------------------------------------
+# SR3 - hardware-proven SR2 lifecycle/auth timing, but module discovery uses
+# the exact v5 syscalls that exposed 61 modules on FW 9.60:
+# SYS_dl_get_list (0x217) + SYS_dl_get_info_2 (0x2cd).
+# Auth is restored before any DMAP table/root/counter read.
+# ------------------------------------------------------------------
+add_executable(common_fps_v028b_sr3
+    "${ROOT}/src/ps5/legacy_v028b/sr3_v5_modulelist_dmap_probe.cpp"
+)
+
+set_target_properties(common_fps_v028b_sr3 PROPERTIES
+    OUTPUT_NAME "Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
+)
+
+target_link_libraries(common_fps_v028b_sr3 PRIVATE
+    common_fps_v028b_backend
+    kernel_sys
+    SceLibcInternal
+)
+
+target_compile_options(common_fps_v028b_sr3 PRIVATE
+    --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
+    -Wall -Wextra -Werror -ffunction-sections -fdata-sections
+)
+
+target_link_options(common_fps_v028b_sr3 PRIVATE -Wl,--gc-sections)
+
+add_custom_command(
+    TARGET common_fps_v028b_sr3 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist/v028b-sr3"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_v028b_sr3>"
+            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
+    COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
+            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP.elf"
+            "${ROOT}/dist/v028b-sr3/Common_FPS_SR3_v028b_V5_ModuleList_DMAP_etaHEN.plugin"
+            --title-id CFPS00916 --version 9.16
+)
