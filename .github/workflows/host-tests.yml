@@ -30,3 +30,6 @@ jobs:
 
       - name: Historical v1.0.0 forensic helper tests
         run: python3 tests/test_v1_forensics.py
+
+      - name: PHU r11 donor delta helper tests
+        run: python3 tests/test_phu_donor_compare.py
