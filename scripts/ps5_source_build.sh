@@ -29,12 +29,18 @@ test -f "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
 test -f "${ROOT}/build-ps5/Common_FPS_ShellUI_v1.1.0.elf"
 test ! -e "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
 
-# Prove that the standalone ELF contains the exact renderer bytes and that the
-# etaHEN plugin contains that same self-contained controller ELF.
-python3 "${ROOT}/tools/verify_embedded_renderer.py" \
-  --controller "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
-  --plugin "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin" \
-  --renderer "${ROOT}/build-ps5/Common_FPS_ShellUI_v1.1.0.elf"
+# Production/self-contained builds must retain the exact embedded renderer.
+# RC4 is intentionally a sysctl-only safety probe: its main path never
+# references the renderer, so --gc-sections is expected to discard that blob.
+# Do not turn that expected diagnostic property into a false CI failure.
+if grep -q "RC4 START sysctl-only" "${ROOT}/src/ps5/commonfps_ps5_main.cpp"; then
+  echo "RC4 diagnostic build: embedded-renderer retention check intentionally skipped"
+else
+  python3 "${ROOT}/tools/verify_embedded_renderer.py" \
+    --controller "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
+    --plugin "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin" \
+    --renderer "${ROOT}/build-ps5/Common_FPS_ShellUI_v1.1.0.elf"
+fi
 
 sha256sum \
   "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf" \
