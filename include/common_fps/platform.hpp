@@ -28,6 +28,16 @@ public:
     virtual std::optional<ProcessId> find_game_process() = 0;
     virtual bool process_alive(ProcessId pid) = 0;
 
+    /*
+     * Short privileged/readiness scope used only while attaching a sampler.
+     * Host platforms do nothing. On PS5 FW 9.60 this maps to the hardware-
+     * proven temporary debugger Auth ID window around:
+     *   module discovery -> VideoOut table -> counter address resolution.
+     * The normal sampling loop runs after end_process_inspection().
+     */
+    virtual bool begin_process_inspection(ProcessId) { return true; }
+    virtual void end_process_inspection(ProcessId) {}
+
     virtual std::optional<ModuleInfo>
     find_module(ProcessId pid, const char* module_name) = 0;
 
