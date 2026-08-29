@@ -7,7 +7,7 @@ on:
       - "v028b-stable-source-rebuild"
 
 jobs:
-  backend-sourceproof:
+  sourceproof:
     runs-on: ubuntu-24.04
 
     steps:
@@ -25,15 +25,16 @@ jobs:
       - name: Prepare pinned PS5 source dependencies
         run: bash ./scripts/prepare_ps5_deps.sh
 
-      - name: Compile recovered v0.28b backend only
+      - name: Compile recovered producer and one-time bootstrap
         run: bash ./scripts/v028b_sourceproof_build.sh
 
-      - name: Upload source-proof artifact
+      - name: Upload source-proof artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-v028b-backend-sourceproof
+          name: Common-FPS-v028b-sourceproof
           path: |
             dist/v028b-sourceproof/Common_FPS_v028b_backend_sourceproof.a
+            dist/v028b-sourceproof/Common_FPS_v028b_bootstrap_sourceproof.a
             dist/v028b-sourceproof/SHA256SUMS.txt
             dist/v028b-sourceproof/UNDEFINED_SYMBOLS.txt
             docs/V028B_BINARY_FORENSICS.md
