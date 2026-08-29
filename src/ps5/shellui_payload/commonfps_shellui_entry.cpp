@@ -6,6 +6,7 @@
 
 #include "commonfps_shellui.hpp"
 #include "common_fps/renderer_health.hpp"
+#include "HookedFuncs.hpp"
 
 #include <cstdio>
 #include <netinet/in.h>
