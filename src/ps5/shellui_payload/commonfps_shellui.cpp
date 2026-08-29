@@ -17,6 +17,7 @@
 
 #include "commonfps_shellui.hpp"
 
+#include "common_fps/layout.hpp"
 #include "HookedFuncs.hpp"
 
 #include <arpa/inet.h>
@@ -50,6 +51,9 @@ void remove_widget(MonoObject* root, const char* id) {
             "Sce.PlayStation.PUI.UI2",
             "Widget");
 
+    if (!widgetClass)
+        return;
+
     MonoObject* child =
         Invoke<MonoObject*>(
             pui_img,
@@ -65,6 +69,84 @@ void remove_widget(MonoObject* root, const char* id) {
             child,
             "RemoveFromParent");
     }
+}
+
+bool render_frame(const OverlayFrame& frame) {
+    if (!pui_img || !Game || !Root_Domain)
+        return false;
+
+    MonoObject* root =
+        Get_Property<MonoObject*>(
+            pui_img,
+            "Sce.PlayStation.PUI.UI2",
+            "Scene",
+            Game,
+            "RootWidget");
+
+    if (!root)
+        return false;
+
+    /*
+     * Recreate both widgets from absolute coordinates.  The state rate is
+     * intentionally low (~1 Hz), so this preserves the stable no-drift
+     * behavior without maintaining any accumulating cursor position.
+     */
+    remove_widget(root, kLabelId);
+    remove_widget(root, kValueId);
+
+    MonoObject* font =
+        CreateUIFont(frame.config.font_size, 0, 0);
+
+    if (!font)
+        return false;
+
+    const float x = frame.anchor.x;
+    const float y = frame.anchor.y;
+
+    /* Stable public color: #B366FF. */
+    MonoObject* label =
+        CreateLabel(
+            kLabelId,
+            x,
+            y,
+            "FPS:",
+            font,
+            1,
+            0,
+            0.702f,
+            0.400f,
+            1.000f,
+            1.000f);
+
+    char value_text[32]{};
+    if (frame.loading)
+        std::snprintf(value_text, sizeof(value_text), "loading");
+    else
+        std::snprintf(value_text, sizeof(value_text), "%d", frame.fps);
+
+    const float value_x =
+        x + static_cast<float>(frame.config.font_size) * 2.7f;
+
+    MonoObject* value =
+        CreateLabel(
+            kValueId,
+            value_x,
+            y,
+            value_text,
+            font,
+            0,
+            0,
+            1.0f,
+            1.0f,
+            1.0f,
+            1.0f);
+
+    if (!label || !value)
+        return false;
+
+    Widget_Append_Child(root, label);
+    Widget_Append_Child(root, value);
+    return true;
 }
 
 void* receiver_thread(void*) {
@@ -138,6 +220,16 @@ void shutdown_receiver() {
     g_running.store(false);
 }
 
+bool show_loading_state() {
+    OverlayFrame frame{};
+    frame.visible = true;
+    frame.loading = true;
+    frame.fps = 0;
+    frame.config = OverlayConfig{};
+    frame.anchor = compute_anchor(frame.config);
+    return render_frame(frame);
+}
+
 void apply_latest_state() {
     static std::uint64_t applied_sequence = 0;
 
@@ -157,84 +249,8 @@ void apply_latest_state() {
     if (!decoded)
         return;
 
-    const OverlayFrame& frame = *decoded;
-
-    MonoObject* root =
-        Get_Property<MonoObject*>(
-            pui_img,
-            "Sce.PlayStation.PUI.UI2",
-            "Scene",
-            Game,
-            "RootWidget");
-
-    if (!root)
-        return;
-
-    /*
-     * Recreate both widgets only when a state packet changes.
-     * The packet rate is ~1 Hz, so this avoids any accumulating cursor state
-     * and uses only PUI primitives already demonstrated in etaHEN source.
-     */
-    remove_widget(root, kLabelId);
-    remove_widget(root, kValueId);
-
-    MonoObject* font =
-        CreateUIFont(frame.config.font_size, 0, 0);
-
-    if (!font)
-        return;
-
-    const float x = frame.anchor.x;
-    const float y = frame.anchor.y;
-
-    /*
-     * Public v1.0.0 color:
-     * #B366FF ~= (0.702, 0.400, 1.000, 1.000)
-     */
-    MonoObject* label =
-        CreateLabel(
-            kLabelId,
-            x,
-            y,
-            "FPS:",
-            font,
-            1,
-            0,
-            0.702f,
-            0.400f,
-            1.000f,
-            1.000f);
-
-    char value_text[32]{};
-    if (frame.loading)
-        std::snprintf(value_text, sizeof(value_text), "loading");
-    else
-        std::snprintf(value_text, sizeof(value_text), "%d", frame.fps);
-
-    const float value_x =
-        x + static_cast<float>(frame.config.font_size) * 2.7f;
-
-    MonoObject* value =
-        CreateLabel(
-            kValueId,
-            value_x,
-            y,
-            value_text,
-            font,
-            0,
-            0,
-            1.0f,
-            1.0f,
-            1.0f,
-            1.0f);
-
-    if (label)
-        Widget_Append_Child(root, label);
-
-    if (value)
-        Widget_Append_Child(root, value);
-
-    applied_sequence = sequence;
+    if (render_frame(*decoded))
+        applied_sequence = sequence;
 }
 
 } // namespace common_fps::ps5::shellui
