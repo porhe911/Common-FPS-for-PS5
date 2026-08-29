@@ -45,6 +45,14 @@ checks = [
      "src/ps5/v1_stable_ps5_platform.cpp",
      'find_process_sysctl("eboot.bin")'),
 
+    ("stable dynlib module discovery",
+     "src/ps5/v1_stable_ps5_platform.cpp",
+     "SYS_dl_get_list"),
+
+    ("FW 9.60 module basename fallback",
+     "src/ps5/v1_stable_ps5_platform.cpp",
+     "module_name_matches"),
+
     ("stable DMAP read model",
      "src/reconstruction/v1_stable_memory.cpp",
      "proc_read_dmap"),
@@ -101,9 +109,6 @@ for label, rel, needle in checks:
     print(f"{'PASS' if ok else 'FAIL'}  {label}")
     failed |= not ok
 
-# The recovered stable shsrv order is image first, payload args second, exec
-# preparation third. The old reconstruction had args before image and must not
-# silently regress back to that ordering.
 loader = (root / "integration/loader/v1_loader_contract.cpp").read_text(
     encoding="utf-8"
 )
@@ -116,9 +121,6 @@ order_ok = all(pos >= 0 for pos in order) and order == sorted(order)
 print(f"{'PASS' if order_ok else 'FAIL'}  image -> payload args -> exec order")
 failed |= not order_ok
 
-# A separate post-load continue_target() belonged to the inaccurate clean-room
-# model. Stable Trace Continue is internal to image loading and final resume is
-# the end of the same loader session.
 no_extra_continue = "continue_target()" not in loader
 print(
     f"{'PASS' if no_extra_continue else 'FAIL'}  "
@@ -126,9 +128,6 @@ print(
 )
 failed |= not no_extra_continue
 
-# Stable v1.0.0 sampled game VideoOut through PHU's DMAP proc_read path.
-# Per-read ptrace was introduced only by the later clean rewrite. Keep ptrace
-# primitives completely out of the reconstructed parity core.
 reconstruction_dir = root / "src" / "reconstruction"
 reconstruction_text = "\n".join(
     path.read_text(encoding="utf-8")
@@ -139,15 +138,16 @@ for forbidden in ("pt_attach(", "pt_copyout(", "pt_detach("):
     print(f"{'PASS' if ok else 'FAIL'}  no parity per-read ptrace: {forbidden}")
     failed |= not ok
 
-# Hardware v2 probe proved that the clean rewrite's etaHEN allproc helper was
-# not equivalent to the stable line's process discovery. Keep the reconstructed
-# platform on sysctl/find_pid for game lookup/liveness.
 platform = (root / "src" / "ps5" / "v1_stable_ps5_platform.cpp").read_text(
     encoding="utf-8"
 )
-for forbidden in ("base_.find_game_process()", "base_.process_alive("):
+for forbidden in (
+    "base_.find_game_process()",
+    "base_.process_alive(",
+    "base_.find_module(",
+):
     ok = forbidden not in platform
-    print(f"{'PASS' if ok else 'FAIL'}  no clean-rewrite process helper: {forbidden}")
+    print(f"{'PASS' if ok else 'FAIL'}  no clean-rewrite platform helper: {forbidden}")
     failed |= not ok
 
 if failed:
