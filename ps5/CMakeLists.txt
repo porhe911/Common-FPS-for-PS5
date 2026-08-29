@@ -162,6 +162,8 @@ add_library(common_fps_v1_ps5_reconstruction STATIC
 target_include_directories(common_fps_v1_ps5_reconstruction PRIVATE
     "${ROOT}/include"
     "${ROOT}/src/ps5"
+    "${ETAHEN_ROOT}/include"
+    "${ETAHEN_FPS}/include"
     "${SDK}"
     "${SDK}/include"
 )
