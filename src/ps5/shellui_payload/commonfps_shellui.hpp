@@ -15,6 +15,14 @@ bool initialize_receiver();
 void shutdown_receiver();
 
 /*
+ * Draw the stable default "FPS: loading" pair immediately after the live
+ * ShellUI Game.RootWidget becomes usable.  This is both the normal startup
+ * state and a hardware diagnostic boundary: VisualReady is not emitted until
+ * these Common FPS widgets were actually created.
+ */
+bool show_loading_state();
+
+/*
  * Call from a ShellUI-safe update/render context.
  * It applies the newest packet only when sequence changes.
  */
