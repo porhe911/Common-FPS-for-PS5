@@ -11,6 +11,7 @@
 #include "ps5_platform.hpp"
 
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -30,6 +31,22 @@ namespace {
 constexpr std::uint64_t kHeartbeatFreshUs = 2'500'000ULL;
 constexpr std::uint64_t kSamePidInjectionCooldownUs = 10'000'000ULL;
 constexpr std::size_t kMaxRendererElfSize = 8U * 1024U * 1024U;
+
+void diag_log(const char* text) {
+    FILE* f = std::fopen("/data/CommonFPS_stageB_controller.log", "a");
+    if (!f)
+        return;
+    std::fprintf(f, "%s\n", text);
+    std::fclose(f);
+}
+
+void diag_log_i(const char* prefix, long long value) {
+    FILE* f = std::fopen("/data/CommonFPS_stageB_controller.log", "a");
+    if (!f)
+        return;
+    std::fprintf(f, "%s%lld\n", prefix, value);
+    std::fclose(f);
+}
 
 bool looks_like_elf(const unsigned char* data, std::size_t size) {
     return data != nullptr && size >= 4 &&
@@ -72,6 +89,7 @@ bool Ps5AutoloadBackend::open_health_socket() {
         health_socket_ = -1;
         return false;
     }
+    diag_log("C3 health socket ready");
     return true;
 }
 
@@ -87,6 +105,7 @@ void Ps5AutoloadBackend::reset_heartbeat_state(pid_t new_pid) {
 }
 
 bool Ps5AutoloadBackend::refresh_shellui() {
+    static pid_t last_logged_pid = -2;
     struct proc* process = find_proc_by_name("SceShellUI");
     if (!process) {
         if (shellui_pid_ != -1)
@@ -98,24 +117,48 @@ bool Ps5AutoloadBackend::refresh_shellui() {
     std::free(process);
     if (pid != shellui_pid_)
         reset_heartbeat_state(pid);
+    if (pid != last_logged_pid) {
+        diag_log_i("C4 SceShellUI pid=", pid);
+        last_logged_pid = pid;
+    }
     return pid > 0;
 }
 
 bool Ps5AutoloadBackend::mono_runtime_present(pid_t pid) {
-    if (!platform_.begin_process_inspection(pid))
+    if (!platform_.begin_process_inspection(pid)) {
+        diag_log("C5 Mono check: begin_process_inspection FAIL");
         return false;
+    }
 
     module_info_t* mono = get_module_info(pid, "libmonosgen-2.0.sprx");
     platform_.end_process_inspection(pid);
 
-    if (!mono)
+    if (!mono) {
+        diag_log("C5 Mono check: libmonosgen not visible");
         return false;
+    }
     std::free(mono);
+    diag_log("C5 Mono check: present");
     return true;
 }
 
 bool Ps5AutoloadBackend::runtime_ready() {
-    return valid() && refresh_shellui() && mono_runtime_present(shellui_pid_);
+    /*
+     * Diagnostic RC3 deliberately does NOT gate injection on Mono module
+     * enumeration. RC2 only logged C0, so it may never have reached the
+     * injector. The smoke payload itself does not use Mono, hooks or widgets;
+     * for this one hardware test, an alive SceShellUI is sufficient.
+     */
+    if (!valid())
+        return false;
+    if (!refresh_shellui())
+        return false;
+    static bool logged = false;
+    if (!logged) {
+        diag_log("C6 RC3 runtime ready: ShellUI only (Mono gate bypassed)");
+        logged = true;
+    }
+    return true;
 }
 
 void Ps5AutoloadBackend::drain_health() {
@@ -139,12 +182,15 @@ void Ps5AutoloadBackend::drain_health() {
             packet.sequence < last_health_sequence_)
             continue;
 
+        const bool first = last_receiver_heartbeat_us_ == 0;
         last_health_sequence_ = packet.sequence;
         const auto now = platform_.monotonic_us();
         last_receiver_heartbeat_us_ = now;
         if (packet.phase == static_cast<std::uint16_t>(
                 common_fps::RendererHealthPhase::VisualReady))
             last_visual_heartbeat_us_ = now;
+        if (first)
+            diag_log("C11 first renderer heartbeat received");
     }
 }
 
@@ -178,62 +224,83 @@ bool Ps5AutoloadBackend::read_renderer_elf(unsigned char** data, std::size_t* si
     const auto* bytes = embedded_renderer::kData;
     const std::size_t bytes_size = embedded_renderer::kSize;
     if (!looks_like_elf(bytes, bytes_size) ||
-        bytes_size == 0 || bytes_size > kMaxRendererElfSize)
+        bytes_size == 0 || bytes_size > kMaxRendererElfSize) {
+        diag_log("C7 embedded renderer invalid");
         return false;
+    }
 
     auto* copy = static_cast<unsigned char*>(std::malloc(bytes_size));
-    if (!copy)
+    if (!copy) {
+        diag_log("C7 embedded renderer malloc FAIL");
         return false;
+    }
 
     std::memcpy(copy, bytes, bytes_size);
     *data = copy;
     *size = bytes_size;
+    diag_log_i("C7 embedded renderer bytes=", static_cast<long long>(bytes_size));
     return true;
 }
 
 bool Ps5AutoloadBackend::install_renderer_once() {
-    if (!runtime_ready())
+    diag_log("C8 install_renderer_once entered");
+    if (!runtime_ready()) {
+        diag_log("C8 runtime_ready FAIL");
         return false;
-    if (renderer_alive())
+    }
+    if (renderer_alive()) {
+        diag_log("C8 renderer already alive");
         return true;
+    }
 
     const auto now = platform_.monotonic_us();
     if (last_injected_pid_ == shellui_pid_ && last_injection_attempt_us_ != 0 &&
         now >= last_injection_attempt_us_ &&
-        (now - last_injection_attempt_us_) < kSamePidInjectionCooldownUs)
+        (now - last_injection_attempt_us_) < kSamePidInjectionCooldownUs) {
+        diag_log("C8 injection cooldown");
         return false;
+    }
 
     unsigned char* renderer = nullptr;
     std::size_t renderer_size = 0;
     if (!read_renderer_elf(&renderer, &renderer_size))
         return false;
-    (void)renderer_size;
 
     const pid_t target_pid = shellui_pid_;
     last_injected_pid_ = target_pid;
     last_injection_attempt_us_ = now;
 
-    /* Never use elfldr_exec(): its failure path may kill SceShellUI. */
+    diag_log_i("C9 pt_attach target pid=", target_pid);
     if (pt_attach(target_pid) < 0) {
+        diag_log("C9 pt_attach FAIL");
         std::free(renderer);
         return false;
     }
+    diag_log("C9 pt_attach OK");
 
     intptr_t base_address = 0;
+    diag_log("C10 elfldr_debug BEGIN");
     const int load_rc = elfldr_debug(-1, -1, -1, target_pid, renderer, &base_address);
+    diag_log_i("C10 elfldr_debug rc=", load_rc);
     const int detach_rc = pt_detach(target_pid, 0);
+    diag_log_i("C10 pt_detach rc=", detach_rc);
     std::free(renderer);
     if (load_rc < 0 || detach_rc < 0)
         return false;
 
     for (unsigned i = 0; i < 60; ++i) {
         platform_.sleep_ms(50);
-        if (!refresh_shellui())
+        if (!refresh_shellui()) {
+            diag_log("C11 ShellUI disappeared after inject");
             return false;
+        }
         drain_health();
-        if (heartbeat_fresh(last_receiver_heartbeat_us_))
+        if (heartbeat_fresh(last_receiver_heartbeat_us_)) {
+            diag_log("C12 RC3 injection heartbeat PASS");
             return true;
+        }
     }
+    diag_log("C12 RC3 injection heartbeat TIMEOUT");
     return false;
 }
 
