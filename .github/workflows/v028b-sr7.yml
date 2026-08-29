@@ -1,0 +1,48 @@
+name: v0.28b SR7 PHUF Loopback
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/**"
+      - "ps5/sr7/**"
+      - "scripts/v028b_sr7_build.sh"
+      - ".github/workflows/v028b-sr7.yml"
+      - "tools/make_etahen_plugin.py"
+
+jobs:
+  build-sr7:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build SR7 PHUF loopback probe
+        run: bash ./scripts/v028b_sr7_build.sh
+
+      - name: Upload SR7 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR7-PHUF-Loopback
+          path: |
+            dist/v028b-sr7/Common_FPS_SR7_v028b_PHUF_Loopback.elf
+            dist/v028b-sr7/Common_FPS_SR7_v028b_PHUF_Loopback_etaHEN.plugin
+            dist/v028b-sr7/SHA256SUMS.txt
+            dist/v028b-sr7/LINKED_SYMBOLS.txt
+          if-no-files-found: error
