@@ -22,13 +22,6 @@ set(ETAHEN_ROOT "${COMMON_FPS_ETAHEN_SOURCE}/Source Code")
 set(ETAHEN_FPS "${ETAHEN_ROOT}/fps_elf")
 set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
 
-# ------------------------------------------------------------------
-# Source-built ShellUI renderer.
-#
-# This target is an INTERNAL build artifact. It is converted to a byte array
-# and linked into the public controller ELF/plugin below, so end users do not
-# need a separate companion file on disk.
-# ------------------------------------------------------------------
 add_executable(common_fps_shellui)
 set_target_properties(common_fps_shellui PROPERTIES
     OUTPUT_NAME "Common_FPS_ShellUI_v1.1.0.elf")
@@ -63,8 +56,6 @@ target_link_options(common_fps_shellui PRIVATE -Wl,--gc-sections)
 target_link_libraries(common_fps_shellui PRIVATE
     kernel_sys SceNet SceSysmodule SceSystemService SceLibcInternal)
 
-# Convert the just-built ShellUI ELF into generated C++ bytes. This creates a
-# strict build dependency: public controller -> embedded blob -> ShellUI ELF.
 set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(EMBEDDED_RENDERER_CPP "${GENERATED_DIR}/commonfps_shellui_blob.cpp")
 
@@ -81,10 +72,6 @@ add_custom_command(
 set_source_files_properties("${EMBEDDED_RENDERER_CPP}" PROPERTIES GENERATED TRUE)
 add_custom_target(common_fps_embed_renderer DEPENDS "${EMBEDDED_RENDERER_CPP}")
 
-# ------------------------------------------------------------------
-# Public standalone ELF / etaHEN plugin controller.
-# Both output forms contain the same embedded ShellUI renderer.
-# ------------------------------------------------------------------
 add_executable(common_fps_controller)
 set_target_properties(common_fps_controller PROPERTIES
     OUTPUT_NAME "Common_FPS_PS5_v1.1.0.elf")
@@ -129,9 +116,6 @@ target_link_libraries(common_fps_controller PRIVATE
     kernel_sys SceLibcInternal SceSystemService SceNet SceSysmodule
     SceUserService SceNetCtl)
 
-# The public distribution contains exactly two launch forms:
-#   1) standalone ELF
-#   2) etaHEN plugin wrapper around that same ELF
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
@@ -139,4 +123,4 @@ add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
             "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
             "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
-            --title-id CFPS00021 --version 1.10)
+            --title-id CFPS00904 --version 9.04)
