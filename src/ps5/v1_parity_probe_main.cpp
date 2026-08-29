@@ -1,14 +1,16 @@
 /*
  * Common FPS for PS5
- * Hardware parity probe v4 for the reconstructed stable v1.0.0 FPS sampler.
+ * Hardware parity probe v5 for the reconstructed stable v1.0.0 FPS sampler.
  *
  * This diagnostic ELF intentionally does not install the ShellUI renderer and
  * does not replace the shipping controller/plugin. It writes every completed
  * stage to /data/CommonFPS_v1_probe.log and flushes immediately.
  *
  * v3 restored sysctl/find_pid game discovery.
- * v4 restores target dynlib module enumeration with basename/suffix matching
- * and records the raw FW 9.60 module list around the VideoOut lookup.
+ * v4 restored target dynlib enumeration and proved that the game process is
+ *    found but cross-process SYS_dl_get_list returns no handles.
+ * v5 restores the debugger authid step used by etaHEN's original fps_elf
+ *    before cross-process dynlib access, while recording before/after counts.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -40,11 +42,18 @@ int sceKernelSendNotificationRequest(
     notify_request_t* request,
     std::size_t request_size,
     int flags);
+
+// Keep etaHEN's ucred header out of this translation unit because it pulls in
+// FreeBSD kernel structure definitions that conflict with the SDK sysctl
+// headers. The implementations are linked from fps_elf/src/ucred.cpp.
+std::uintptr_t set_ucred_to_debugger();
+std::uintptr_t set_proc_authid(pid_t pid, std::uintptr_t new_authid);
 }
 
 namespace {
 
 constexpr const char* kLogPath = "/data/CommonFPS_v1_probe.log";
+constexpr std::uintptr_t kDebuggerAuthId = 0x4800000000000006ull;
 FILE* g_log = nullptr;
 
 void log_line(const char* fmt, ...) {
@@ -65,6 +74,18 @@ void notify(const char* message) {
     log_line("NOTIFY rc=%d text=%s", rc, message);
 }
 
+void log_dynlib_count(const char* label, common_fps::ProcessId pid) {
+    using namespace common_fps::ps5;
+    std::size_t handle_count = 0;
+    const long rc = syscall(kSysDlGetList, pid, nullptr, 0, &handle_count);
+    log_line(
+        "%s pid=%d rc=%ld count=%llu",
+        label,
+        pid,
+        rc,
+        static_cast<unsigned long long>(handle_count));
+}
+
 void log_dynlib_scan(common_fps::ProcessId pid) {
     using namespace common_fps::ps5;
 
@@ -74,7 +95,7 @@ void log_dynlib_scan(common_fps::ProcessId pid) {
         "S2RAW get_list(count) rc=%ld count=%llu",
         count_rc,
         static_cast<unsigned long long>(handle_count));
-    if (count_rc < 0 || handle_count == 0)
+    if (handle_count == 0)
         return;
 
     std::vector<std::uintptr_t> handles(handle_count);
@@ -86,14 +107,14 @@ void log_dynlib_scan(common_fps::ProcessId pid) {
         list_rc,
         static_cast<unsigned long long>(returned_count),
         static_cast<unsigned long long>(handles.size()));
-    if (list_rc < 0)
+    if (returned_count == 0)
         return;
 
     returned_count = std::min(returned_count, handles.size());
     for (std::size_t i = 0; i < returned_count; ++i) {
         DynlibModuleInfo info{};
         const long info_rc = syscall(kSysDlGetInfo2, pid, 1, handles[i], &info);
-        if (info_rc < 0) {
+        if (info_rc != 0) {
             if (i < 8) {
                 log_line(
                     "S2RAW[%llu] info rc=%ld handle=0x%llx",
@@ -120,16 +141,26 @@ void log_dynlib_scan(common_fps::ProcessId pid) {
     }
 }
 
+void restore_authid(std::uintptr_t old_authid) {
+    if (old_authid == 0)
+        return;
+    const auto replaced = set_proc_authid(getpid(), old_authid);
+    log_line(
+        "S2AUTH restore old=0x%llx replaced=0x%llx",
+        static_cast<unsigned long long>(old_authid),
+        static_cast<unsigned long long>(replaced));
+}
+
 } // namespace
 
 int main() {
     g_log = std::fopen(kLogPath, "w");
     if (g_log) {
         std::setvbuf(g_log, nullptr, _IONBF, 0);
-        log_line("S0 main entered v4");
+        log_line("S0 main entered v5");
     }
 
-    notify("Common FPS parity probe v4\nSTART");
+    notify("Common FPS parity probe v5\nSTART");
 
     common_fps::ps5::V1StablePs5Platform platform;
     std::optional<common_fps::ProcessId> pid;
@@ -144,18 +175,39 @@ int main() {
 
     if (!pid) {
         log_line("FAIL S1 sysctl game process not found after 30s");
-        notify("Common FPS parity probe v4\nFAIL S1: game not found");
+        notify("Common FPS parity probe v5\nFAIL S1: game not found");
         if (g_log) std::fclose(g_log);
         return 11;
     }
     log_line("S1 game pid=%d", *pid);
 
+    // FW 9.60 v4 returned rc=1/count=0 for the target game. Compare the same
+    // syscall against our own process, then reproduce etaHEN fps_elf's
+    // set_ucred_to_debugger() step before touching the target process again.
+    log_dynlib_count("S2AUTH self-before", getpid());
+    log_dynlib_count("S2AUTH game-before", *pid);
+
+    const std::uintptr_t old_authid = set_ucred_to_debugger();
+    log_line(
+        "S2AUTH debugger set old=0x%llx target=0x%llx",
+        static_cast<unsigned long long>(old_authid),
+        static_cast<unsigned long long>(kDebuggerAuthId));
+
+    if (old_authid == 0) {
+        log_line("FAIL S2AUTH could not acquire debugger authid");
+        notify("Common FPS parity probe v5\nFAIL S2AUTH: debugger auth");
+        if (g_log) std::fclose(g_log);
+        return 16;
+    }
+
+    log_dynlib_count("S2AUTH game-after", *pid);
     log_dynlib_scan(*pid);
 
     const auto module = platform.find_module(*pid, "libSceVideoOut.sprx");
     if (!module || module->base == 0) {
         log_line("FAIL S2 libSceVideoOut.sprx not found");
-        notify("Common FPS parity probe v4\nFAIL S2: VideoOut module");
+        notify("Common FPS parity probe v5\nFAIL S2: VideoOut module");
+        restore_authid(old_authid);
         if (g_log) std::fclose(g_log);
         return 12;
     }
@@ -182,7 +234,8 @@ int main() {
         static_cast<unsigned long long>(table.size()));
 
     if (!table_ok) {
-        notify("Common FPS parity probe v4\nFAIL S3: DMAP table read");
+        notify("Common FPS parity probe v5\nFAIL S3: DMAP table read");
+        restore_authid(old_authid);
         if (g_log) std::fclose(g_log);
         return 13;
     }
@@ -193,7 +246,8 @@ int main() {
             "FAIL S4 sampler attach sdk=0x%08x dmap=0x%llx",
             dmap.last_sdk_version(),
             static_cast<unsigned long long>(dmap.last_dmap_base()));
-        notify("Common FPS parity probe v4\nFAIL S4: sampler attach");
+        notify("Common FPS parity probe v5\nFAIL S4: sampler attach");
+        restore_authid(old_authid);
         if (g_log) std::fclose(g_log);
         return 14;
     }
@@ -210,9 +264,10 @@ int main() {
             std::snprintf(
                 message,
                 sizeof(message),
-                "Common FPS parity probe v4\nDMAP FW 9.60 OK: %.1f FPS",
+                "Common FPS parity probe v5\nDMAP FW 9.60 OK: %.1f FPS",
                 *fps);
             notify(message);
+            restore_authid(old_authid);
             platform.sleep_ms(1500);
             if (g_log) std::fclose(g_log);
             return 0;
@@ -228,7 +283,8 @@ int main() {
     }
 
     log_line("FAIL S5 no valid FPS");
-    notify("Common FPS parity probe v4\nFAIL S5: no valid FPS");
+    notify("Common FPS parity probe v5\nFAIL S5: no valid FPS");
+    restore_authid(old_authid);
     if (g_log) std::fclose(g_log);
     return 15;
 }
