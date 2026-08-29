@@ -214,3 +214,41 @@ add_custom_command(
             "${ROOT}/dist/v028b-sr5/Common_FPS_SR5_v028b_DMAP_Stage_Trace_etaHEN.plugin"
             --title-id CFPS00918 --version 9.18
 )
+
+# ------------------------------------------------------------------
+# SR6 - production-backend validation.  The probe itself contains no DMAP or
+# module-enumeration implementation; it exercises the reusable backend library
+# after the SR5 hardware findings were folded into proc_rw_v960.cpp and
+# videoout_counter.cpp.  No ptrace/MDBG/renderer/injection.
+# ------------------------------------------------------------------
+add_executable(common_fps_v028b_sr6
+    "${ROOT}/src/ps5/legacy_v028b/sr6_production_backend_probe.cpp"
+)
+
+set_target_properties(common_fps_v028b_sr6 PROPERTIES
+    OUTPUT_NAME "Common_FPS_SR6_v028b_Production_Backend.elf"
+)
+
+target_link_libraries(common_fps_v028b_sr6 PRIVATE
+    common_fps_v028b_backend
+    kernel_sys
+    SceLibcInternal
+)
+
+target_compile_options(common_fps_v028b_sr6 PRIVATE
+    --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
+    -Wall -Wextra -Werror -ffunction-sections -fdata-sections
+)
+
+target_link_options(common_fps_v028b_sr6 PRIVATE -Wl,--gc-sections)
+
+add_custom_command(
+    TARGET common_fps_v028b_sr6 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist/v028b-sr6"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_v028b_sr6>"
+            "${ROOT}/dist/v028b-sr6/Common_FPS_SR6_v028b_Production_Backend.elf"
+    COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
+            "${ROOT}/dist/v028b-sr6/Common_FPS_SR6_v028b_Production_Backend.elf"
+            "${ROOT}/dist/v028b-sr6/Common_FPS_SR6_v028b_Production_Backend_etaHEN.plugin"
+            --title-id CFPS00919 --version 9.19
+)
