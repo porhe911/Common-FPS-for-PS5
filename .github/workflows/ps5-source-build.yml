@@ -34,16 +34,16 @@ jobs:
           cmake --build build-host -j2
           ctest --test-dir build-host --output-on-failure
 
-      - name: Build RC9 sparse lifecycle plus v11 FPS backend
+      - name: Build RC10 snapshot-gated v11 FPS backend
         run: bash ./scripts/ps5_source_build.sh
 
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-RC9-FPS-Backend
+          name: Common-FPS-RC10-Snapshot-Gated
           path: |
-            dist/Common_FPS_RC9_FPS_Backend.elf
-            dist/Common_FPS_RC9_FPS_Backend_etaHEN.plugin
+            dist/Common_FPS_RC10_Snapshot_Gated.elf
+            dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
