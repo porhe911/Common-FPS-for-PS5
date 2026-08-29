@@ -37,7 +37,10 @@ inline constexpr int kDefaultFontSize = 26;
 inline constexpr int kMinFontSize = 18;
 inline constexpr int kMaxFontSize = 36;
 
-/* Matches the stable binary's sanity bound: 3000 tenths = 300.0 FPS. */
-inline constexpr std::uint32_t kMaxTenthsFps = 3000;
+/*
+ * FW 9.60 hardware v10/v11 filter: preserve real 30/60/120 Hz modes with
+ * margin, but reject attach/startup deltas such as 146/259 FPS.
+ */
+inline constexpr std::uint32_t kMaxTenthsFps = 1300;
 
 } // namespace common_fps
