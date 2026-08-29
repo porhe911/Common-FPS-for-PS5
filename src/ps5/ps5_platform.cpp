@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <sys/sysctl.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -35,6 +36,8 @@ int sceKernelGetProsperoSystemSwVersion(OrbisKernelSwVersion* version);
 
 namespace common_fps::ps5 {
 
+namespace {
+
 static int firmware_short() {
     OrbisKernelSwVersion version{};
     if (sceKernelGetProsperoSystemSwVersion(&version) < 0)
@@ -43,23 +46,86 @@ static int firmware_short() {
     return static_cast<int>(version.version >> 16);
 }
 
-std::optional<ProcessId> Ps5Platform::find_game_process() {
-    struct proc* p = find_proc_by_name("eboot.bin");
-    if (!p)
+bool bounded_name_equals(const std::uint8_t* record,
+                         std::size_t record_size,
+                         const char* wanted) {
+    constexpr std::size_t kNameOffset = 447U;
+    if (record_size <= kNameOffset)
+        return false;
+
+    const std::size_t wanted_len = std::strlen(wanted);
+    const std::size_t available = record_size - kNameOffset;
+    if (available < wanted_len + 1U)
+        return false;
+
+    const auto* name = record + kNameOffset;
+    return std::memcmp(name, wanted, wanted_len) == 0 &&
+           name[wanted_len] == 0;
+}
+
+std::optional<ProcessId> find_pid_sysctl(const char* wanted) {
+    int mib[4] = {1, 14, 8, 0};
+    std::size_t required = 0;
+    if (sysctl(mib, 4, nullptr, &required, nullptr, 0) != 0 || required == 0)
         return std::nullopt;
 
-    const ProcessId pid = p->pid;
-    std::free(p);
-    return pid;
+    const std::size_t capacity = required + 65536U;
+    auto* buffer = static_cast<std::uint8_t*>(std::malloc(capacity));
+    if (!buffer)
+        return std::nullopt;
+
+    std::size_t filled = capacity;
+    if (sysctl(mib, 4, buffer, &filled, nullptr, 0) != 0 || filled > capacity) {
+        std::free(buffer);
+        return std::nullopt;
+    }
+
+    std::optional<ProcessId> result;
+    std::uint8_t* ptr = buffer;
+    std::uint8_t* end = buffer + filled;
+
+    while (ptr < end) {
+        if (static_cast<std::size_t>(end - ptr) < sizeof(int))
+            break;
+
+        int record_size_signed = 0;
+        std::memcpy(&record_size_signed, ptr, sizeof(record_size_signed));
+        if (record_size_signed <= 0)
+            break;
+
+        const std::size_t record_size = static_cast<std::size_t>(record_size_signed);
+        if (record_size > static_cast<std::size_t>(end - ptr))
+            break;
+
+        if (record_size >= 76U && bounded_name_equals(ptr, record_size, wanted)) {
+            int pid = -1;
+            std::memcpy(&pid, ptr + 72U, sizeof(pid));
+            if (pid > 0)
+                result = pid;
+            break;
+        }
+
+        ptr += record_size;
+    }
+
+    std::free(buffer);
+    return result;
+}
+
+} // namespace
+
+std::optional<ProcessId> Ps5Platform::find_game_process() {
+    // RC8-proven userland discovery; never walk KERNEL_ADDRESS_ALLPROC here.
+    return find_pid_sysctl("eboot.bin");
 }
 
 bool Ps5Platform::process_alive(ProcessId pid) {
-    struct proc* p = get_proc_by_pid(pid);
-    if (!p)
-        return false;
-
-    std::free(p);
-    return true;
+    /*
+     * RC9 deliberately avoids a second process-list scan for every FPS sample.
+     * The controller owns game lifecycle through sparse sysctl snapshots. If a
+     * process exits between snapshots, read_memory() fails and FpsSampler resets.
+     */
+    return pid > 0;
 }
 
 bool Ps5Platform::begin_process_inspection(ProcessId) {
