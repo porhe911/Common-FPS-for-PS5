@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "v1_stable_ps5_platform.hpp"
+#include "v1_stable_dynlib.hpp"
 
 #include "common_fps/v1_stable_memory.hpp"
 
@@ -16,65 +17,34 @@
 #include <unistd.h>
 #include <vector>
 
-extern "C" {
-#include "proc.h"
-}
-
 namespace common_fps::ps5 {
 namespace {
 
-/*
- * Hardware-parity process discovery.
- *
- * The stable Common FPS line (v0.7 -> v0.17 -> v0.22c -> v1.0.0) found the
- * foreground game through the ordinary PS5/FreeBSD KERN_PROC sysctl snapshot.
- * Do not replace this with etaHEN's allproc find_proc_by_name(): the latter was
- * introduced only by the later clean rewrite and failed the FW 9.60 parity
- * probe even while eboot.bin was already running.
- */
 std::optional<ProcessId> find_process_sysctl(const char* process_name) {
     int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0};
-
     std::size_t buffer_size = 0;
-    if (sysctl(mib, 4, nullptr, &buffer_size, nullptr, 0) != 0 ||
-        buffer_size == 0) {
+    if (sysctl(mib, 4, nullptr, &buffer_size, nullptr, 0) != 0 || buffer_size == 0)
         return std::nullopt;
-    }
 
     std::vector<std::uint8_t> buffer(buffer_size);
-    if (sysctl(
-            mib,
-            4,
-            buffer.data(),
-            &buffer_size,
-            nullptr,
-            0) != 0) {
+    if (sysctl(mib, 4, buffer.data(), &buffer_size, nullptr, 0) != 0)
         return std::nullopt;
-    }
 
     auto* cursor = buffer.data();
     auto* end = buffer.data() + buffer_size;
-
     while (cursor + sizeof(int) <= end) {
         const auto* info = reinterpret_cast<const struct kinfo_proc*>(cursor);
         const auto record_size = static_cast<std::size_t>(info->ki_structsize);
-
         if (record_size < sizeof(struct kinfo_proc) ||
-            record_size > static_cast<std::size_t>(end - cursor)) {
+            record_size > static_cast<std::size_t>(end - cursor))
             break;
-        }
 
         if (info->ki_pid > 0 &&
-            std::strncmp(
-                info->ki_comm,
-                process_name,
-                sizeof(info->ki_comm)) == 0) {
+            std::strncmp(info->ki_comm, process_name, sizeof(info->ki_comm)) == 0)
             return static_cast<ProcessId>(info->ki_pid);
-        }
 
         cursor += record_size;
     }
-
     return std::nullopt;
 }
 
@@ -83,49 +53,32 @@ bool process_alive_sysctl(ProcessId pid) {
         return false;
 
     int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0};
-
     std::size_t buffer_size = 0;
-    if (sysctl(mib, 4, nullptr, &buffer_size, nullptr, 0) != 0 ||
-        buffer_size == 0) {
+    if (sysctl(mib, 4, nullptr, &buffer_size, nullptr, 0) != 0 || buffer_size == 0)
         return false;
-    }
 
     std::vector<std::uint8_t> buffer(buffer_size);
-    if (sysctl(
-            mib,
-            4,
-            buffer.data(),
-            &buffer_size,
-            nullptr,
-            0) != 0) {
+    if (sysctl(mib, 4, buffer.data(), &buffer_size, nullptr, 0) != 0)
         return false;
-    }
 
     auto* cursor = buffer.data();
     auto* end = buffer.data() + buffer_size;
-
     while (cursor + sizeof(int) <= end) {
         const auto* info = reinterpret_cast<const struct kinfo_proc*>(cursor);
         const auto record_size = static_cast<std::size_t>(info->ki_structsize);
-
         if (record_size < sizeof(struct kinfo_proc) ||
-            record_size > static_cast<std::size_t>(end - cursor)) {
+            record_size > static_cast<std::size_t>(end - cursor))
             break;
-        }
-
         if (info->ki_pid == pid)
             return true;
-
         cursor += record_size;
     }
-
     return false;
 }
 
 bool module_name_matches(const char* reported, const char* requested) {
     if (!reported || !requested || !reported[0] || !requested[0])
         return false;
-
     if (std::strcmp(reported, requested) == 0)
         return true;
 
@@ -140,43 +93,22 @@ bool module_name_matches(const char* reported, const char* requested) {
            std::strcmp(reported + reported_len - requested_len, requested) == 0;
 }
 
-/*
- * Stable module discovery uses the target process' dynlib handle list.
- * etaHEN's helper compared module_info_t::filename with strcmp(), which is too
- * strict for FW 9.60 if the kernel reports a full module path. Keep the same
- * syscalls but compare the basename/suffix as well.
- */
 std::optional<ModuleInfo>
 find_module_dynlib(ProcessId pid, const char* module_name) {
     std::size_t handle_count = 0;
-    if (syscall(SYS_dl_get_list, pid, nullptr, 0, &handle_count) < 0 ||
-        handle_count == 0) {
+    if (syscall(kSysDlGetList, pid, nullptr, 0, &handle_count) < 0 || handle_count == 0)
         return std::nullopt;
-    }
 
     std::vector<std::uintptr_t> handles(handle_count);
     std::size_t returned_count = handle_count;
-    if (syscall(
-            SYS_dl_get_list,
-            pid,
-            handles.data(),
-            handles.size(),
-            &returned_count) < 0) {
+    if (syscall(kSysDlGetList, pid, handles.data(), handles.size(), &returned_count) < 0)
         return std::nullopt;
-    }
 
     returned_count = std::min(returned_count, handles.size());
     for (std::size_t i = 0; i < returned_count; ++i) {
-        module_info_t info{};
-        if (syscall(
-                SYS_dl_get_info_2,
-                pid,
-                1,
-                handles[i],
-                &info) < 0) {
+        DynlibModuleInfo info{};
+        if (syscall(kSysDlGetInfo2, pid, 1, handles[i], &info) < 0)
             continue;
-        }
-
         if (!module_name_matches(info.filename, module_name))
             continue;
 
@@ -209,13 +141,7 @@ bool V1StablePs5Platform::read_memory(
     std::uintptr_t address,
     void* out,
     std::size_t size) {
-
-    return common_fps::v1_stable::proc_read_dmap(
-        dmap_,
-        pid,
-        address,
-        out,
-        size);
+    return common_fps::v1_stable::proc_read_dmap(dmap_, pid, address, out, size);
 }
 
 std::uint64_t V1StablePs5Platform::monotonic_us() {
