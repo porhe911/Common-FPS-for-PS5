@@ -22,6 +22,7 @@ add_library(common_fps_v1_reconstruction STATIC
     src/reconstruction/v1_stable_hook_state.cpp
     src/reconstruction/v1_stable_render_loop.cpp
     src/reconstruction/v1_stable_sampler.cpp
+    src/reconstruction/v1_stable_controller.cpp
     integration/loader/v1_loader_contract.cpp
 )
 target_include_directories(
@@ -51,65 +52,27 @@ if(COMMON_FPS_BUILD_TESTS)
     target_include_directories(common_fps_v1_stable_wire_tests PRIVATE include)
     add_test(NAME common_fps_v1_stable_wire_tests COMMAND common_fps_v1_stable_wire_tests)
 
-    add_executable(
-        common_fps_v1_stable_hook_state_tests
-        tests/test_v1_stable_hook_state.cpp
-    )
-    target_link_libraries(
-        common_fps_v1_stable_hook_state_tests
-        PRIVATE common_fps_v1_reconstruction
-    )
-    add_test(
-        NAME common_fps_v1_stable_hook_state_tests
-        COMMAND common_fps_v1_stable_hook_state_tests
-    )
+    add_executable(common_fps_v1_stable_hook_state_tests tests/test_v1_stable_hook_state.cpp)
+    target_link_libraries(common_fps_v1_stable_hook_state_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_stable_hook_state_tests COMMAND common_fps_v1_stable_hook_state_tests)
 
-    add_executable(
-        common_fps_v1_stable_render_loop_tests
-        tests/test_v1_stable_render_loop.cpp
-    )
-    target_link_libraries(
-        common_fps_v1_stable_render_loop_tests
-        PRIVATE common_fps_v1_reconstruction
-    )
-    add_test(
-        NAME common_fps_v1_stable_render_loop_tests
-        COMMAND common_fps_v1_stable_render_loop_tests
-    )
+    add_executable(common_fps_v1_stable_render_loop_tests tests/test_v1_stable_render_loop.cpp)
+    target_link_libraries(common_fps_v1_stable_render_loop_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_stable_render_loop_tests COMMAND common_fps_v1_stable_render_loop_tests)
 
-    add_executable(
-        common_fps_v1_stable_sampler_tests
-        tests/test_v1_stable_sampler.cpp
-    )
-    target_link_libraries(
-        common_fps_v1_stable_sampler_tests
-        PRIVATE common_fps_v1_reconstruction
-    )
-    add_test(
-        NAME common_fps_v1_stable_sampler_tests
-        COMMAND common_fps_v1_stable_sampler_tests
-    )
+    add_executable(common_fps_v1_stable_sampler_tests tests/test_v1_stable_sampler.cpp)
+    target_link_libraries(common_fps_v1_stable_sampler_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_stable_sampler_tests COMMAND common_fps_v1_stable_sampler_tests)
 
-    add_executable(
-        common_fps_v1_loader_contract_tests
-        tests/test_v1_loader_contract.cpp
-    )
-    target_link_libraries(
-        common_fps_v1_loader_contract_tests
-        PRIVATE common_fps_v1_reconstruction
-    )
-    add_test(
-        NAME common_fps_v1_loader_contract_tests
-        COMMAND common_fps_v1_loader_contract_tests
-    )
+    add_executable(common_fps_v1_loader_contract_tests tests/test_v1_loader_contract.cpp)
+    target_link_libraries(common_fps_v1_loader_contract_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_loader_contract_tests COMMAND common_fps_v1_loader_contract_tests)
 
-    add_executable(
-        common_fps_v1_stable_overlay_tests
-        tests/test_v1_stable_overlay.cpp
-    )
+    add_executable(common_fps_v1_stable_overlay_tests tests/test_v1_stable_overlay.cpp)
     target_include_directories(common_fps_v1_stable_overlay_tests PRIVATE include)
-    add_test(
-        NAME common_fps_v1_stable_overlay_tests
-        COMMAND common_fps_v1_stable_overlay_tests
-    )
+    add_test(NAME common_fps_v1_stable_overlay_tests COMMAND common_fps_v1_stable_overlay_tests)
+
+    add_executable(common_fps_v1_stable_controller_tests tests/test_v1_stable_controller.cpp)
+    target_link_libraries(common_fps_v1_stable_controller_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_stable_controller_tests COMMAND common_fps_v1_stable_controller_tests)
 endif()
