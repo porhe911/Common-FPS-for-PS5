@@ -177,3 +177,40 @@ add_custom_command(
             "${ROOT}/dist/v028b-sr4/Common_FPS_SR4_v028b_V5_RC12_DMAP_etaHEN.plugin"
             --title-id CFPS00917 --version 9.17
 )
+
+# ------------------------------------------------------------------
+# SR5 - keep the hardware-proven SR4 lifecycle/module/auth path, then trace
+# every stage of the exact-reference FW 9.60 DMAP translation recovered from
+# the stable v0.28b ELF.  No ptrace/MDBG/renderer/injection.
+# ------------------------------------------------------------------
+add_executable(common_fps_v028b_sr5
+    "${ROOT}/src/ps5/legacy_v028b/sr5_dmap_stage_trace.cpp"
+)
+
+set_target_properties(common_fps_v028b_sr5 PROPERTIES
+    OUTPUT_NAME "Common_FPS_SR5_v028b_DMAP_Stage_Trace.elf"
+)
+
+target_link_libraries(common_fps_v028b_sr5 PRIVATE
+    common_fps_v028b_backend
+    kernel_sys
+    SceLibcInternal
+)
+
+target_compile_options(common_fps_v028b_sr5 PRIVATE
+    --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
+    -Wall -Wextra -Werror -ffunction-sections -fdata-sections
+)
+
+target_link_options(common_fps_v028b_sr5 PRIVATE -Wl,--gc-sections)
+
+add_custom_command(
+    TARGET common_fps_v028b_sr5 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist/v028b-sr5"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_v028b_sr5>"
+            "${ROOT}/dist/v028b-sr5/Common_FPS_SR5_v028b_DMAP_Stage_Trace.elf"
+    COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
+            "${ROOT}/dist/v028b-sr5/Common_FPS_SR5_v028b_DMAP_Stage_Trace.elf"
+            "${ROOT}/dist/v028b-sr5/Common_FPS_SR5_v028b_DMAP_Stage_Trace_etaHEN.plugin"
+            --title-id CFPS00918 --version 9.18
+)
