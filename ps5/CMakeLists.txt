@@ -18,9 +18,10 @@ if(NOT EXISTS "${ETAHEN_FPS}/src/proc.cpp")
     message(FATAL_ERROR "Pinned etaHEN source missing; run scripts/prepare_ps5_deps.sh")
 endif()
 
-# RC12 keeps MDBG only for the one-time FpsSampler.attach discovery sequence.
-# After the counter address is discovered, the controller deliberately never
-# calls sampler.sample(), so no periodic remote memory reads occur.
+# RC13 keeps the RC12 one-time discovery path, but never reuses the process
+# that performs privileged inspection. A clean sysctl-only supervisor forks
+# one short-lived discovery child per confirmed game PID. The child exits
+# immediately after resolving the VideoOut FPS counter and never samples FPS.
 add_executable(common_fps_controller
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/ps5/ps5_platform.cpp"
@@ -29,7 +30,7 @@ add_executable(common_fps_controller
     "${ETAHEN_SHELLUI}/src/ucred.cpp"
 )
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC12_Discovery_Only.elf")
+    OUTPUT_NAME "Common_FPS_RC13_Fresh_Child_Discovery.elf")
 
 target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/include"
@@ -52,8 +53,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only.elf"
+            "${ROOT}/dist/Common_FPS_RC13_Fresh_Child_Discovery.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only.elf"
-            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only_etaHEN.plugin"
-            --title-id CFPS00912 --version 9.12)
+            "${ROOT}/dist/Common_FPS_RC13_Fresh_Child_Discovery.elf"
+            "${ROOT}/dist/Common_FPS_RC13_Fresh_Child_Discovery_etaHEN.plugin"
+            --title-id CFPS00913 --version 9.13)
