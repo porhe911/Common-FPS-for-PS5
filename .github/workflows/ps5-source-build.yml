@@ -3,6 +3,8 @@ name: PS5 Source Build
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "fw960-stageb-v11"
     tags:
       - "v1.1.0-rc*"
       - "v1.1.0"
