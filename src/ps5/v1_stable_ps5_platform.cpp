@@ -7,12 +7,18 @@
 
 #include "common_fps/v1_stable_memory.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
+#include <unistd.h>
 #include <vector>
+
+extern "C" {
+#include "proc.h"
+}
 
 namespace common_fps::ps5 {
 namespace {
@@ -116,6 +122,73 @@ bool process_alive_sysctl(ProcessId pid) {
     return false;
 }
 
+bool module_name_matches(const char* reported, const char* requested) {
+    if (!reported || !requested || !reported[0] || !requested[0])
+        return false;
+
+    if (std::strcmp(reported, requested) == 0)
+        return true;
+
+    const char* basename = std::strrchr(reported, '/');
+    basename = basename ? basename + 1 : reported;
+    if (std::strcmp(basename, requested) == 0)
+        return true;
+
+    const std::size_t reported_len = std::strlen(reported);
+    const std::size_t requested_len = std::strlen(requested);
+    return reported_len >= requested_len &&
+           std::strcmp(reported + reported_len - requested_len, requested) == 0;
+}
+
+/*
+ * Stable module discovery uses the target process' dynlib handle list.
+ * etaHEN's helper compared module_info_t::filename with strcmp(), which is too
+ * strict for FW 9.60 if the kernel reports a full module path. Keep the same
+ * syscalls but compare the basename/suffix as well.
+ */
+std::optional<ModuleInfo>
+find_module_dynlib(ProcessId pid, const char* module_name) {
+    std::size_t handle_count = 0;
+    if (syscall(SYS_dl_get_list, pid, nullptr, 0, &handle_count) < 0 ||
+        handle_count == 0) {
+        return std::nullopt;
+    }
+
+    std::vector<std::uintptr_t> handles(handle_count);
+    std::size_t returned_count = handle_count;
+    if (syscall(
+            SYS_dl_get_list,
+            pid,
+            handles.data(),
+            handles.size(),
+            &returned_count) < 0) {
+        return std::nullopt;
+    }
+
+    returned_count = std::min(returned_count, handles.size());
+    for (std::size_t i = 0; i < returned_count; ++i) {
+        module_info_t info{};
+        if (syscall(
+                SYS_dl_get_info_2,
+                pid,
+                1,
+                handles[i],
+                &info) < 0) {
+            continue;
+        }
+
+        if (!module_name_matches(info.filename, module_name))
+            continue;
+
+        ModuleInfo result;
+        result.base = static_cast<std::uintptr_t>(info.sections[0].vaddr);
+        result.name = info.filename;
+        return result;
+    }
+
+    return std::nullopt;
+}
+
 } // namespace
 
 std::optional<ProcessId> V1StablePs5Platform::find_game_process() {
@@ -128,7 +201,7 @@ bool V1StablePs5Platform::process_alive(ProcessId pid) {
 
 std::optional<ModuleInfo>
 V1StablePs5Platform::find_module(ProcessId pid, const char* module_name) {
-    return base_.find_module(pid, module_name);
+    return find_module_dynlib(pid, module_name);
 }
 
 bool V1StablePs5Platform::read_memory(
