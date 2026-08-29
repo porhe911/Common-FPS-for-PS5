@@ -11,24 +11,28 @@ namespace common_fps::v1_stable {
 inline constexpr std::uint32_t kWireMagic = 0x46554850u; // PHUF
 inline constexpr std::uint32_t kWireVersion = 1;
 inline constexpr std::uint16_t kWirePort = 55541;
-inline constexpr std::size_t kRawTextCapacity = 1024;
+inline constexpr std::size_t kTextCapacity = 1024;
 inline constexpr std::uint32_t kMaxTenthsFps = 3000;
 
+/*
+ * Exact field names/layout recovered from PHU r11 DWARF and verified against
+ * the hardware-stable Common FPS v1.0.0 sender/receiver disassembly.
+ */
 struct FpsPacket {
     std::uint32_t magic = kWireMagic;
     std::uint32_t version = kWireVersion;
     std::uint64_t sequence = 0;
     double fps = 0.0;
-    std::uint64_t reserved = 0;
-    char raw[kRawTextCapacity]{};
+    std::uint64_t last_ns = 0;
+    char text[kTextCapacity]{};
 };
 
 static_assert(offsetof(FpsPacket, magic) == 0x00);
 static_assert(offsetof(FpsPacket, version) == 0x04);
 static_assert(offsetof(FpsPacket, sequence) == 0x08);
 static_assert(offsetof(FpsPacket, fps) == 0x10);
-static_assert(offsetof(FpsPacket, reserved) == 0x18);
-static_assert(offsetof(FpsPacket, raw) == 0x20);
+static_assert(offsetof(FpsPacket, last_ns) == 0x18);
+static_assert(offsetof(FpsPacket, text) == 0x20);
 static_assert(sizeof(FpsPacket) == 0x420);
 
 inline void set_loading(FpsPacket& packet, std::uint64_t sequence) {
@@ -37,7 +41,7 @@ inline void set_loading(FpsPacket& packet, std::uint64_t sequence) {
     packet.version = kWireVersion;
     packet.sequence = sequence;
     constexpr char kLoading[] = "FPS\tloading\n";
-    std::memcpy(packet.raw, kLoading, sizeof(kLoading));
+    std::memcpy(packet.text, kLoading, sizeof(kLoading));
 }
 
 inline void set_numeric(FpsPacket& packet,
@@ -48,7 +52,7 @@ inline void set_numeric(FpsPacket& packet,
     packet.version = kWireVersion;
     packet.sequence = sequence;
     packet.fps = fps;
-    packet.raw[0] = '\0';
+    packet.text[0] = '\0';
 }
 
 inline std::optional<double> calculate_fps(std::uint32_t previous_counter,
