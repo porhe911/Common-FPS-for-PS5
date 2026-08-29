@@ -26,6 +26,11 @@ set(ETAHEN_FPS "${ETAHEN_ROOT}/fps_elf")
 set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
 
 # ------------------------------------------------------------------
+# Hardware-proven v0.28b producer reconstruction (compile-only for now).
+# ------------------------------------------------------------------
+include("${CMAKE_CURRENT_LIST_DIR}/V028BRebuild.cmake")
+
+# ------------------------------------------------------------------
 # Controller/plugin ELF.
 # ------------------------------------------------------------------
 add_executable(common_fps_controller)
