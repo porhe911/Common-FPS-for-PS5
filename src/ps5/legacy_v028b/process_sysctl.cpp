@@ -12,7 +12,6 @@ namespace {
 
 constexpr std::size_t kPidOffset = 72U;
 constexpr std::size_t kNameOffset = 447U;
-constexpr std::size_t kExtraCapacity = 64U * 1024U;
 constexpr char kGameName[] = "eboot.bin";
 
 bool record_name_equals(
@@ -42,13 +41,14 @@ pid_t find_game_pid_sysctl() noexcept {
     if (sysctl(mib, 4, nullptr, &required, nullptr, 0) != 0 || required == 0)
         return -1;
 
-    const std::size_t capacity = required + kExtraCapacity;
-    auto* buffer = static_cast<std::uint8_t*>(std::malloc(capacity));
+    // Exact v0.28b behavior: allocate the size returned by the first sysctl,
+    // then reuse that same size variable for the fill call.
+    auto* buffer = static_cast<std::uint8_t*>(std::malloc(required));
     if (!buffer)
         return -1;
 
-    std::size_t filled = capacity;
-    if (sysctl(mib, 4, buffer, &filled, nullptr, 0) != 0 || filled > capacity) {
+    std::size_t filled = required;
+    if (sysctl(mib, 4, buffer, &filled, nullptr, 0) != 0 || filled > required) {
         std::free(buffer);
         return -1;
     }
@@ -77,10 +77,8 @@ pid_t find_game_pid_sysctl() noexcept {
             record_name_equals(ptr, record_size, kGameName)) {
             pid_t pid = -1;
             std::memcpy(&pid, ptr + kPidOffset, sizeof(pid));
-            if (pid > 0 && pid != self) {
+            if (pid > 0 && pid != self)
                 result = pid;
-                break;
-            }
         }
 
         ptr += record_size;
