@@ -1,5 +1,5 @@
 /*
- * Common FPS for PS5 - RC10 snapshot-gated v11 FPS backend probe
+ * Common FPS for PS5 - RC11 snapshot-gated MDBG FPS backend probe
  * Copyright (C) 2026 porhe911
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -18,7 +18,7 @@
 
 namespace {
 
-constexpr const char* kLogPath = "/data/CommonFPS_RC10_snapshot_gated.log";
+constexpr const char* kLogPath = "/data/CommonFPS_RC11_mdbg_backend.log";
 constexpr int kRuntimeSeconds = 180;
 constexpr int kSnapshotPeriodSeconds = 5;
 constexpr int kSnapshotCount = kRuntimeSeconds / kSnapshotPeriodSeconds;
@@ -122,7 +122,7 @@ void log_snapshot(int index, const SnapshotResult& s, int stable_count) {
     if (!f)
         return;
     std::fprintf(f,
-                 "RC10 SNAPSHOT %d/%d rc=%d records=%zu filled=%zu shellui=%d game=%d stable=%d\n",
+                 "RC11 SNAPSHOT %d/%d rc=%d records=%zu filled=%zu shellui=%d game=%d stable=%d\n",
                  index, kSnapshotCount, s.rc, s.records, s.filled,
                  s.shellui_pid, s.game_pid, stable_count);
     std::fclose(f);
@@ -132,7 +132,7 @@ void log_attach_ok(int pid, std::uintptr_t counter) {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f)
         return;
-    std::fprintf(f, "RC10 ATTACH OK pid=%d counter=0x%llx\n",
+    std::fprintf(f, "RC11 ATTACH OK pid=%d counter=0x%llx\n",
                  pid, static_cast<unsigned long long>(counter));
     std::fclose(f);
 }
@@ -141,16 +141,17 @@ void log_fps(int pid, int fps) {
     FILE* f = std::fopen(kLogPath, "a");
     if (!f)
         return;
-    std::fprintf(f, "RC10 FPS pid=%d value=%d\n", pid, fps);
+    std::fprintf(f, "RC11 FPS pid=%d value=%d\n", pid, fps);
     std::fclose(f);
 }
 
 int run_child() {
-    log_pid("RC10 CHILD pid=", static_cast<int>(getpid()));
-    log_line("RC10 snapshot-gated v11 FPS backend; NO renderer / NO ShellUI inject");
-    log_line("RC10 one combined sysctl snapshot every 5s; ZERO FPS reads between snapshots");
-    log_line("RC10 new game PID must survive TWO consecutive snapshots before attach");
-    log_line("RC10 temporary debugger auth ONLY during sampler attach/discovery");
+    log_pid("RC11 CHILD pid=", static_cast<int>(getpid()));
+    log_line("RC11 snapshot-gated v11 FPS backend using MDBG; NO renderer / NO ShellUI inject");
+    log_line("RC11 one combined sysctl snapshot every 5s; one FPS read immediately after snapshot");
+    log_line("RC11 new game PID must survive TWO consecutive snapshots before attach");
+    log_line("RC11 NO shsrv ptrace: no PT_ATTACH / waitpid / PT_IO / PT_DETACH");
+    log_line("RC11 module enumeration still uses short debugger-auth scope; sampling uses SDK v0.41 mdbg_copyout");
 
     common_fps::ps5::Ps5Platform platform;
     common_fps::FpsSampler sampler(platform);
@@ -163,7 +164,7 @@ int run_child() {
 
         if (s.rc != 0) {
             log_snapshot(index, s, stable_count);
-            log_line("RC10 SNAPSHOT FAIL; no ptrace/FPS operation this cycle");
+            log_line("RC11 SNAPSHOT FAIL; no FPS operation this cycle");
             sleep(kSnapshotPeriodSeconds);
             continue;
         }
@@ -172,7 +173,7 @@ int run_child() {
             observed_game = s.game_pid;
             stable_count = 1;
             sampler.reset();
-            log_pid("RC10 CHANGE eboot.bin pid=", observed_game);
+            log_pid("RC11 CHANGE eboot.bin pid=", observed_game);
         } else if (stable_count < 1000) {
             ++stable_count;
         }
@@ -180,65 +181,60 @@ int run_child() {
         log_snapshot(index, s, stable_count);
 
         if (observed_game <= 0) {
-            // Critical transition rule: once sysctl no longer sees a game,
-            // never touch the previous PID again.
             sampler.reset();
             sleep(kSnapshotPeriodSeconds);
             continue;
         }
 
         if (stable_count < kStableSnapshotsBeforeAttach) {
-            log_line("RC10 WAIT PID confirmation; no attach/sample this cycle");
+            log_line("RC11 WAIT PID confirmation; no attach/sample this cycle");
             sleep(kSnapshotPeriodSeconds);
             continue;
         }
 
         if (!sampler.attached()) {
-            log_pid("RC10 ATTACH TRY confirmed pid=", observed_game);
+            log_pid("RC11 ATTACH TRY confirmed pid=", observed_game);
             if (sampler.attach(observed_game))
                 log_attach_ok(observed_game, sampler.counter_address());
             else {
-                log_line("RC10 ATTACH RETRY on next confirmed snapshot");
+                log_line("RC11 ATTACH RETRY on next confirmed snapshot");
                 sleep(kSnapshotPeriodSeconds);
                 continue;
             }
         }
 
-        // Exactly ONE sample immediately after the sysctl snapshot confirmed
-        // that the same PID still exists. There are no ptrace reads during
-        // the following 5-second sleep window.
         if (sampler.attached() && sampler.pid() == observed_game) {
             const auto fps = sampler.sample();
             if (fps)
                 log_fps(observed_game, *fps);
             else if (!sampler.attached())
-                log_line("RC10 SAMPLE lost attachment; wait for next snapshot");
+                log_line("RC11 SAMPLE lost attachment; wait for next snapshot");
             else
-                log_line("RC10 SAMPLE warmup/no-value");
+                log_line("RC11 SAMPLE warmup/no-value");
         }
 
         sleep(kSnapshotPeriodSeconds);
     }
 
     sampler.reset();
-    log_line("RC10 CHILD DONE clean return");
+    log_line("RC11 CHILD DONE clean return");
     return 0;
 }
 
 } // namespace
 
 extern "C" int main() {
-    log_pid("RC10 PARENT start pid=", static_cast<int>(getpid()));
+    log_pid("RC11 PARENT start pid=", static_cast<int>(getpid()));
 
     const pid_t pid = fork();
     if (pid < 0) {
-        log_line("RC10 fork FAIL");
+        log_line("RC11 fork FAIL");
         return 1;
     }
 
     if (pid > 0) {
-        log_pid("RC10 PARENT forked child=", static_cast<int>(pid));
-        log_line("RC10 PARENT RETURN 0");
+        log_pid("RC11 PARENT forked child=", static_cast<int>(pid));
+        log_line("RC11 PARENT RETURN 0");
         return 0;
     }
 
