@@ -10,13 +10,13 @@ endif()
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
-# RC7 is still a one-file diagnostic binary. It adds only FreeBSD sysctl
-# process-list reading to the RC6-proven fork worker. No etaHEN source, shsrv,
-# renderer, ptrace, auth helpers, FPS backend, or networking is linked.
+# RC8 remains a one-file diagnostic binary. It uses only fork + sparse FreeBSD
+# sysctl process snapshots. No etaHEN source, shsrv, renderer, ptrace, auth
+# helpers, FPS backend, or networking is linked.
 add_executable(common_fps_controller
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp")
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC7_Sysctl_Once.elf")
+    OUTPUT_NAME "Common_FPS_RC8_Sysctl_Sparse.elf")
 
 target_compile_options(common_fps_controller PRIVATE
     --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE -march=znver2 -O2
@@ -28,8 +28,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC7_Sysctl_Once.elf"
+            "${ROOT}/dist/Common_FPS_RC8_Sysctl_Sparse.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC7_Sysctl_Once.elf"
-            "${ROOT}/dist/Common_FPS_RC7_Sysctl_Once_etaHEN.plugin"
-            --title-id CFPS00907 --version 9.07)
+            "${ROOT}/dist/Common_FPS_RC8_Sysctl_Sparse.elf"
+            "${ROOT}/dist/Common_FPS_RC8_Sysctl_Sparse_etaHEN.plugin"
+            --title-id CFPS00908 --version 9.08)
