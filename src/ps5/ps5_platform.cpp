@@ -17,34 +17,11 @@ extern "C" {
 #include "proc.h"
 #include "pt.h"
 #include "ucred.h"
-
-int mdbg_copyout(
-    pid_t pid,
-    std::uintptr_t remote,
-    void* local,
-    std::size_t size);
-
-struct OrbisKernelSwVersion {
-    std::uint64_t pad0;
-    char version_str[0x1C];
-    std::uint32_t version;
-    std::uint64_t pad1;
-};
-
-int sceKernelGetProsperoSystemSwVersion(OrbisKernelSwVersion* version);
 }
 
 namespace common_fps::ps5 {
 
 namespace {
-
-static int firmware_short() {
-    OrbisKernelSwVersion version{};
-    if (sceKernelGetProsperoSystemSwVersion(&version) < 0)
-        return -1;
-
-    return static_cast<int>(version.version >> 16);
-}
 
 bool bounded_name_equals(const std::uint8_t* record,
                          std::size_t record_size,
@@ -175,20 +152,16 @@ bool Ps5Platform::read_memory(
     void* out,
     std::size_t size) {
 
-    const int fw = firmware_short();
-    if (fw < 0)
+    /*
+     * RC9 is an FW 9.60 hardware probe. Keep only the v11-proven ptrace copyout
+     * path here so no legacy debug-copy helpers are linked into this build.
+     */
+    if (pt_attach(pid) < 0)
         return false;
 
-    if (fw >= 0x840) {
-        if (pt_attach(pid) < 0)
-            return false;
-
-        const int rc = pt_copyout(pid, address, out, size);
-        pt_detach(pid, 0);
-        return rc >= 0;
-    }
-
-    return mdbg_copyout(pid, address, out, size) >= 0;
+    const int rc = pt_copyout(pid, address, out, size);
+    pt_detach(pid, 0);
+    return rc >= 0;
 }
 
 std::uint64_t Ps5Platform::monotonic_us() {
