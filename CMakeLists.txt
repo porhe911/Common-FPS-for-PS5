@@ -23,6 +23,7 @@ add_library(common_fps_v1_reconstruction STATIC
     src/reconstruction/v1_stable_render_loop.cpp
     src/reconstruction/v1_stable_sampler.cpp
     src/reconstruction/v1_stable_controller.cpp
+    src/reconstruction/v1_stable_memory.cpp
     integration/loader/v1_loader_contract.cpp
 )
 target_include_directories(
@@ -51,6 +52,10 @@ if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_v1_stable_wire_tests tests/test_v1_stable_wire.cpp)
     target_include_directories(common_fps_v1_stable_wire_tests PRIVATE include)
     add_test(NAME common_fps_v1_stable_wire_tests COMMAND common_fps_v1_stable_wire_tests)
+
+    add_executable(common_fps_v1_stable_memory_tests tests/test_v1_stable_memory.cpp)
+    target_link_libraries(common_fps_v1_stable_memory_tests PRIVATE common_fps_v1_reconstruction)
+    add_test(NAME common_fps_v1_stable_memory_tests COMMAND common_fps_v1_stable_memory_tests)
 
     add_executable(common_fps_v1_stable_hook_state_tests tests/test_v1_stable_hook_state.cpp)
     target_link_libraries(common_fps_v1_stable_hook_state_tests PRIVATE common_fps_v1_reconstruction)
