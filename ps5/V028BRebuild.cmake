@@ -1,8 +1,9 @@
 # Hardware-proven v0.28b producer reconstruction.
 #
-# The static library compiles the recovered FW 9.60 lifecycle + DMAP +
-# VideoOut + PHUF producer path. SR1 is a deliberately renderer-free hardware
-# parity probe that links this recovered backend directly.
+# The static backend compiles the recovered FW 9.60 lifecycle + DMAP +
+# VideoOut + PHUF producer path. The bootstrap static library is deliberately
+# separate so startup injection can be audited without contaminating the FPS
+# lifecycle with ptrace/MDBG dependencies.
 
 add_library(common_fps_v028b_backend STATIC
     "${ROOT}/src/ps5/legacy_v028b/process_sysctl.cpp"
@@ -35,11 +36,51 @@ target_compile_options(common_fps_v028b_backend PRIVATE
 )
 
 # ------------------------------------------------------------------
+# v0.28b one-time ShellUI bootstrap reconstruction (compile-only).
+#
+# This target intentionally contains ptrace/shsrv because the stable payload
+# uses ptrace once during renderer startup. It is NOT linked into the periodic
+# FPS producer path and is not emitted as a runnable payload by source-proof CI.
+# ------------------------------------------------------------------
+add_library(common_fps_v028b_bootstrap STATIC
+    "${ROOT}/src/ps5/legacy_v028b/stable_injector.cpp"
+    "${ROOT}/src/ps5/legacy_v028b/pt_call_breakpoint.cpp"
+    "${ROOT}/src/ps5/legacy_v028b/shsrv_elfldr_bridge.c"
+    "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
+)
+
+set_target_properties(common_fps_v028b_bootstrap PROPERTIES
+    OUTPUT_NAME "Common_FPS_v028b_bootstrap_sourceproof"
+)
+
+target_include_directories(common_fps_v028b_bootstrap PUBLIC
+    "${ROOT}/src/ps5/legacy_v028b"
+    "${COMMON_FPS_SHSRV_SOURCE}"
+    "${SDK}"
+    "${SDK}/include"
+)
+
+target_compile_options(common_fps_v028b_bootstrap PRIVATE
+    --target=x86_64-sie-ps5
+    -DPS5
+    -fPIC
+    -march=znver2
+    -O2
+    -Wall
+    -Wextra
+    -ffunction-sections
+    -fdata-sections
+)
+
+# ------------------------------------------------------------------
 # SR1 - recovered v0.28b backend hardware parity probe.
 #
 # No renderer, ShellUI injection, shsrv ptrace, MDBG or credential switching.
 # main() preserves the proven async fork entry and then exercises only:
 # sysctl lifecycle -> kernel dynlib VideoOut -> DMAP proc_read -> counter.
+#
+# SR1 exists for later controlled hardware parity testing; source-rebuild CI
+# does not automatically publish it as the next user test.
 # ------------------------------------------------------------------
 add_executable(common_fps_v028b_sr1
     "${ROOT}/src/ps5/legacy_v028b/sr1_backend_probe.cpp"
