@@ -34,23 +34,23 @@ clean-room `CFPS` packet used by the current rewrite.
 - magic: `PHUF` (`0x46554850` on the little-endian target)
 - version: `1`
 
-Recovered layout:
+Exact DWARF-recovered layout:
 
 ```cpp
-struct FpsPacket {
+struct PhuSharedFps {
     uint32_t magic;       // +0x00, PHUF
     uint32_t version;     // +0x04, 1
-    uint64_t sequence;    // +0x08
+    uint64_t seq;         // +0x08
     double   fps;         // +0x10
-    uint64_t reserved;    // +0x18
-    char     raw[1024];   // +0x20
+    uint64_t last_ns;     // +0x18
+    char     text[1024];  // +0x20
 };                       // sizeof = 0x420
 ```
 
-Numeric packets have `raw[0] == 0`. Loading packets use the exact controller
+The public reconstruction uses equivalent names in
+`include/common_fps/v1_stable_wire.hpp` (`sequence` for the recovered `seq`).
+Numeric packets have `text[0] == 0`. Loading packets use the exact controller
 literal `"FPS\tloading\n"` with `fps == 0.0`.
-
-The public source definition is now `include/common_fps/v1_stable_wire.hpp`.
 
 ## 3. Stable FPS sampler
 
@@ -86,13 +86,46 @@ retries.
 The stable renderer formats numeric values with `FPS\t%.0f\n`, so the visible
 FPS is integer-only even though the wire value retains tenth-FPS precision.
 
+### 3.1 Stable game-memory reads are DMAP reads, not per-read ptrace
+
+The historical v1.0.0 outer payload retains `proc_rw_v940.cpp`. Every VideoOut
+table/root/counter read in `probe_main_entry` goes through:
+
+```cpp
+prw::proc_read(pid, virtual_address, output, size)
+```
+
+Recovered `prw::proc_read()` behavior:
+
+1. zero-length read succeeds immediately;
+2. translate the current game virtual address to a physical address and return
+   the mapping page size;
+3. calculate the number of bytes remaining before the current mapping boundary;
+4. copy `min(remaining, bytes_to_boundary)` from
+   `g_dmap_base + physical_address` with `kernel_copyout()`;
+5. advance source/destination and repeat until the whole request is copied;
+6. fail immediately on address-translation or physical-copy failure.
+
+The translator supports the page sizes observed in the donor implementation:
+`4 KiB`, `2 MiB` and `1 GiB`.
+
+This distinction is a parity requirement. The later clean rewrite's
+`pt_attach() -> pt_copyout() -> pt_detach()` for every read is **not** the
+stable v1.0.0 memory path and must not be used by the reconstructed parity
+runtime.
+
+The host-testable page-chunk algorithm is published as
+`v1_stable::proc_read_dmap()` in `include/common_fps/v1_stable_memory.hpp` and
+`src/reconstruction/v1_stable_memory.cpp`. The PS5-specific translator/DMAP
+backend is reconstructed separately from the donor `proc_rw_v940.cpp` behavior.
+
 ## 4. Stable shsrv loader delta
 
 The outer PHU r11 payload and Common FPS v1.0.0 have identical layout and Build
 ID. Only three outer functions contain runtime text changes: `main`,
 `probe_main_entry`, and `elfldr_load`.
 
-The two `elfldr_load` edits are now decoded against pinned shsrv
+The two `elfldr_load` edits are decoded against pinned shsrv
 `6f320637d56d344a0e7797753099e33238bbf146`.
 
 ### 4.1 Continue during local ELF preparation
@@ -179,11 +212,12 @@ calls from the render callback. The remaining donor render/update path is kept.
 ## 6. Reconstruction order
 
 1. exact PHUF wire contract + sampler arithmetic (host-tested);
-2. stable controller lifecycle and process/module probe;
-3. stable shsrv loader delta on top of pinned upstream source;
-4. source reconstruction of the six changed renderer functions on top of the
+2. stable DMAP `proc_read` contract and PS5 translator backend;
+3. stable controller lifecycle and process/module probe;
+4. stable shsrv loader delta on top of pinned upstream source;
+5. source reconstruction of the six changed renderer functions on top of the
    donor architecture and public upstream helpers;
-5. source-built manual-start hardware parity on FW 9.60;
-6. only then add an Autoload readiness gate around the proven initialization.
+6. source-built manual-start hardware parity on FW 9.60;
+7. only then add an Autoload readiness gate around the proven initialization.
 
-No new hardware artifact should be promoted until step 5 passes.
+No new hardware artifact should be promoted until step 6 passes.
