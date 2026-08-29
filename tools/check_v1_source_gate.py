@@ -85,6 +85,10 @@ checks = [
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
      "mono_get_root_domain"),
 
+    ("etaHEN current-domain Game lookup",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "mono_domain_get"),
+
     ("source-built PUI assembly lookup",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
      'Sce.PlayStation.PUI.dll'),
@@ -100,6 +104,14 @@ checks = [
     ("etaHEN hook chaining",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
      "chain_over_existing_hook"),
+
+    ("VisualReady requires real Common FPS widget",
+     "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
+     "show_loading_state()"),
+
+    ("stable FPS loading startup probe",
+     "src/ps5/shellui_payload/commonfps_shellui.cpp",
+     "bool show_loading_state()"),
 
     ("PUI mutation only from update callback",
      "src/ps5/shellui_payload/commonfps_shellui_bootstrap.cpp",
@@ -144,4 +156,4 @@ failed |= not ok
 if failed:
     sys.exit(1)
 
-print("v1.0.0 + safe-autoload Stage B2 source gate: PASS")
+print("v1.0.0 + safe-autoload Stage B3 visual-probe source gate: PASS")
