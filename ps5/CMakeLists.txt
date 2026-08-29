@@ -18,9 +18,9 @@ if(NOT EXISTS "${ETAHEN_FPS}/src/proc.cpp")
     message(FATAL_ERROR "Pinned etaHEN source missing; run scripts/prepare_ps5_deps.sh")
 endif()
 
-# RC11: RC10 snapshot-gated lifecycle + v11 FPS algorithm, but all process
-# memory reads use SDK v0.41 mdbg_copyout. shsrv/pt.c is deliberately NOT
-# linked, so PT_ATTACH/PT_IO/PT_DETACH cannot occur in this binary.
+# RC12 keeps MDBG only for the one-time FpsSampler.attach discovery sequence.
+# After the counter address is discovered, the controller deliberately never
+# calls sampler.sample(), so no periodic remote memory reads occur.
 add_executable(common_fps_controller
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/ps5/ps5_platform.cpp"
@@ -29,7 +29,7 @@ add_executable(common_fps_controller
     "${ETAHEN_SHELLUI}/src/ucred.cpp"
 )
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC11_MDBG_Backend.elf")
+    OUTPUT_NAME "Common_FPS_RC12_Discovery_Only.elf")
 
 target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/include"
@@ -52,8 +52,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf"
+            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf"
-            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin"
-            --title-id CFPS00911 --version 9.11)
+            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only.elf"
+            "${ROOT}/dist/Common_FPS_RC12_Discovery_Only_etaHEN.plugin"
+            --title-id CFPS00912 --version 9.12)
