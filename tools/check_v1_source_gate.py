@@ -57,6 +57,14 @@ checks = [
      "src/ps5/v1_stable_ps5_platform.cpp",
      "module_name_matches"),
 
+    ("etaHEN debugger auth parity",
+     "src/ps5/v1_parity_probe_main.cpp",
+     "set_ucred_to_debugger()"),
+
+    ("debugger auth restored after probe",
+     "src/ps5/v1_parity_probe_main.cpp",
+     "restore_authid(old_authid)"),
+
     ("stable DMAP read model",
      "src/reconstruction/v1_stable_memory.cpp",
      "proc_read_dmap"),
@@ -153,6 +161,20 @@ for forbidden in (
     ok = forbidden not in platform
     print(f"{'PASS' if ok else 'FAIL'}  no clean-rewrite platform helper: {forbidden}")
     failed |= not ok
+
+cmake = (root / "ps5" / "CMakeLists.txt").read_text(encoding="utf-8")
+ucred_linked = '"${ETAHEN_FPS}/src/ucred.cpp"' in cmake
+print(f"{'PASS' if ucred_linked else 'FAIL'}  etaHEN ucred.cpp linked into parity probe")
+failed |= not ucred_linked
+
+probe = (root / "src" / "ps5" / "v1_parity_probe_main.cpp").read_text(
+    encoding="utf-8"
+)
+auth_pos = probe.find("set_ucred_to_debugger()")
+scan_pos = probe.find("log_dynlib_scan(*pid)")
+auth_order_ok = auth_pos >= 0 and scan_pos >= 0 and auth_pos < scan_pos
+print(f"{'PASS' if auth_order_ok else 'FAIL'}  debugger auth before target dynlib scan")
+failed |= not auth_order_ok
 
 if failed:
     sys.exit(1)
