@@ -20,6 +20,7 @@ target_compile_options(common_fps_core PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(common_fps_v1_reconstruction STATIC
     src/reconstruction/v1_stable_hook_state.cpp
+    src/reconstruction/v1_stable_render_loop.cpp
 )
 target_include_directories(common_fps_v1_reconstruction PUBLIC include)
 target_compile_options(common_fps_v1_reconstruction PRIVATE -Wall -Wextra -Wpedantic)
@@ -76,5 +77,17 @@ if(COMMON_FPS_BUILD_TESTS)
     add_test(
         NAME common_fps_v1_stable_hook_state_tests
         COMMAND common_fps_v1_stable_hook_state_tests
+    )
+
+    add_executable(common_fps_v1_stable_render_loop_tests
+        tests/test_v1_stable_render_loop.cpp
+    )
+    target_link_libraries(
+        common_fps_v1_stable_render_loop_tests
+        PRIVATE common_fps_v1_reconstruction
+    )
+    add_test(
+        NAME common_fps_v1_stable_render_loop_tests
+        COMMAND common_fps_v1_stable_render_loop_tests
     )
 endif()
