@@ -48,3 +48,12 @@ if(COMMON_FPS_BUILD_TESTS)
     target_link_libraries(common_fps_autoload_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_autoload_tests COMMAND common_fps_autoload_tests)
 endif()
+
+
+if(COMMON_FPS_BUILD_TESTS)
+    add_executable(common_fps_v1_stable_wire_tests
+        tests/test_v1_stable_wire.cpp
+    )
+    target_include_directories(common_fps_v1_stable_wire_tests PRIVATE include)
+    add_test(NAME common_fps_v1_stable_wire_tests COMMAND common_fps_v1_stable_wire_tests)
+endif()
