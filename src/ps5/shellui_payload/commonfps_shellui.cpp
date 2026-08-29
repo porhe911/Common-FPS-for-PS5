@@ -5,18 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/*
- * Source-only Common FPS ShellUI renderer.
- *
- * Upstream API style follows etaHEN's GPL shellui implementation:
- * HookFunctions.cpp -> CreateGameWidget()/RemoveGameWidget().
- *
- * This file intentionally does not embed or depend on the historical
- * PHU libphu_overlay.so binary.
- */
-
 #include "commonfps_shellui.hpp"
-
 #include "HookedFuncs.hpp"
 
 #include <arpa/inet.h>
@@ -35,6 +24,7 @@ namespace {
 std::atomic_bool g_running{false};
 std::atomic_bool g_have_packet{false};
 std::atomic<std::uint64_t> g_sequence{0};
+std::atomic_bool g_logged_packet{false};
 
 pthread_t g_thread{};
 WirePacket g_packet{};
@@ -43,20 +33,32 @@ pthread_mutex_t g_packet_lock = PTHREAD_MUTEX_INITIALIZER;
 constexpr const char* kLabelId = "id_commonfps_label";
 constexpr const char* kValueId = "id_commonfps_value";
 
-void remove_widget(MonoObject* root, const char* id) {
-    MonoClass* widgetClass =
-        mono_class_from_name(
-            pui_img,
-            "Sce.PlayStation.PUI.UI2",
-            "Widget");
+void renderer_log(const char* format, const char* value = nullptr) {
+    FILE* f = std::fopen("/data/CommonFPS_stageB_shellui.log", "a");
+    if (!f)
+        return;
+    if (value)
+        std::fprintf(f, format, value);
+    else
+        std::fprintf(f, "%s", format);
+    std::fprintf(f, "\n");
+    std::fclose(f);
+}
 
-    MonoObject* child =
-        Invoke<MonoObject*>(
-            pui_img,
-            widgetClass,
-            root,
-            "FindWidgetByName",
-            mono_string_new(Root_Domain, id));
+void remove_widget(MonoObject* root, const char* id) {
+    MonoClass* widgetClass = mono_class_from_name(
+        pui_img,
+        "Sce.PlayStation.PUI.UI2",
+        "Widget");
+    if (!widgetClass)
+        return;
+
+    MonoObject* child = Invoke<MonoObject*>(
+        pui_img,
+        widgetClass,
+        root,
+        "FindWidgetByName",
+        mono_string_new(Root_Domain, id));
 
     if (child) {
         Invoke<void>(
@@ -77,31 +79,22 @@ void* receiver_thread(void*) {
     addr.sin_port = htons(kDefaultIpcPort);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    if (bind(
-            fd,
-            reinterpret_cast<sockaddr*>(&addr),
-            sizeof(addr)) < 0) {
+    if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        renderer_log("R6 FAIL state receiver bind");
         close(fd);
         return nullptr;
     }
 
     while (g_running.load()) {
         WirePacket packet{};
-
-        const ssize_t n = recv(
-            fd,
-            &packet,
-            sizeof(packet),
-            0);
+        const ssize_t n = recv(fd, &packet, sizeof(packet), 0);
 
         if (n != static_cast<ssize_t>(sizeof(packet)))
             continue;
-
         if (packet.magic != kWireMagic ||
             packet.version != kWireVersion ||
-            packet.size != sizeof(WirePacket)) {
+            packet.size != sizeof(WirePacket))
             continue;
-        }
 
         pthread_mutex_lock(&g_packet_lock);
         g_packet = packet;
@@ -109,6 +102,9 @@ void* receiver_thread(void*) {
 
         g_sequence.store(packet.sequence);
         g_have_packet.store(true);
+
+        if (!g_logged_packet.exchange(true))
+            renderer_log("R6 first valid state packet received");
     }
 
     close(fd);
@@ -121,11 +117,7 @@ bool initialize_receiver() {
     if (g_running.exchange(true))
         return true;
 
-    if (pthread_create(
-            &g_thread,
-            nullptr,
-            receiver_thread,
-            nullptr) != 0) {
+    if (pthread_create(&g_thread, nullptr, receiver_thread, nullptr) != 0) {
         g_running.store(false);
         return false;
     }
@@ -140,6 +132,7 @@ void shutdown_receiver() {
 
 void apply_latest_state() {
     static std::uint64_t applied_sequence = 0;
+    static bool logged_widget_append = false;
 
     if (!g_have_packet.load())
         return;
@@ -159,51 +152,37 @@ void apply_latest_state() {
 
     const OverlayFrame& frame = *decoded;
 
-    MonoObject* root =
-        Get_Property<MonoObject*>(
-            pui_img,
-            "Sce.PlayStation.PUI.UI2",
-            "Scene",
-            Game,
-            "RootWidget");
-
+    MonoObject* root = Get_Property<MonoObject*>(
+        pui_img,
+        "Sce.PlayStation.PUI.UI2",
+        "Scene",
+        Game,
+        "RootWidget");
     if (!root)
         return;
 
-    /*
-     * Recreate both widgets only when a state packet changes.
-     * The packet rate is ~1 Hz, so this avoids any accumulating cursor state
-     * and uses only PUI primitives already demonstrated in etaHEN source.
-     */
     remove_widget(root, kLabelId);
     remove_widget(root, kValueId);
 
-    MonoObject* font =
-        CreateUIFont(frame.config.font_size, 0, 0);
-
+    MonoObject* font = CreateUIFont(frame.config.font_size, 0, 0);
     if (!font)
         return;
 
     const float x = frame.anchor.x;
     const float y = frame.anchor.y;
 
-    /*
-     * Public v1.0.0 color:
-     * #B366FF ~= (0.702, 0.400, 1.000, 1.000)
-     */
-    MonoObject* label =
-        CreateLabel(
-            kLabelId,
-            x,
-            y,
-            "FPS:",
-            font,
-            1,
-            0,
-            0.702f,
-            0.400f,
-            1.000f,
-            1.000f);
+    MonoObject* label = CreateLabel(
+        kLabelId,
+        x,
+        y,
+        "FPS:",
+        font,
+        1,
+        0,
+        0.702f,
+        0.400f,
+        1.000f,
+        1.000f);
 
     char value_text[32]{};
     if (frame.loading)
@@ -214,25 +193,29 @@ void apply_latest_state() {
     const float value_x =
         x + static_cast<float>(frame.config.font_size) * 2.7f;
 
-    MonoObject* value =
-        CreateLabel(
-            kValueId,
-            value_x,
-            y,
-            value_text,
-            font,
-            0,
-            0,
-            1.0f,
-            1.0f,
-            1.0f,
-            1.0f);
+    MonoObject* value = CreateLabel(
+        kValueId,
+        value_x,
+        y,
+        value_text,
+        font,
+        0,
+        0,
+        1.0f,
+        1.0f,
+        1.0f,
+        1.0f);
 
-    if (label)
-        Widget_Append_Child(root, label);
+    if (!label || !value)
+        return;
 
-    if (value)
-        Widget_Append_Child(root, value);
+    Widget_Append_Child(root, label);
+    Widget_Append_Child(root, value);
+
+    if (!logged_widget_append) {
+        renderer_log("R7 widgets appended; value=%s", value_text);
+        logged_widget_append = true;
+    }
 
     applied_sequence = sequence;
 }
