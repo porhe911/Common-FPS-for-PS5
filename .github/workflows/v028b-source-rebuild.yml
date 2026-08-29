@@ -1,0 +1,41 @@
+name: v0.28b Stable Source Rebuild
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+
+jobs:
+  backend-sourceproof:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git wget unzip cmake meson pkg-config \
+            python3 python3-pyelftools \
+            clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Compile recovered v0.28b backend only
+        run: bash ./scripts/v028b_sourceproof_build.sh
+
+      - name: Upload source-proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-backend-sourceproof
+          path: |
+            dist/v028b-sourceproof/Common_FPS_v028b_backend_sourceproof.a
+            dist/v028b-sourceproof/SHA256SUMS.txt
+            dist/v028b-sourceproof/UNDEFINED_SYMBOLS.txt
+            docs/V028B_BINARY_FORENSICS.md
+            RESOLVED_BUILD_DEPENDENCIES.txt
+          if-no-files-found: error
