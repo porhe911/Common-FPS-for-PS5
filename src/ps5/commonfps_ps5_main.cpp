@@ -1,8 +1,11 @@
 /*
- * Common FPS for PS5 - RC8 sparse combined-sysctl polling probe
+ * Common FPS for PS5 - RC9 sparse lifecycle + v11 FPS backend probe
  * Copyright (C) 2026 porhe911
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+
+#include "common_fps/fps_sampler.hpp"
+#include "ps5_platform.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +18,9 @@
 
 namespace {
 
-constexpr const char* kLogPath = "/data/CommonFPS_RC8_sysctl_sparse.log";
+constexpr const char* kLogPath = "/data/CommonFPS_RC9_fps_backend.log";
+constexpr int kRuntimeSeconds = 120;
+constexpr int kSnapshotPeriodSeconds = 5;
 
 void log_line(const char* text) {
     FILE* f = std::fopen(kLogPath, "a");
@@ -116,54 +121,96 @@ void log_snapshot(int index, const SnapshotResult& s) {
     if (!f)
         return;
     std::fprintf(f,
-                 "RC8 SNAPSHOT %d/12 rc=%d records=%zu filled=%zu shellui=%d game=%d\n",
+                 "RC9 SNAPSHOT %d rc=%d records=%zu filled=%zu shellui=%d game=%d\n",
                  index, s.rc, s.records, s.filled, s.shellui_pid, s.game_pid);
     std::fclose(f);
 }
 
+void log_attach_ok(int pid, std::uintptr_t counter) {
+    FILE* f = std::fopen(kLogPath, "a");
+    if (!f)
+        return;
+    std::fprintf(f, "RC9 ATTACH OK pid=%d counter=0x%llx\n",
+                 pid, static_cast<unsigned long long>(counter));
+    std::fclose(f);
+}
+
+void log_fps(int pid, int fps) {
+    FILE* f = std::fopen(kLogPath, "a");
+    if (!f)
+        return;
+    std::fprintf(f, "RC9 FPS pid=%d value=%d\n", pid, fps);
+    std::fclose(f);
+}
+
 int run_child() {
-    log_pid("RC8 CHILD pid=", static_cast<int>(getpid()));
-    log_line("RC8 CHILD sparse polling: ONE combined process snapshot every 5s; 12 snapshots total");
-    log_line("RC8 NO kernel allproc / NO ptrace / NO auth / NO inject / NO FPS");
+    log_pid("RC9 CHILD pid=", static_cast<int>(getpid()));
+    log_line("RC9 sparse lifecycle + v11 FPS backend; NO renderer / NO ShellUI inject");
+    log_line("RC9 process discovery = one combined sysctl snapshot every 5s");
+    log_line("RC9 temporary debugger auth ONLY during sampler attach/discovery");
+
+    common_fps::ps5::Ps5Platform platform;
+    common_fps::FpsSampler sampler(platform);
 
     int last_game = -2;
-    int last_shellui = -2;
+    int current_game = -1;
+    int snapshot_index = 0;
 
-    for (int i = 1; i <= 12; ++i) {
-        sleep(5);
-        const SnapshotResult s = take_snapshot();
-        log_snapshot(i, s);
+    for (int second = 0; second < kRuntimeSeconds; ++second) {
+        if ((second % kSnapshotPeriodSeconds) == 0) {
+            const SnapshotResult s = take_snapshot();
+            log_snapshot(++snapshot_index, s);
 
-        if (s.rc == 0) {
-            if (s.shellui_pid != last_shellui) {
-                log_pid("RC8 CHANGE SceShellUI pid=", s.shellui_pid);
-                last_shellui = s.shellui_pid;
-            }
-            if (s.game_pid != last_game) {
-                log_pid("RC8 CHANGE eboot.bin pid=", s.game_pid);
-                last_game = s.game_pid;
+            if (s.rc == 0) {
+                current_game = s.game_pid;
+
+                if (current_game != last_game) {
+                    log_pid("RC9 CHANGE eboot.bin pid=", current_game);
+                    sampler.reset();
+                    last_game = current_game;
+                }
+
+                if (current_game > 0 && !sampler.attached()) {
+                    log_pid("RC9 ATTACH TRY pid=", current_game);
+                    if (sampler.attach(current_game))
+                        log_attach_ok(current_game, sampler.counter_address());
+                    else
+                        log_line("RC9 ATTACH RETRY later");
+                }
             }
         }
+
+        if (sampler.attached()) {
+            const int sample_pid = sampler.pid();
+            const auto fps = sampler.sample();
+            if (fps)
+                log_fps(sample_pid, *fps);
+            else if (!sampler.attached())
+                log_line("RC9 SAMPLE lost attachment; waiting for next sparse snapshot");
+        }
+
+        sleep(1);
     }
 
-    log_line("RC8 CHILD DONE clean return");
+    sampler.reset();
+    log_line("RC9 CHILD DONE clean return");
     return 0;
 }
 
 } // namespace
 
 extern "C" int main() {
-    log_pid("RC8 PARENT start pid=", static_cast<int>(getpid()));
+    log_pid("RC9 PARENT start pid=", static_cast<int>(getpid()));
 
     const pid_t pid = fork();
     if (pid < 0) {
-        log_line("RC8 fork FAIL");
+        log_line("RC9 fork FAIL");
         return 1;
     }
 
     if (pid > 0) {
-        log_pid("RC8 PARENT forked child=", static_cast<int>(pid));
-        log_line("RC8 PARENT RETURN 0");
+        log_pid("RC9 PARENT forked child=", static_cast<int>(pid));
+        log_line("RC9 PARENT RETURN 0");
         return 0;
     }
 
