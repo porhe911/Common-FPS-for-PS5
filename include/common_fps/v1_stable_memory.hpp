@@ -18,6 +18,24 @@ struct PageTranslation {
     std::size_t page_size = 0;
 };
 
+/* Read one 64-bit x86-64 page-table entry by physical address. */
+class PhysicalEntryReader {
+public:
+    virtual ~PhysicalEntryReader() = default;
+    virtual bool read_entry(
+        std::uintptr_t physical_address,
+        std::uint64_t& value) = 0;
+};
+
+/*
+ * Four-level x86-64 page-table translation used by the PHU DMAP reader.
+ * Supports ordinary 4 KiB mappings plus PS-bit 2 MiB and 1 GiB mappings.
+ */
+std::optional<PageTranslation> translate_x86_64(
+    PhysicalEntryReader& reader,
+    std::uintptr_t cr3_physical,
+    std::uintptr_t virtual_address) noexcept;
+
 /*
  * Host-testable boundary around the historical PHU DMAP reader.
  *
