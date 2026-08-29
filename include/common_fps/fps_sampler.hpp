@@ -31,9 +31,7 @@ public:
      *     FPS: 59
      *
      * Never returns/display decimal FPS.
-     *
-     * Internally the stable v1.0.0 algorithm calculates tenths of FPS from
-     * the VideoOut counter, then rounds once to the nearest integer.
+     * Internally the counter is calculated in tenths and rounded once.
      */
     std::optional<int> sample();
 
@@ -45,7 +43,8 @@ private:
     std::uintptr_t module_base_ = 0;
     std::uintptr_t counter_address_ = 0;
 
-    bool have_baseline_ = false;
+    /* 0=need baseline, 1=discard first delta, 2=normal sampling. */
+    std::uint8_t warmup_stage_ = 0;
     std::uint32_t previous_counter_ = 0;
     std::uint64_t previous_time_us_ = 0;
 };
