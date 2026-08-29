@@ -21,6 +21,7 @@ target_compile_options(common_fps_core PRIVATE -Wall -Wextra -Wpedantic)
 add_library(common_fps_v1_reconstruction STATIC
     src/reconstruction/v1_stable_hook_state.cpp
     src/reconstruction/v1_stable_render_loop.cpp
+    src/reconstruction/v1_stable_sampler.cpp
 )
 target_include_directories(common_fps_v1_reconstruction PUBLIC include)
 target_compile_options(common_fps_v1_reconstruction PRIVATE -Wall -Wextra -Wpedantic)
@@ -33,40 +34,27 @@ if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_tests
         tests/test_core.cpp
     )
-
     target_link_libraries(common_fps_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_tests COMMAND common_fps_tests)
-endif()
 
-
-if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_v1_parity_tests
         tests/test_v1_parity.cpp
     )
     target_link_libraries(common_fps_v1_parity_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_v1_parity_tests COMMAND common_fps_v1_parity_tests)
-endif()
 
-
-if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_autoload_tests
         tests/test_autoload_guard.cpp
     )
     target_link_libraries(common_fps_autoload_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_autoload_tests COMMAND common_fps_autoload_tests)
-endif()
 
-
-if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_v1_stable_wire_tests
         tests/test_v1_stable_wire.cpp
     )
     target_include_directories(common_fps_v1_stable_wire_tests PRIVATE include)
     add_test(NAME common_fps_v1_stable_wire_tests COMMAND common_fps_v1_stable_wire_tests)
-endif()
 
-
-if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_v1_stable_hook_state_tests
         tests/test_v1_stable_hook_state.cpp
     )
@@ -89,5 +77,17 @@ if(COMMON_FPS_BUILD_TESTS)
     add_test(
         NAME common_fps_v1_stable_render_loop_tests
         COMMAND common_fps_v1_stable_render_loop_tests
+    )
+
+    add_executable(common_fps_v1_stable_sampler_tests
+        tests/test_v1_stable_sampler.cpp
+    )
+    target_link_libraries(
+        common_fps_v1_stable_sampler_tests
+        PRIVATE common_fps_v1_reconstruction
+    )
+    add_test(
+        NAME common_fps_v1_stable_sampler_tests
+        COMMAND common_fps_v1_stable_sampler_tests
     )
 endif()
