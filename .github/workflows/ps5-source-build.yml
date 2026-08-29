@@ -34,16 +34,16 @@ jobs:
           cmake --build build-host -j2
           ctest --test-dir build-host --output-on-failure
 
-      - name: Build self-contained PS5 ELF and etaHEN plugin from source
+      - name: Build RC5 minimal no-op PS5 ELF and etaHEN plugin
         run: bash ./scripts/ps5_source_build.sh
 
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-for-PS5-v1.1.0-source-build
+          name: Common-FPS-RC5-NoOp
           path: |
-            dist/Common_FPS_PS5_v1.1.0.elf
-            dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin
+            dist/Common_FPS_RC5_NoOp.elf
+            dist/Common_FPS_RC5_NoOp_etaHEN.plugin
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
