@@ -27,3 +27,6 @@ jobs:
 
       - name: etaHEN wrapper test
         run: python3 tests/test_plugin_wrapper.py
+
+      - name: Historical v1.0.0 forensic helper tests
+        run: python3 tests/test_v1_forensics.py
