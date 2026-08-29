@@ -37,13 +37,17 @@ if ! grep -q 'find_game_pid_sysctl' "${OUT}/LINKED_SYMBOLS.txt"; then
   exit 1
 fi
 
+# Some stage labels are passed as arguments to the generic TRACE logger, so
+# require the literal label and the generic TRACE format independently.
 for marker in \
   'SR5 START exact-reference DMAP stage trace' \
   'SR5 AUTH restored before all DMAP work' \
   'SR5 TRACE sdk sysctl' \
-  'SR5 TRACE allproc_head' \
-  'SR5 TRACE pmap' \
-  'SR5 TRACE PML4E' \
+  'SR5 TRACE %s rc=' \
+  'allproc_head' \
+  'pmap' \
+  'PML4E' \
+  'final_DMAP_copyout' \
   'SR5 COUNTER READY'; do
   if ! strings "${ELF}" | grep -q "${marker}"; then
     echo "ERROR: SR5 diagnostic marker missing: ${marker}"
