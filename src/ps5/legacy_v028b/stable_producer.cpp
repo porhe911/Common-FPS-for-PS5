@@ -14,10 +14,11 @@
 namespace common_fps::legacy_v028b {
 namespace {
 
-constexpr std::uint32_t kMaxTenthsFps = 3000U;
+constexpr std::uint32_t kMaxTenthsFps = 1300U;
 constexpr std::uint64_t kTenthsScale = 10'000'000ULL;
 constexpr double kTenthsToFps = 10.0;
 constexpr char kLoadingText[] = "FPS\tloading\n";
+constexpr unsigned kWarmupDeltasToDiscard = 1U;
 
 std::uint16_t network_port_literal() noexcept {
     // htons(55541) on the x86-64 little-endian target. The reference binary
@@ -99,6 +100,9 @@ std::int64_t elapsed_microseconds(
 
         const auto counter_address = resolve_videoout_counter(pid);
         if (!counter_address) {
+            // VideoOut can exist before its active table entry is ready.  Keep
+            // the visible Loading state and retry without changing process
+            // credentials outside the short module-discovery window.
             publisher.publish_loading();
             sleep(1);
             continue;
@@ -113,6 +117,8 @@ std::int64_t elapsed_microseconds(
 
         timeval previous_time{};
         gettimeofday(&previous_time, nullptr);
+        unsigned warmup_deltas = kWarmupDeltasToDiscard;
+        publisher.publish_loading();
         sleep(1);
 
         for (;;) {
@@ -143,13 +149,20 @@ std::int64_t elapsed_microseconds(
                 const std::uint32_t tenths = static_cast<std::uint32_t>(
                     scaled / static_cast<std::uint64_t>(elapsed));
 
-                if (tenths > kMaxTenthsFps) {
+                // v11 hardware-proven warmup: sample 1 is the baseline, sample
+                // 2 only advances the baseline, sample 3+ may be published.
+                if (warmup_deltas != 0) {
+                    --warmup_deltas;
                     publisher.publish_loading();
-                    break;
+                } else if (tenths <= kMaxTenthsFps) {
+                    publisher.publish_fps(
+                        static_cast<double>(tenths) / kTenthsToFps);
+                } else {
+                    // A single startup/scheduling spike must not force module
+                    // rediscovery.  Discard it, advance the baseline, and keep
+                    // sampling the already resolved counter.
+                    publisher.publish_loading();
                 }
-
-                publisher.publish_fps(
-                    static_cast<double>(tenths) / kTenthsToFps);
             }
 
             previous_counter = current_counter;
