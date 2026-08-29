@@ -18,6 +18,12 @@ add_library(common_fps_core STATIC
 target_include_directories(common_fps_core PUBLIC include)
 target_compile_options(common_fps_core PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(common_fps_v1_reconstruction STATIC
+    src/reconstruction/v1_stable_hook_state.cpp
+)
+target_include_directories(common_fps_v1_reconstruction PUBLIC include)
+target_compile_options(common_fps_v1_reconstruction PRIVATE -Wall -Wextra -Wpedantic)
+
 option(COMMON_FPS_BUILD_TESTS "Build host tests" ON)
 
 if(COMMON_FPS_BUILD_TESTS)
@@ -56,4 +62,19 @@ if(COMMON_FPS_BUILD_TESTS)
     )
     target_include_directories(common_fps_v1_stable_wire_tests PRIVATE include)
     add_test(NAME common_fps_v1_stable_wire_tests COMMAND common_fps_v1_stable_wire_tests)
+endif()
+
+
+if(COMMON_FPS_BUILD_TESTS)
+    add_executable(common_fps_v1_stable_hook_state_tests
+        tests/test_v1_stable_hook_state.cpp
+    )
+    target_link_libraries(
+        common_fps_v1_stable_hook_state_tests
+        PRIVATE common_fps_v1_reconstruction
+    )
+    add_test(
+        NAME common_fps_v1_stable_hook_state_tests
+        COMMAND common_fps_v1_stable_hook_state_tests
+    )
 endif()
