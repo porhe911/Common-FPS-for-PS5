@@ -24,10 +24,9 @@ struct RawSnapshot {
 /*
  * Source reconstruction of the state bridge used by the stable renderer.
  *
- * The donor binary uses an odd/even sequence protocol around fixed 0x400-byte
- * buffers. OnRender reads only a stable even sequence and retries if a writer
- * changed the sequence during the copy. This keeps UI mutation on the render
- * thread while the UDP receiver only publishes text state.
+ * The historical binary uses an odd/even sequence protocol around fixed
+ * 0x400-byte buffers. This source version keeps the same protocol while using
+ * atomic bytes so the behavior is also well-defined under the C++ memory model.
  */
 class HookState {
 public:
@@ -41,14 +40,18 @@ public:
     std::uint64_t raw_sequence() const noexcept;
 
 private:
-    static void copy_text(std::array<char, kHookTextCapacity>& dst,
-                          const char* src);
+    using AtomicBuffer =
+        std::array<std::atomic<unsigned char>, kHookTextCapacity>;
+
+    static void store_text(AtomicBuffer& dst, const char* src);
+    static void load_text(const AtomicBuffer& src,
+                          std::array<char, kHookTextCapacity>& dst);
 
     mutable std::atomic<std::uint64_t> sequence_{0};
     mutable std::atomic<std::uint64_t> raw_sequence_{0};
-    std::array<char, kHookTextCapacity> text_{};
-    std::array<char, kHookTextCapacity> text2_{};
-    std::array<char, kHookTextCapacity> raw_text_{};
+    AtomicBuffer text_{};
+    AtomicBuffer text2_{};
+    AtomicBuffer raw_text_{};
 };
 
 } // namespace common_fps::v1_stable
