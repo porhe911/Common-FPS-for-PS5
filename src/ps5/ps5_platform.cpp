@@ -5,17 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/*
- * PS5 adapter for Common FPS.
- *
- * Upstream basis:
- *   etaHEN/Source Code/fps_elf/src/proc.cpp
- *   etaHEN util/libhijacker process-read helpers
- *
- * This file is GPL-3.0-or-later and is intended to be built against
- * the etaHEN Plugin SDK / PS5 Payload SDK.
- */
-
 #include "ps5_platform.hpp"
 
 #include <cstdlib>
@@ -23,18 +12,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-/*
- * The clean build supplies etaHEN's public proc.h in the include path.
- * It defines struct proc and module_info_t, plus these helper functions.
- */
 extern "C" {
 #include "proc.h"
 #include "pt.h"
+#include "ucred.h"
 
-/*
- * mdbg_copyout is supplied by the PS5 Payload SDK runtime.
- * shsrv/pt.h supplies pt_attach(), pt_detach() and pt_copyout().
- */
 int mdbg_copyout(
     pid_t pid,
     std::uintptr_t remote,
@@ -62,10 +44,6 @@ static int firmware_short() {
 }
 
 std::optional<ProcessId> Ps5Platform::find_game_process() {
-    /*
-     * Stable Common FPS v1.0.0 searched for "eboot.bin".
-     * etaHEN publishes find_proc_by_name() under GPL.
-     */
     struct proc* p = find_proc_by_name("eboot.bin");
     if (!p)
         return std::nullopt;
@@ -84,6 +62,33 @@ bool Ps5Platform::process_alive(ProcessId pid) {
     return true;
 }
 
+bool Ps5Platform::begin_process_inspection(ProcessId) {
+    if (inspection_active_)
+        return true;
+
+    /*
+     * FW 9.60 hardware parity v5-v11:
+     * without debugger auth SYS_dl_get_list returns zero modules for the game;
+     * with DEBUG_AUTHID the native VideoOut module/DMAP is visible.
+     * Keep this privilege only for the short attach/discovery window.
+     */
+    saved_authid_ = set_ucred_to_debugger();
+    if (saved_authid_ == 0)
+        return false;
+
+    inspection_active_ = true;
+    return true;
+}
+
+void Ps5Platform::end_process_inspection(ProcessId) {
+    if (!inspection_active_)
+        return;
+
+    set_proc_authid(getpid(), saved_authid_);
+    saved_authid_ = 0;
+    inspection_active_ = false;
+}
+
 std::optional<ModuleInfo>
 Ps5Platform::find_module(ProcessId pid, const char* module_name) {
     module_info_t* module = get_module_info(pid, module_name);
@@ -91,8 +96,7 @@ Ps5Platform::find_module(ProcessId pid, const char* module_name) {
         return std::nullopt;
 
     ModuleInfo result;
-    result.base = static_cast<std::uintptr_t>(
-        module->sections[0].vaddr);
+    result.base = static_cast<std::uintptr_t>(module->sections[0].vaddr);
     result.name = module->filename;
 
     std::free(module);
@@ -105,16 +109,6 @@ bool Ps5Platform::read_memory(
     void* out,
     std::size_t size) {
 
-    /*
-     * etaHEN's current GPL source uses the ptrace copyout path on
-     * firmware >= 0x840 and mdbg_copyout below that threshold.
-     *
-     * FW 9.60 therefore follows the pt_* path.
-     *
-     * This conservative alpha implementation uses a short
-     * attach -> read -> detach window. It never writes to game memory.
-     * Hardware testing is required before calling this adapter stable.
-     */
     const int fw = firmware_short();
     if (fw < 0)
         return false;
