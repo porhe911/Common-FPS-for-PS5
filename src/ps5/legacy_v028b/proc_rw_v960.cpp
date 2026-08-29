@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <sys/sysctl.h>
 
 extern "C" {
 #include <ps5/kernel.h>
@@ -50,7 +51,14 @@ bool read_kernel_value(std::uintptr_t address, T& out) noexcept {
 }
 
 bool fw_is_960() noexcept {
-    return (kernel_get_fw_version() & 0xFFFF0000U) == kFw960;
+    // On the hardware-proven FW 9.60 path kernel_get_fw_version() returns 0,
+    // while the reference v0.28b payload and SR5 both resolve the firmware via
+    // kern.sdk_version (0x09600004 on the tested console).
+    std::uint32_t sdk = 0;
+    std::size_t sdk_len = sizeof(sdk);
+    if (sysctlbyname("kern.sdk_version", &sdk, &sdk_len, nullptr, 0) != 0)
+        return false;
+    return sdk_len == sizeof(sdk) && (sdk & 0xFFFF0000U) == kFw960;
 }
 
 std::uintptr_t find_proc(pid_t pid) noexcept {
