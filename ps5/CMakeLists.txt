@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
-project(CommonFPS_PS5 C CXX)
+project(CommonFPS_PS5 CXX)
 
-set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT DEFINED ENV{PS5_PAYLOAD_SDK})
@@ -15,28 +13,23 @@ set(SDK "$ENV{PS5_PAYLOAD_SDK}")
 set(ETAHEN_ROOT "${ROOT}/.deps/etahen/Source Code")
 set(ETAHEN_FPS "${ETAHEN_ROOT}/fps_elf")
 set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
-set(SHSRV_ROOT "${ROOT}/.deps/shsrv")
 
 if(NOT EXISTS "${ETAHEN_FPS}/src/proc.cpp")
     message(FATAL_ERROR "Pinned etaHEN source missing; run scripts/prepare_ps5_deps.sh")
 endif()
-if(NOT EXISTS "${SHSRV_ROOT}/pt.c")
-    message(FATAL_ERROR "Pinned shsrv source missing; run scripts/prepare_ps5_deps.sh")
-endif()
 
-# RC10 keeps the RC9 v11 FPS backend but gates every FPS read behind a fresh,
-# RC8-proven sysctl lifecycle snapshot. No renderer, ShellUI payload, Mono,
-# detour, elfldr, health UDP, state sender, or overlay code is linked.
+# RC11: RC10 snapshot-gated lifecycle + v11 FPS algorithm, but all process
+# memory reads use SDK v0.41 mdbg_copyout. shsrv/pt.c is deliberately NOT
+# linked, so PT_ATTACH/PT_IO/PT_DETACH cannot occur in this binary.
 add_executable(common_fps_controller
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/ps5/ps5_platform.cpp"
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp"
     "${ETAHEN_FPS}/src/proc.cpp"
     "${ETAHEN_SHELLUI}/src/ucred.cpp"
-    "${SHSRV_ROOT}/pt.c"
 )
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC10_Snapshot_Gated.elf")
+    OUTPUT_NAME "Common_FPS_RC11_MDBG_Backend.elf")
 
 target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/include"
@@ -44,7 +37,6 @@ target_include_directories(common_fps_controller PRIVATE
     "${ETAHEN_ROOT}/include"
     "${ETAHEN_FPS}/include"
     "${ETAHEN_SHELLUI}/include"
-    "${SHSRV_ROOT}"
     "${SDK}"
     "${SDK}/include"
 )
@@ -60,8 +52,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf"
+            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf"
-            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin"
-            --title-id CFPS00910 --version 9.10)
+            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf"
+            "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin"
+            --title-id CFPS00911 --version 9.11)
