@@ -125,6 +125,6 @@ add_custom_command(
             "${ROOT}/tools/make_etahen_plugin.py"
             "${ROOT}/dist/v028b-sr1/Common_FPS_SR1_v028b_Backend.elf"
             "${ROOT}/dist/v028b-sr1/Common_FPS_SR1_v028b_Backend_etaHEN.plugin"
-            --title-id CFPS0SR01
-            --version 0.281
+            --title-id CFPS00914
+            --version 9.14
 )
