@@ -57,6 +57,7 @@ bool resolve_mono_symbols()
 
     /* Minimal symbol set required by bootstrap + Common FPS PUI helpers. */
     KERNEL_DLSYM(mono_handle, mono_get_root_domain);
+    KERNEL_DLSYM(mono_handle, mono_domain_get);
     KERNEL_DLSYM(mono_handle, mono_domain_assembly_open);
     KERNEL_DLSYM(mono_handle, mono_assembly_get_image);
     KERNEL_DLSYM(mono_handle, mono_thread_attach);
@@ -74,6 +75,7 @@ bool resolve_mono_symbols()
 
     return
         mono_get_root_domain != nullptr &&
+        mono_domain_get != nullptr &&
         mono_domain_assembly_open != nullptr &&
         mono_assembly_get_image != nullptr &&
         mono_thread_attach != nullptr &&
@@ -145,7 +147,16 @@ bool locate_game_scene()
     if (!find_scene)
         return false;
 
-    MonoString* path = mono_string_new(Root_Domain, "Game");
+    /*
+     * Match etaHEN's proven ShellUI bootstrap exactly here: the "Game"
+     * string belongs to the current executing Mono domain, not necessarily
+     * the root-domain pointer used to open the system assemblies.
+     */
+    MonoDomain* current_domain = mono_domain_get();
+    if (!current_domain)
+        current_domain = Root_Domain;
+
+    MonoString* path = mono_string_new(current_domain, "Game");
     if (!path)
         return false;
 
@@ -190,11 +201,16 @@ void application_update_hook(MonoObject* instance)
         original(instance);
 
     /*
-     * This callback is our only PUI execution point.  PUI mutation remains on
-     * the real ShellUI Application.Update thread.
+     * VisualReady now means more than "RootWidget existed": it is emitted only
+     * after Common FPS successfully creates its own FPS/loading labels on the
+     * real ShellUI update thread.  This gives hardware testing a clean visual
+     * boundary before the controller is allowed to touch the game sampler.
      */
-    if (!g_visual_ready.load(std::memory_order_relaxed) && game_root_ready())
+    if (!g_visual_ready.load(std::memory_order_relaxed) &&
+        game_root_ready() &&
+        show_loading_state()) {
         g_visual_ready.store(true, std::memory_order_release);
+    }
 
     if (g_visual_ready.load(std::memory_order_acquire))
         apply_latest_state();
@@ -262,11 +278,8 @@ bool chain_over_existing_hook(
      *   <8-byte absolute destination>
      *
      * Do not run DetourFunction over that already-detoured 14-byte sequence.
-     * Keep its opcode intact, remember etaHEN's destination, and only replace
-     * the destination pointer with Common FPS. The call chain becomes:
-     *
-     * Application.Update -> Common FPS -> etaHEN OnRender_Hook
-     *                    -> etaHEN trampoline -> original Update
+     * Keep its opcode intact, remember the existing destination, and only
+     * replace the destination pointer with Common FPS.
      */
     g_update_original =
         reinterpret_cast<UpdateFn>(existing_destination);
@@ -314,11 +327,6 @@ bool install_application_update_hook()
     if (!update_address)
         return false;
 
-    /*
-     * etaHEN 2.4B already hooks the same method with its FF25 absolute jump.
-     * Chain safely when that hook is present. Standalone ELF mode, where no
-     * hook is present yet, falls back to the ordinary source DetourFunction.
-     */
     std::uint64_t existing_destination = 0;
     if (decode_existing_absolute_jump(
             update_address,
