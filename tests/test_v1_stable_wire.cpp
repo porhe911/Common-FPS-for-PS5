@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 int main() {
@@ -11,6 +12,8 @@ int main() {
     static_assert(kWireVersion == 1);
     static_assert(kWirePort == 55541);
     static_assert(sizeof(FpsPacket) == 0x420);
+    static_assert(offsetof(FpsPacket, last_ns) == 0x18);
+    static_assert(offsetof(FpsPacket, text) == 0x20);
 
     FpsPacket packet{};
     set_loading(packet, 7);
@@ -18,12 +21,14 @@ int main() {
     assert(packet.version == 1);
     assert(packet.sequence == 7);
     assert(packet.fps == 0.0);
-    assert(std::strcmp(packet.raw, "FPS\tloading\n") == 0);
+    assert(packet.last_ns == 0);
+    assert(std::strcmp(packet.text, "FPS\tloading\n") == 0);
 
     set_numeric(packet, 8, 59.9);
     assert(packet.sequence == 8);
     assert(std::fabs(packet.fps - 59.9) < 0.000001);
-    assert(packet.raw[0] == '\0');
+    assert(packet.last_ns == 0);
+    assert(packet.text[0] == '\0');
 
     const auto fps60 = calculate_fps(1000, 1060, 1000000);
     assert(fps60.has_value());
