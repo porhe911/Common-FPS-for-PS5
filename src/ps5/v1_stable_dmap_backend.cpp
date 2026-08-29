@@ -6,6 +6,7 @@
  */
 #include "v1_stable_dmap_backend.hpp"
 
+#include <sys/types.h>
 #include <sys/sysctl.h>
 
 extern "C" {
