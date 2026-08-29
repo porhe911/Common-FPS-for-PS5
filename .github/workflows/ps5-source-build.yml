@@ -34,16 +34,16 @@ jobs:
           cmake --build build-host -j2
           ctest --test-dir build-host --output-on-failure
 
-      - name: Build RC11 snapshot-gated MDBG FPS backend
+      - name: Build RC12 discovery-only probe
         run: bash ./scripts/ps5_source_build.sh
 
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-RC11-MDBG-Backend
+          name: Common-FPS-RC12-Discovery-Only
           path: |
-            dist/Common_FPS_RC11_MDBG_Backend.elf
-            dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin
+            dist/Common_FPS_RC12_Discovery_Only.elf
+            dist/Common_FPS_RC12_Discovery_Only_etaHEN.plugin
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
