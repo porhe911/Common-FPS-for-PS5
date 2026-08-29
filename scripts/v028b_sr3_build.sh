@@ -41,7 +41,8 @@ for sym in find_game_pid_sysctl translate proc_read; do
 done
 
 for marker in \
-  'SR3 MODULE list-size' \
+  'SR3 DISCOVERY TRY exact v5 module-list path' \
+  'SR3 MODULE FOUND' \
   'SR3 AUTH debugger active for v5 module-list discovery only' \
   'SR3 AUTH restored before DMAP reads' \
   'SR3 DMAP table read OK' \
