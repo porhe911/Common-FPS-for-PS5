@@ -1,14 +1,15 @@
 /*
  * Common FPS for PS5
- * Hardware parity probe v3 for the reconstructed stable v1.0.0 FPS sampler.
+ * Hardware parity probe v4 for the reconstructed stable v1.0.0 FPS sampler.
  *
  * This diagnostic ELF intentionally does not install the ShellUI renderer and
  * does not replace the shipping controller/plugin. It writes every completed
  * stage to /data/CommonFPS_v1_probe.log and flushes immediately, so a silent
  * notification path cannot hide where FW 9.60 parity stops.
  *
- * v3 restores the stable line's sysctl/find_pid game discovery instead of the
- * later clean rewrite's etaHEN allproc helper.
+ * v3 restored the stable line's sysctl/find_pid game discovery.
+ * v4 restores target dynlib module enumeration with basename/suffix matching
+ * and records the raw FW 9.60 module list around the VideoOut lookup.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -17,14 +18,19 @@
 #include "common_fps/v1_stable_sampler.hpp"
 #include "v1_stable_ps5_platform.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
 extern "C" {
+#include "proc.h"
 
 typedef struct notify_request {
     char padding[45];
@@ -64,16 +70,82 @@ void notify(const char* message) {
     log_line("NOTIFY rc=%d text=%s", rc, message);
 }
 
+void log_dynlib_scan(common_fps::ProcessId pid) {
+    std::size_t handle_count = 0;
+    const long count_rc = syscall(
+        SYS_dl_get_list, pid, nullptr, 0, &handle_count);
+    log_line(
+        "S2RAW get_list(count) rc=%ld count=%llu",
+        count_rc,
+        static_cast<unsigned long long>(handle_count));
+
+    if (count_rc < 0 || handle_count == 0)
+        return;
+
+    std::vector<std::uintptr_t> handles(handle_count);
+    std::size_t returned_count = handle_count;
+    const long list_rc = syscall(
+        SYS_dl_get_list,
+        pid,
+        handles.data(),
+        handles.size(),
+        &returned_count);
+    log_line(
+        "S2RAW get_list(fill) rc=%ld returned=%llu capacity=%llu",
+        list_rc,
+        static_cast<unsigned long long>(returned_count),
+        static_cast<unsigned long long>(handles.size()));
+
+    if (list_rc < 0)
+        return;
+
+    returned_count = std::min(returned_count, handles.size());
+    for (std::size_t i = 0; i < returned_count; ++i) {
+        module_info_t info{};
+        const long info_rc = syscall(
+            SYS_dl_get_info_2,
+            pid,
+            1,
+            handles[i],
+            &info);
+
+        if (info_rc < 0) {
+            if (i < 8) {
+                log_line(
+                    "S2RAW[%llu] info rc=%ld handle=0x%llx",
+                    static_cast<unsigned long long>(i),
+                    info_rc,
+                    static_cast<unsigned long long>(handles[i]));
+            }
+            continue;
+        }
+
+        const bool interesting =
+            i < 12 ||
+            std::strstr(info.filename, "Video") != nullptr ||
+            std::strstr(info.filename, "video") != nullptr;
+        if (!interesting)
+            continue;
+
+        log_line(
+            "S2RAW[%llu] name=%s base=0x%llx handle=0x%llx",
+            static_cast<unsigned long long>(i),
+            info.filename,
+            static_cast<unsigned long long>(info.sections[0].vaddr),
+            static_cast<unsigned long long>(handles[i]));
+    }
+}
+
 } // namespace
 
 int main() {
     g_log = std::fopen(kLogPath, "w");
     if (g_log) {
         std::setvbuf(g_log, nullptr, _IONBF, 0);
-        log_line("S0 main entered v3");
+        log_line("S0 main entered v4");
     }
 
-    notify("Common FPS parity probe v3\nSTART");
+    notify("Common FPS parity probe v4\nSTART");
 
     common_fps::ps5::V1StablePs5Platform platform;
 
@@ -89,23 +161,26 @@ int main() {
 
     if (!pid) {
         log_line("FAIL S1 sysctl game process not found after 30s");
-        notify("Common FPS parity probe v3\nFAIL S1: game not found");
+        notify("Common FPS parity probe v4\nFAIL S1: game not found");
         if (g_log)
             std::fclose(g_log);
         return 11;
     }
     log_line("S1 game pid=%d", *pid);
 
+    log_dynlib_scan(*pid);
+
     const auto module = platform.find_module(*pid, "libSceVideoOut.sprx");
     if (!module || module->base == 0) {
         log_line("FAIL S2 libSceVideoOut.sprx not found");
-        notify("Common FPS parity probe v3\nFAIL S2: VideoOut module");
+        notify("Common FPS parity probe v4\nFAIL S2: VideoOut module");
         if (g_log)
             std::fclose(g_log);
         return 12;
     }
     log_line(
-        "S2 VideoOut base=0x%llx",
+        "S2 VideoOut name=%s base=0x%llx",
+        module->name.c_str(),
         static_cast<unsigned long long>(module->base));
 
     constexpr std::size_t kTableSize =
@@ -128,7 +203,7 @@ int main() {
         static_cast<unsigned long long>(table.size()));
 
     if (!table_ok) {
-        notify("Common FPS parity probe v3\nFAIL S3: DMAP table read");
+        notify("Common FPS parity probe v4\nFAIL S3: DMAP table read");
         if (g_log)
             std::fclose(g_log);
         return 13;
@@ -140,7 +215,7 @@ int main() {
             "FAIL S4 sampler attach sdk=0x%08x dmap=0x%llx",
             dmap.last_sdk_version(),
             static_cast<unsigned long long>(dmap.last_dmap_base()));
-        notify("Common FPS parity probe v3\nFAIL S4: sampler attach");
+        notify("Common FPS parity probe v4\nFAIL S4: sampler attach");
         if (g_log)
             std::fclose(g_log);
         return 14;
@@ -158,7 +233,7 @@ int main() {
             std::snprintf(
                 message,
                 sizeof(message),
-                "Common FPS parity probe v3\nDMAP FW 9.60 OK: %.1f FPS",
+                "Common FPS parity probe v4\nDMAP FW 9.60 OK: %.1f FPS",
                 *fps);
             notify(message);
             platform.sleep_ms(1500);
@@ -178,7 +253,7 @@ int main() {
     }
 
     log_line("FAIL S5 no valid FPS");
-    notify("Common FPS parity probe v3\nFAIL S5: no valid FPS");
+    notify("Common FPS parity probe v4\nFAIL S5: no valid FPS");
     if (g_log)
         std::fclose(g_log);
     return 15;
