@@ -15,6 +15,7 @@
 #include "v1_stable_ps5_platform.hpp"
 
 #include <array>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
