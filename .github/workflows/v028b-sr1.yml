@@ -48,7 +48,7 @@ jobs:
             dist/v028b-sr1/Common_FPS_SR1_v028b_Backend.elf
             dist/v028b-sr1/Common_FPS_SR1_v028b_Backend_etaHEN.plugin
             dist/v028b-sr1/SHA256SUMS.txt
-            dist/v028b-sr1/UNDEFINED_SYMBOLS.txt
+            dist/v028b-sr1/SYMBOLS.txt
             docs/V028B_BINARY_FORENSICS.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
