@@ -102,4 +102,14 @@ if(COMMON_FPS_BUILD_TESTS)
         NAME common_fps_v1_loader_contract_tests
         COMMAND common_fps_v1_loader_contract_tests
     )
+
+    add_executable(
+        common_fps_v1_stable_overlay_tests
+        tests/test_v1_stable_overlay.cpp
+    )
+    target_include_directories(common_fps_v1_stable_overlay_tests PRIVATE include)
+    add_test(
+        NAME common_fps_v1_stable_overlay_tests
+        COMMAND common_fps_v1_stable_overlay_tests
+    )
 endif()
