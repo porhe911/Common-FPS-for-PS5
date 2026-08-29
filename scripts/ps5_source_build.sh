@@ -8,8 +8,8 @@ export PS5_PAYLOAD_SDK="${PS5_PAYLOAD_SDK:-/opt/ps5-payload-sdk}"
 python3 "${ROOT}/tests/test_plugin_wrapper.py"
 
 mkdir -p "${ROOT}/dist"
-rm -f "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf" \
-      "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin"
+rm -f "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf" \
+      "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin"
 
 "${PS5_PAYLOAD_SDK}/bin/prospero-cmake" \
   -S "${ROOT}/ps5" \
@@ -18,12 +18,18 @@ rm -f "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf" \
 
 cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
-test -f "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf"
-test -f "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin"
+test -f "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf"
+test -f "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin"
+
+# Guard the diagnostic invariant: this RC must not contain shsrv ptrace API names.
+if strings "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf" | grep -Eq 'pt_attach|pt_copyout|pt_detach'; then
+  echo "ERROR: RC11 unexpectedly contains shsrv ptrace symbols"
+  exit 1
+fi
 
 sha256sum \
-  "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf" \
-  "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin" \
+  "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend.elf" \
+  "${ROOT}/dist/Common_FPS_RC11_MDBG_Backend_etaHEN.plugin" \
   > "${ROOT}/dist/SHA256SUMS.txt"
 
 cat "${ROOT}/dist/SHA256SUMS.txt"
