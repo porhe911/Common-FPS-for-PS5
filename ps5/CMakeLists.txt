@@ -24,9 +24,9 @@ if(NOT EXISTS "${SHSRV_ROOT}/pt.c")
     message(FATAL_ERROR "Pinned shsrv source missing; run scripts/prepare_ps5_deps.sh")
 endif()
 
-# RC9 intentionally restores ONLY the v11 FPS backend on top of RC8-proven
-# sparse process discovery. No renderer, ShellUI payload, Mono, detour,
-# elfldr, health UDP, state sender, or overlay code is linked.
+# RC10 keeps the RC9 v11 FPS backend but gates every FPS read behind a fresh,
+# RC8-proven sysctl lifecycle snapshot. No renderer, ShellUI payload, Mono,
+# detour, elfldr, health UDP, state sender, or overlay code is linked.
 add_executable(common_fps_controller
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/ps5/ps5_platform.cpp"
@@ -36,7 +36,7 @@ add_executable(common_fps_controller
     "${SHSRV_ROOT}/pt.c"
 )
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_RC9_FPS_Backend.elf")
+    OUTPUT_NAME "Common_FPS_RC10_Snapshot_Gated.elf")
 
 target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/include"
@@ -60,8 +60,8 @@ target_link_libraries(common_fps_controller PRIVATE
 add_custom_command(TARGET common_fps_controller POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_RC9_FPS_Backend.elf"
+            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf"
     COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_RC9_FPS_Backend.elf"
-            "${ROOT}/dist/Common_FPS_RC9_FPS_Backend_etaHEN.plugin"
-            --title-id CFPS00909 --version 9.09)
+            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated.elf"
+            "${ROOT}/dist/Common_FPS_RC10_Snapshot_Gated_etaHEN.plugin"
+            --title-id CFPS00910 --version 9.10)
