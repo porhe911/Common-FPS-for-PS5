@@ -146,6 +146,37 @@ target_link_libraries(common_fps_shellui PRIVATE
 )
 
 # ------------------------------------------------------------------
+# Stable-v1 reconstruction compile check.
+#
+# This archive is deliberately NOT linked into the shipping controller yet.
+# Its purpose is to compile the reconstructed PHU-style DMAP read path with
+# the real PS5 toolchain while manual-run parity work is still in progress.
+# Building it cannot change the runtime ELF/plugin behavior.
+# ------------------------------------------------------------------
+add_library(common_fps_v1_ps5_reconstruction STATIC
+    "${ROOT}/src/reconstruction/v1_stable_memory.cpp"
+    "${ROOT}/src/ps5/v1_stable_dmap_backend.cpp"
+    "${ROOT}/src/ps5/v1_stable_ps5_platform.cpp"
+)
+
+target_include_directories(common_fps_v1_ps5_reconstruction PRIVATE
+    "${ROOT}/include"
+    "${ROOT}/src/ps5"
+    "${SDK}"
+    "${SDK}/include"
+)
+
+target_compile_options(common_fps_v1_ps5_reconstruction PRIVATE
+    --target=x86_64-sie-ps5
+    -DPS5
+    -fPIC
+    -march=znver2
+    -O2
+    -Wall
+    -Wextra
+)
+
+# ------------------------------------------------------------------
 # Package controller as etaHEN .plugin.
 # The renderer ELF remains a source-built companion artifact until the
 # controller-side loader embedding step is validated.
