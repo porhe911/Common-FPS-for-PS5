@@ -1,5 +1,5 @@
 /*
- * Common FPS for PS5 - RC7 single-sysctl-snapshot safety probe
+ * Common FPS for PS5 - RC8 sparse combined-sysctl polling probe
  * Copyright (C) 2026 porhe911
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -15,7 +15,7 @@
 
 namespace {
 
-constexpr const char* kLogPath = "/data/CommonFPS_RC7_sysctl_once.log";
+constexpr const char* kLogPath = "/data/CommonFPS_RC8_sysctl_sparse.log";
 
 void log_line(const char* text) {
     FILE* f = std::fopen(kLogPath, "a");
@@ -50,42 +50,32 @@ bool bounded_name_equals(const std::uint8_t* record,
            name[wanted_len] == 0;
 }
 
-/*
- * Exactly one process-list snapshot for the whole RC7 run.
- * sysctl is called once to size the buffer and once to fill it. The same
- * returned buffer is parsed for both SceShellUI and eboot.bin, unlike RC4
- * which performed independent process-list reads twice every 500 ms.
- */
-void take_single_snapshot() {
-    log_line("RC7 SNAPSHOT BEGIN (one process-list read only)");
-
-    int mib[4] = {1, 14, 8, 0};
-    std::size_t required = 0;
-    const int size_rc = sysctl(mib, 4, nullptr, &required, nullptr, 0);
-    if (size_rc != 0 || required == 0) {
-        log_line("RC7 SNAPSHOT size sysctl FAIL");
-        return;
-    }
-
-    // Leave headroom in case a process appears between the size and fill call.
-    const std::size_t capacity = required + 65536U;
-    auto* buffer = static_cast<std::uint8_t*>(std::malloc(capacity));
-    if (!buffer) {
-        log_line("RC7 SNAPSHOT malloc FAIL");
-        return;
-    }
-
-    std::size_t filled = capacity;
-    const int fill_rc = sysctl(mib, 4, buffer, &filled, nullptr, 0);
-    if (fill_rc != 0 || filled > capacity) {
-        std::free(buffer);
-        log_line("RC7 SNAPSHOT fill sysctl FAIL");
-        return;
-    }
-
+struct SnapshotResult {
     int shellui_pid = -1;
     int game_pid = -1;
     std::size_t records = 0;
+    std::size_t filled = 0;
+    int rc = -1;
+};
+
+SnapshotResult take_snapshot() {
+    SnapshotResult out{};
+    int mib[4] = {1, 14, 8, 0};
+
+    std::size_t required = 0;
+    if (sysctl(mib, 4, nullptr, &required, nullptr, 0) != 0 || required == 0)
+        return out;
+
+    const std::size_t capacity = required + 65536U;
+    auto* buffer = static_cast<std::uint8_t*>(std::malloc(capacity));
+    if (!buffer)
+        return out;
+
+    std::size_t filled = capacity;
+    if (sysctl(mib, 4, buffer, &filled, nullptr, 0) != 0 || filled > capacity) {
+        std::free(buffer);
+        return out;
+    }
 
     std::uint8_t* ptr = buffer;
     std::uint8_t* end = buffer + filled;
@@ -102,67 +92,78 @@ void take_single_snapshot() {
         if (record_size > static_cast<std::size_t>(end - ptr))
             break;
 
-        ++records;
+        ++out.records;
         if (record_size >= 76U) {
             int pid = -1;
             std::memcpy(&pid, ptr + 72U, sizeof(pid));
-            if (shellui_pid < 0 && bounded_name_equals(ptr, record_size, "SceShellUI"))
-                shellui_pid = pid;
-            if (game_pid < 0 && bounded_name_equals(ptr, record_size, "eboot.bin"))
-                game_pid = pid;
+            if (out.shellui_pid < 0 && bounded_name_equals(ptr, record_size, "SceShellUI"))
+                out.shellui_pid = pid;
+            if (out.game_pid < 0 && bounded_name_equals(ptr, record_size, "eboot.bin"))
+                out.game_pid = pid;
         }
 
         ptr += record_size;
     }
 
+    out.filled = filled;
+    out.rc = 0;
     std::free(buffer);
+    return out;
+}
 
+void log_snapshot(int index, const SnapshotResult& s) {
     FILE* f = std::fopen(kLogPath, "a");
-    if (f) {
-        std::fprintf(f, "RC7 SNAPSHOT records=%zu filled=%zu\n", records, filled);
-        std::fclose(f);
-    }
-    log_pid("RC7 SceShellUI pid=", shellui_pid);
-    log_pid("RC7 eboot.bin pid=", game_pid);
-    log_line("RC7 SNAPSHOT END; NO MORE sysctl calls");
+    if (!f)
+        return;
+    std::fprintf(f,
+                 "RC8 SNAPSHOT %d/12 rc=%d records=%zu filled=%zu shellui=%d game=%d\n",
+                 index, s.rc, s.records, s.filled, s.shellui_pid, s.game_pid);
+    std::fclose(f);
 }
 
 int run_child() {
-    log_pid("RC7 CHILD pid=", static_cast<int>(getpid()));
-    log_line("RC7 CHILD resident; fork proven in RC6; waiting 10s before ONE sysctl snapshot");
+    log_pid("RC8 CHILD pid=", static_cast<int>(getpid()));
+    log_line("RC8 CHILD sparse polling: ONE combined process snapshot every 5s; 12 snapshots total");
+    log_line("RC8 NO kernel allproc / NO ptrace / NO auth / NO inject / NO FPS");
 
-    sleep(10);
-    take_single_snapshot();
+    int last_game = -2;
+    int last_shellui = -2;
 
-    // No more sysctl calls after the snapshot. Keep the same resident-worker
-    // shape long enough to test gameplay stability, then terminate cleanly.
-    for (int i = 1; i <= 10; ++i) {
+    for (int i = 1; i <= 12; ++i) {
         sleep(5);
-        FILE* f = std::fopen(kLogPath, "a");
-        if (f) {
-            std::fprintf(f, "RC7 ALIVE %d/10 (no sysctl)\n", i);
-            std::fclose(f);
+        const SnapshotResult s = take_snapshot();
+        log_snapshot(i, s);
+
+        if (s.rc == 0) {
+            if (s.shellui_pid != last_shellui) {
+                log_pid("RC8 CHANGE SceShellUI pid=", s.shellui_pid);
+                last_shellui = s.shellui_pid;
+            }
+            if (s.game_pid != last_game) {
+                log_pid("RC8 CHANGE eboot.bin pid=", s.game_pid);
+                last_game = s.game_pid;
+            }
         }
     }
 
-    log_line("RC7 CHILD DONE clean return");
+    log_line("RC8 CHILD DONE clean return");
     return 0;
 }
 
 } // namespace
 
 extern "C" int main() {
-    log_pid("RC7 PARENT start pid=", static_cast<int>(getpid()));
+    log_pid("RC8 PARENT start pid=", static_cast<int>(getpid()));
 
     const pid_t pid = fork();
     if (pid < 0) {
-        log_line("RC7 fork FAIL");
+        log_line("RC8 fork FAIL");
         return 1;
     }
 
     if (pid > 0) {
-        log_pid("RC7 PARENT forked child=", static_cast<int>(pid));
-        log_line("RC7 PARENT RETURN 0");
+        log_pid("RC8 PARENT forked child=", static_cast<int>(pid));
+        log_line("RC8 PARENT RETURN 0");
         return 0;
     }
 
