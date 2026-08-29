@@ -23,6 +23,14 @@ MonoImage* pui_img = nullptr;
 MonoImage* AppSystem_img = nullptr;
 MonoObject* Game = nullptr;
 
+/*
+ * etaHEN 2.4B Detour.cpp expects these prx.cpp globals. The upstream prx
+ * initializes both to false, and even installs its first PUI Update detour
+ * while has_hv_bypass is still false. Preserve that exact initial contract.
+ */
+bool has_hv_bypass = false;
+bool is_testkit = false;
+
 namespace {
 
 std::atomic_bool g_visual_ready{false};
@@ -200,7 +208,6 @@ int main(int, const char**) {
     (void)mono_thread_attach(Root_Domain);
     stage_log("R2 Mono attached");
 
-    /* Images can appear slightly after libmonosgen during ShellUI startup. */
     bool images_ready = false;
     for (unsigned i = 0; i < 120; ++i) {
         if (resolve_images()) {
