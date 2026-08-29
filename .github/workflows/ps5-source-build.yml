@@ -46,6 +46,7 @@ jobs:
             dist/Common_FPS_PS5_v1.1.0.elf
             dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin
             dist/Common_FPS_ShellUI_v1.1.0.elf
+            dist/Common_FPS_PS5_v1_parity_probe_FW960.elf
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
