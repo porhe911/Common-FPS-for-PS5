@@ -16,8 +16,9 @@
 
 extern "C" {
 #include "proc.h"
-#include "pt.h"
 #include "ucred.h"
+
+int mdbg_copyout(int pid, unsigned long addr, void* buf, unsigned long len);
 }
 
 namespace common_fps::ps5 {
@@ -93,16 +94,10 @@ std::optional<ProcessId> find_pid_sysctl(const char* wanted) {
 } // namespace
 
 std::optional<ProcessId> Ps5Platform::find_game_process() {
-    // RC8-proven userland discovery; never walk KERNEL_ADDRESS_ALLPROC here.
     return find_pid_sysctl("eboot.bin");
 }
 
 bool Ps5Platform::process_alive(ProcessId pid) {
-    /*
-     * RC9 deliberately avoids a second process-list scan for every FPS sample.
-     * The controller owns game lifecycle through sparse sysctl snapshots. If a
-     * process exits between snapshots, read_memory() fails and FpsSampler resets.
-     */
     return pid > 0;
 }
 
@@ -110,12 +105,7 @@ bool Ps5Platform::begin_process_inspection(ProcessId) {
     if (inspection_active_)
         return true;
 
-    /*
-     * FW 9.60 hardware parity v5-v11:
-     * without debugger auth SYS_dl_get_list returns zero modules for the game;
-     * with DEBUG_AUTHID the native VideoOut module/DMAP is visible.
-     * Keep this privilege only for the short attach/discovery window.
-     */
+    /* Module enumeration needs temporary debugger auth on FW 9.60. */
     saved_authid_ = set_ucred_to_debugger();
     if (saved_authid_ == 0)
         return false;
@@ -154,15 +144,15 @@ bool Ps5Platform::read_memory(
     std::size_t size) {
 
     /*
-     * RC9 is an FW 9.60 hardware probe. Keep only the v11-proven ptrace copyout
-     * path here so no legacy debug-copy helpers are linked into this build.
+     * RC11: no shsrv ptrace at all. mdbg_copyout() is provided by the pinned
+     * PS5 Payload SDK v0.41 CRT and reads process memory through SYS_mdbg_call.
+     * This avoids PT_ATTACH/waitpid/PT_IO/PT_DETACH on every FPS sample.
      */
-    if (pt_attach(pid) < 0)
-        return false;
-
-    const int rc = pt_copyout(pid, address, out, size);
-    pt_detach(pid, 0);
-    return rc >= 0;
+    return mdbg_copyout(
+               static_cast<int>(pid),
+               static_cast<unsigned long>(address),
+               out,
+               static_cast<unsigned long>(size)) == 0;
 }
 
 std::uint64_t Ps5Platform::monotonic_us() {
