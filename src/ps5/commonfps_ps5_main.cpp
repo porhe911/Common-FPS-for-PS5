@@ -4,92 +4,113 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "common_fps/autoload_guard.hpp"
-#include "common_fps/config.hpp"
-#include "common_fps/lifecycle.hpp"
-#include "common_fps/wire.hpp"
-
-#include "ps5_autoload_backend.hpp"
-#include "ps5_platform.hpp"
-#include "state_sender.hpp"
-
+#include <cstdint>
 #include <cstdio>
-#include <fstream>
-#include <sstream>
+#include <cstdlib>
+#include <cstring>
+#include <sys/sysctl.h>
 #include <unistd.h>
 
 namespace {
 
-common_fps::OverlayConfig load_config() {
-    constexpr const char* kPath = "/data/CommonFPS/config.ini";
-    std::ifstream file(kPath);
-    if (!file)
-        return common_fps::default_config();
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return common_fps::parse_config_text(buffer.str());
-}
-
 void stage_log(const char* text) {
-    FILE* f = std::fopen("/data/CommonFPS_stageB_controller.log", "a");
+    FILE* f = std::fopen("/data/CommonFPS_RC4_sysctl.log", "a");
     if (!f)
         return;
     std::fprintf(f, "%s\n", text);
     std::fclose(f);
 }
 
-int run_worker() {
-    common_fps::ps5::Ps5Platform platform;
-    common_fps::ps5::StateSender sender;
-    common_fps::ps5::Ps5AutoloadBackend autoload_backend(platform);
+void stage_log_pid(const char* prefix, int pid) {
+    FILE* f = std::fopen("/data/CommonFPS_RC4_sysctl.log", "a");
+    if (!f)
+        return;
+    std::fprintf(f, "%s%d\n", prefix, pid);
+    std::fclose(f);
+}
 
-    if (!autoload_backend.valid()) {
-        stage_log("C0 FAIL health socket / duplicate worker");
-        return 0;
+/*
+ * Read-only userland process discovery.
+ *
+ * This deliberately does NOT use etaHEN fps_elf/find_proc_by_name(),
+ * KERNEL_ADDRESS_ALLPROC, kernel_copyout, ptrace, authid changes, or any
+ * ShellUI injection. The raw offsets below are the same kinfo_proc fields
+ * already used by etaHEN's own sysctl fallback: pid @ 72, tdname @ 447.
+ */
+int safe_find_pid(const char* wanted) {
+    int mib[4] = {1, 14, 8, 0};
+    std::size_t size = 0;
+    if (sysctl(mib, 4, nullptr, &size, nullptr, 0) != 0 || size == 0)
+        return -1;
+
+    auto* buffer = static_cast<std::uint8_t*>(std::malloc(size));
+    if (!buffer)
+        return -1;
+
+    std::size_t filled = size;
+    if (sysctl(mib, 4, buffer, &filled, nullptr, 0) != 0) {
+        std::free(buffer);
+        return -1;
     }
 
-    stage_log("C0 worker started StageB v11");
+    int found = -1;
+    std::uint8_t* ptr = buffer;
+    std::uint8_t* end = buffer + filled;
 
-    auto config = load_config();
-    common_fps::Lifecycle lifecycle(platform, config);
+    while (ptr < end) {
+        if (static_cast<std::size_t>(end - ptr) < sizeof(int))
+            break;
 
-    common_fps::AutoloadPolicy policy;
-    policy.consecutive_ready_samples = 8;
-    policy.retry_delay_us = 5'000'000ULL;
-    common_fps::AutoloadGuard guard(autoload_backend, policy);
+        int record_size = 0;
+        std::memcpy(&record_size, ptr, sizeof(record_size));
+        if (record_size <= 0 ||
+            static_cast<std::size_t>(record_size) > static_cast<std::size_t>(end - ptr))
+            break;
 
-    std::uint64_t sequence = 1;
-    bool previously_operational = false;
-    bool logged_receiver = false;
-    bool logged_visual = false;
+        if (record_size > 448) {
+            int pid = -1;
+            std::memcpy(&pid, ptr + 72, sizeof(pid));
+            const char* name = reinterpret_cast<const char*>(ptr + 447);
+            const std::size_t available = static_cast<std::size_t>(record_size) - 447U;
+            const std::size_t compare = available < 64U ? available : 64U;
+
+            if (compare != 0 && std::strncmp(name, wanted, compare) == 0) {
+                found = pid;
+                break;
+            }
+        }
+
+        ptr += record_size;
+    }
+
+    std::free(buffer);
+    return found;
+}
+
+int run_worker() {
+    stage_log("RC4 START sysctl-only; NO kernel allproc / NO ptrace / NO auth / NO inject");
+
+    int last_shellui = -2;
+    int last_game = -2;
+    unsigned heartbeat = 0;
 
     for (;;) {
-        const bool renderer_running =
-            guard.tick(platform.monotonic_us()) == common_fps::AutoloadState::Ready;
+        const int shellui = safe_find_pid("SceShellUI");
+        const int game = safe_find_pid("eboot.bin");
 
-        if (renderer_running && !logged_receiver) {
-            stage_log("C1 ReceiverReady");
-            logged_receiver = true;
+        if (shellui != last_shellui) {
+            stage_log_pid("RC4 SceShellUI pid=", shellui);
+            last_shellui = shellui;
+        }
+        if (game != last_game) {
+            stage_log_pid("RC4 eboot.bin pid=", game);
+            last_game = game;
         }
 
-        const bool visual_ready = renderer_running && autoload_backend.visual_ready();
-        if (visual_ready && !logged_visual) {
-            stage_log("C2 VisualReady; FPS lifecycle enabled");
-            logged_visual = true;
-        }
+        if ((heartbeat++ % 10U) == 0U)
+            stage_log("RC4 ALIVE");
 
-        if (!visual_ready) {
-            if (previously_operational)
-                lifecycle.reset();
-            previously_operational = false;
-            platform.sleep_ms(250);
-            continue;
-        }
-
-        previously_operational = true;
-        const auto frame = lifecycle.tick();
-        sender.send(common_fps::make_wire_packet(frame, sequence++));
-        platform.sleep_ms(1000);
+        usleep(500000);
     }
 }
 
@@ -99,7 +120,9 @@ extern "C" int main() {
     const pid_t pid = fork();
     if (pid > 0)
         return 0;
-    if (pid < 0)
-        return 1;
+    if (pid < 0) {
+        stage_log("RC4 fork FAIL; continuing in current process");
+        return run_worker();
+    }
     return run_worker();
 }
