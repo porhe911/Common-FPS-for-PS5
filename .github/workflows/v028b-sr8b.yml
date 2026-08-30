@@ -1,0 +1,51 @@
+name: v0.28b SR8B UDP Receiver Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/**"
+      - "ps5/sr8b/**"
+      - "scripts/v028b_sr8b_build.sh"
+      - "tools/embed_binary_cpp.py"
+      - "tools/make_etahen_plugin.py"
+      - ".github/workflows/v028b-sr8b.yml"
+
+jobs:
+  build-sr8b:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build SR8B UDP receiver bootstrap
+        run: bash ./scripts/v028b_sr8b_build.sh
+
+      - name: Upload SR8B artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR8B-UDP-Receiver-Bootstrap
+          path: |
+            dist/v028b-sr8b/Common_FPS_SR8B_ReceiverUDP.elf
+            dist/v028b-sr8b/Common_FPS_SR8B_v028b_Receiver_UDP.elf
+            dist/v028b-sr8b/Common_FPS_SR8B_v028b_Receiver_UDP_etaHEN.plugin
+            dist/v028b-sr8b/SHA256SUMS.txt
+            dist/v028b-sr8b/LINKED_SYMBOLS.txt
+            dist/v028b-sr8b/RECEIVER_GLOB_DAT.txt
+          if-no-files-found: error
