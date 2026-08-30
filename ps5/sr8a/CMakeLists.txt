@@ -18,15 +18,14 @@ set(SDK "$ENV{PS5_PAYLOAD_SDK}")
 set(ETAHEN_ROOT "${COMMON_FPS_ETAHEN_SOURCE}/Source Code")
 set(NINES "${ETAHEN_ROOT}/libNineS")
 
-# Receiver-only injected payload: deliberately no Mono/PUI sources.
+# Minimal receiver-only C payload: no C++ runtime, no Mono/PUI/UI hooks.
 add_executable(common_fps_sr8a_receiver
-    "${ROOT}/src/ps5/legacy_v028b/sr8a_receiver_only.cpp"
+    "${ROOT}/src/ps5/legacy_v028b/sr8a_receiver_minimal.c"
 )
 set_target_properties(common_fps_sr8a_receiver PROPERTIES
     OUTPUT_NAME "Common_FPS_SR8A_ReceiverOnly.elf"
 )
 target_include_directories(common_fps_sr8a_receiver PRIVATE
-    "${ROOT}/src/ps5/legacy_v028b"
     "${SDK}" "${SDK}/include"
 )
 target_compile_options(common_fps_sr8a_receiver PRIVATE
@@ -65,9 +64,9 @@ target_compile_options(sr8a_backend PRIVATE
     -Wall -Wextra -Werror -ffunction-sections -fdata-sections
 )
 
-# Stable-style one-time bootstrap built from the exact etaHEN-vendored
-# libNineS pt.c + libNineS elfldr.c, with the two v0.28b Trace Continue patches
-# supplied by libnines_elfldr_trace_bridge.c.
+# One-time stable-style bootstrap built from etaHEN's vendored libNineS pt.c
+# and our source-recovered PHU elfldr extensions: GLOB_DAT resolver + the two
+# Trace Continue patch points.
 add_library(sr8a_bootstrap STATIC
     "${ROOT}/src/ps5/legacy_v028b/stable_injector.cpp"
     "${ROOT}/src/ps5/legacy_v028b/pt_call_breakpoint.cpp"
@@ -87,7 +86,7 @@ target_compile_options(sr8a_bootstrap PRIVATE
 )
 
 add_executable(common_fps_v028b_sr8a
-    "${ROOT}/src/ps5/legacy_v028b/sr8a_receiver_bootstrap_probe.cpp"
+    "${ROOT}/src/ps5/legacy_v028b/sr8a_file_bootstrap_probe.cpp"
     "${RECEIVER_BLOB_CPP}"
 )
 set_target_properties(common_fps_v028b_sr8a PROPERTIES
