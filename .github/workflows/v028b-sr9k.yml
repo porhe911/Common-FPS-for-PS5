@@ -1,0 +1,51 @@
+name: v0.28b SR9K Direct Native Action Queue
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/sr9k_direct_native_action_receiver.c"
+      - "src/ps5/legacy_v028b/sr9k_direct_native_action_bootstrap_probe.cpp"
+      - "ps5/sr9k/CMakeLists.txt"
+      - "scripts/v028b_sr9k_build.sh"
+      - ".github/workflows/v028b-sr9k.yml"
+      - "src/ps5/legacy_v028b/stable_injector.cpp"
+      - "src/ps5/legacy_v028b/pt_call_breakpoint.cpp"
+      - "src/ps5/legacy_v028b/libnines_elfldr_trace_bridge.c"
+      - "src/ps5/legacy_v028b/process_sysctl.cpp"
+      - "tools/embed_binary_cpp.py"
+      - "tools/make_etahen_plugin.py"
+
+jobs:
+  build-sr9k:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+      - name: Build SR9K direct native Action queue proof
+        run: bash ./scripts/v028b_sr9k_build.sh
+      - name: Upload SR9K artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR9K-Direct-Native-Action
+          path: |
+            dist/v028b-sr9k/Common_FPS_SR9K_Direct_Native_Action_Receiver.elf
+            dist/v028b-sr9k/Common_FPS_SR9K_v028b_Direct_Native_Action.elf
+            dist/v028b-sr9k/Common_FPS_SR9K_v028b_Direct_Native_Action_etaHEN.plugin
+            dist/v028b-sr9k/SHA256SUMS.txt
+            dist/v028b-sr9k/LINKED_SYMBOLS.txt
+            dist/v028b-sr9k/RECEIVER_GLOB_DAT.txt
+          if-no-files-found: error
