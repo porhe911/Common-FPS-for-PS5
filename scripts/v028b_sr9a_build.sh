@@ -47,13 +47,20 @@ if [[ -n "${BAD_RELOCS}" ]]; then
 fi
 readelf -r "${RECEIVER}" | grep R_X86_64_GLOB_DAT > "${OUT}/RECEIVER_GLOB_DAT.txt" || true
 
+nm -C "${ELF}" > "${OUT}/LINKED_SYMBOLS.txt" || true
+
 # Controller has ptrace only for the already-proven one-time ShellUI bootstrap.
-if strings "${ELF}" | grep -Eqi 'mdbg_copyout|CreateLabel|AppendChild|OnRender'; then
-  echo "ERROR: SR9A controller contains forbidden MDBG/visual code"
+# Check linked symbols instead of human-readable diagnostic strings so the
+# explicit "NO CreateLabel" marker cannot trigger a false positive.
+if strings "${ELF}" | grep -Fq 'mdbg_copyout'; then
+  echo "ERROR: SR9A controller contains forbidden MDBG code"
+  exit 1
+fi
+if grep -Eq 'CreateLabel|Widget_Append_Child|CreateUIFont|CreateUIColor|OnRender' "${OUT}/LINKED_SYMBOLS.txt"; then
+  echo "ERROR: SR9A controller links visual/UI mutation symbols"
   exit 1
 fi
 
-nm -C "${ELF}" > "${OUT}/LINKED_SYMBOLS.txt" || true
 for symbol in \
   'inject_renderer_once' \
   'commonfps_v028b_elfldr_load' \
