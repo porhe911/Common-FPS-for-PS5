@@ -1,0 +1,50 @@
+name: v0.28b SR8A Receiver Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/**"
+      - "ps5/sr8a/**"
+      - "scripts/v028b_sr8a_build.sh"
+      - "tools/embed_binary_cpp.py"
+      - "tools/make_etahen_plugin.py"
+      - ".github/workflows/v028b-sr8a.yml"
+
+jobs:
+  build-sr8a:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build SR8A receiver bootstrap
+        run: bash ./scripts/v028b_sr8a_build.sh
+
+      - name: Upload SR8A artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR8A-Receiver-Bootstrap
+          path: |
+            dist/v028b-sr8a/Common_FPS_SR8A_ReceiverOnly.elf
+            dist/v028b-sr8a/Common_FPS_SR8A_v028b_Receiver_Bootstrap.elf
+            dist/v028b-sr8a/Common_FPS_SR8A_v028b_Receiver_Bootstrap_etaHEN.plugin
+            dist/v028b-sr8a/SHA256SUMS.txt
+            dist/v028b-sr8a/LINKED_SYMBOLS.txt
+          if-no-files-found: error
