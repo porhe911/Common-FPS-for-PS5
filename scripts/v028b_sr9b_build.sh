@@ -52,14 +52,20 @@ if [[ -n "${BAD_RELOCS}" ]]; then
 fi
 readelf -r "${RECEIVER}" | grep R_X86_64_GLOB_DAT > "${OUT}/RECEIVER_GLOB_DAT.txt" || true
 
-# Controller must remain visual-code-free; all PUI mutation lives in injected
-# receiver, while controller remains SR9A backend/bootstrap/PHUF lifecycle.
-if strings "${ELF}" | grep -Eqi 'mdbg_copyout|id_commonfps_sr9b_label|AppendChild|FitWidthToText'; then
-  echo "ERROR: SR9B controller contains receiver visual implementation"
+nm -C "${ELF}" > "${OUT}/LINKED_SYMBOLS.txt" || true
+
+# Receiver bytes are intentionally embedded in the controller ELF, so visual
+# strings are expected there. What must NOT happen is linking receiver visual
+# routines as executable controller symbols.
+if strings "${ELF}" | grep -Fq 'mdbg_copyout'; then
+  echo "ERROR: SR9B controller contains forbidden MDBG transport"
+  exit 1
+fi
+if grep -Eq '(^| )create_static_visual\(|(^| )create_label\(|(^| )append_child\(' "${OUT}/LINKED_SYMBOLS.txt"; then
+  echo "ERROR: SR9B controller linked receiver visual routines as code"
   exit 1
 fi
 
-nm -C "${ELF}" > "${OUT}/LINKED_SYMBOLS.txt" || true
 for symbol in \
   'inject_renderer_once' \
   'commonfps_v028b_elfldr_load' \
