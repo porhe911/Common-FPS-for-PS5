@@ -2,9 +2,9 @@
  * Common FPS v0.28b SR9A - PUI context-only ShellUI receiver
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Builds directly on the hardware-proven SR8B receiver/bootstrap.  This stage
+ * Builds directly on the hardware-proven SR8B receiver/bootstrap. This stage
  * resolves and validates the exact etaHEN Mono/PUI context chain but never
- * creates, removes, or updates a widget.  Progress is reported over UDP 55542.
+ * creates, removes, or updates a widget. Progress is reported over UDP 55542.
  */
 
 #include <netinet/in.h>
@@ -35,6 +35,18 @@ typedef void MonoMethod;
 typedef void MonoString;
 typedef void MonoObject;
 typedef void MonoProperty;
+
+typedef MonoDomain* (*mono_get_root_domain_fn)(void);
+typedef MonoThread* (*mono_thread_attach_fn)(MonoDomain*);
+typedef MonoAssembly* (*mono_domain_assembly_open_fn)(MonoDomain*, const char*);
+typedef MonoImage* (*mono_assembly_get_image_fn)(MonoAssembly*);
+typedef MonoClass* (*mono_class_from_name_fn)(MonoImage*, const char*, const char*);
+typedef MonoMethod* (*mono_class_get_method_from_name_fn)(MonoClass*, const char*, int);
+typedef MonoString* (*mono_string_new_fn)(MonoDomain*, const char*);
+typedef MonoDomain* (*mono_domain_get_fn)(void);
+typedef MonoObject* (*mono_runtime_invoke_fn)(MonoMethod*, void*, void**, MonoObject**);
+typedef MonoProperty* (*mono_class_get_property_from_name_fn)(MonoClass*, const char*);
+typedef MonoMethod* (*mono_property_get_get_method_fn)(MonoProperty*);
 
 struct phuf_packet {
     uint32_t magic;
@@ -95,17 +107,17 @@ static int init_pui_context(void) {
     context_mask |= 1ull << 0;
     context_step(1);
 
-    RESOLVE_MONO(mono_handle, mono_get_root_domain, MonoDomain* (*)(void));
-    RESOLVE_MONO(mono_handle, mono_thread_attach, MonoThread* (*)(MonoDomain*));
-    RESOLVE_MONO(mono_handle, mono_domain_assembly_open, MonoAssembly* (*)(MonoDomain*, const char*));
-    RESOLVE_MONO(mono_handle, mono_assembly_get_image, MonoImage* (*)(MonoAssembly*));
-    RESOLVE_MONO(mono_handle, mono_class_from_name, MonoClass* (*)(MonoImage*, const char*, const char*));
-    RESOLVE_MONO(mono_handle, mono_class_get_method_from_name, MonoMethod* (*)(MonoClass*, const char*, int));
-    RESOLVE_MONO(mono_handle, mono_string_new, MonoString* (*)(MonoDomain*, const char*));
-    RESOLVE_MONO(mono_handle, mono_domain_get, MonoDomain* (*)(void));
-    RESOLVE_MONO(mono_handle, mono_runtime_invoke, MonoObject* (*)(MonoMethod*, void*, void**, MonoObject**));
-    RESOLVE_MONO(mono_handle, mono_class_get_property_from_name, MonoProperty* (*)(MonoClass*, const char*));
-    RESOLVE_MONO(mono_handle, mono_property_get_get_method, MonoMethod* (*)(MonoProperty*));
+    RESOLVE_MONO(mono_handle, mono_get_root_domain, mono_get_root_domain_fn);
+    RESOLVE_MONO(mono_handle, mono_thread_attach, mono_thread_attach_fn);
+    RESOLVE_MONO(mono_handle, mono_domain_assembly_open, mono_domain_assembly_open_fn);
+    RESOLVE_MONO(mono_handle, mono_assembly_get_image, mono_assembly_get_image_fn);
+    RESOLVE_MONO(mono_handle, mono_class_from_name, mono_class_from_name_fn);
+    RESOLVE_MONO(mono_handle, mono_class_get_method_from_name, mono_class_get_method_from_name_fn);
+    RESOLVE_MONO(mono_handle, mono_string_new, mono_string_new_fn);
+    RESOLVE_MONO(mono_handle, mono_domain_get, mono_domain_get_fn);
+    RESOLVE_MONO(mono_handle, mono_runtime_invoke, mono_runtime_invoke_fn);
+    RESOLVE_MONO(mono_handle, mono_class_get_property_from_name, mono_class_get_property_from_name_fn);
+    RESOLVE_MONO(mono_handle, mono_property_get_get_method, mono_property_get_get_method_fn);
 
     if (!mono_get_root_domain || !mono_thread_attach ||
         !mono_domain_assembly_open || !mono_assembly_get_image ||
