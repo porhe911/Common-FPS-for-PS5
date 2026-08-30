@@ -1,0 +1,51 @@
+name: v0.28b SR9A PUI Context Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/**"
+      - "ps5/sr9a/**"
+      - "scripts/v028b_sr9a_build.sh"
+      - "tools/embed_binary_cpp.py"
+      - "tools/make_etahen_plugin.py"
+      - ".github/workflows/v028b-sr9a.yml"
+
+jobs:
+  build-sr9a:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build SR9A context-only probe
+        run: bash ./scripts/v028b_sr9a_build.sh
+
+      - name: Upload SR9A artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR9A-PUI-Context
+          path: |
+            dist/v028b-sr9a/Common_FPS_SR9A_PUI_Context_Receiver.elf
+            dist/v028b-sr9a/Common_FPS_SR9A_v028b_PUI_Context.elf
+            dist/v028b-sr9a/Common_FPS_SR9A_v028b_PUI_Context_etaHEN.plugin
+            dist/v028b-sr9a/SHA256SUMS.txt
+            dist/v028b-sr9a/LINKED_SYMBOLS.txt
+            dist/v028b-sr9a/RECEIVER_GLOB_DAT.txt
+          if-no-files-found: error
