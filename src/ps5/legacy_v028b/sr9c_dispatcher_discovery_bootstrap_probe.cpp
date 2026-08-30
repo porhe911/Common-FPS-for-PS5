@@ -153,13 +153,11 @@ int run_probe() noexcept {
 
     bool done = false;
     bool error = false;
-    unsigned quiet_ms = 0;
     for (unsigned elapsed_ms = 0; elapsed_ms < 15000; elapsed_ms += 10) {
         DiscoveryPacket p{};
         const ssize_t got = recvfrom(receiver, &p, sizeof(p), MSG_DONTWAIT, nullptr, nullptr);
         if (got == static_cast<ssize_t>(sizeof(p)) && p.magic == kDiscoveryMagic) {
             log_packet(p);
-            quiet_ms = 0;
             if (p.kind == kKindDone) {
                 done = true;
                 break;
@@ -168,8 +166,6 @@ int run_probe() noexcept {
                 error = true;
                 break;
             }
-        } else {
-            quiet_ms += 10;
         }
         usleep(10000);
     }
