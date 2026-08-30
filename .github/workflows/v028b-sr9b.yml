@@ -1,0 +1,57 @@
+name: v0.28b SR9B Static PUI Visual
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "v028b-stable-source-rebuild"
+    paths:
+      - "src/ps5/legacy_v028b/sr9b_*"
+      - "ps5/sr9b/**"
+      - "scripts/v028b_sr9b_build.sh"
+      - ".github/workflows/v028b-sr9b.yml"
+      - "src/ps5/legacy_v028b/process_sysctl.*"
+      - "src/ps5/legacy_v028b/proc_rw_v960.*"
+      - "src/ps5/legacy_v028b/videoout_counter.*"
+      - "src/ps5/legacy_v028b/stable_injector.*"
+      - "src/ps5/legacy_v028b/pt_call_breakpoint.*"
+      - "src/ps5/legacy_v028b/libnines_elfldr_trace_bridge.c"
+      - "tools/embed_binary_cpp.py"
+      - "tools/make_etahen_plugin.py"
+
+jobs:
+  build-sr9b:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 python3-pyelftools clang-18 lld-18 binutils
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build SR9B static visual probe
+        run: bash ./scripts/v028b_sr9b_build.sh
+
+      - name: Upload SR9B artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v028b-SR9B-Static-Visual
+          path: |
+            dist/v028b-sr9b/Common_FPS_SR9B_Static_Visual_Receiver.elf
+            dist/v028b-sr9b/Common_FPS_SR9B_v028b_Static_Visual.elf
+            dist/v028b-sr9b/Common_FPS_SR9B_v028b_Static_Visual_etaHEN.plugin
+            dist/v028b-sr9b/SHA256SUMS.txt
+            dist/v028b-sr9b/LINKED_SYMBOLS.txt
+            dist/v028b-sr9b/RECEIVER_GLOB_DAT.txt
+          if-no-files-found: error
