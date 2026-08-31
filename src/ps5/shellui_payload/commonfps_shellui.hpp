@@ -11,12 +11,16 @@
 
 namespace common_fps::ps5::shellui {
 
+/* Resolve the already-loaded ShellUI Mono runtime and PUI assemblies. */
+bool initialize_runtime();
+
+/* Start the loopback UDP receiver used by the controller. */
 bool initialize_receiver();
 void shutdown_receiver();
 
 /*
- * Call from a ShellUI-safe update/render context.
- * It applies the newest packet only when sequence changes.
+ * Queue the newest state onto ShellUI's native UI event queue.
+ * All PUI mutation itself happens from the queued callback.
  */
 void apply_latest_state();
 
