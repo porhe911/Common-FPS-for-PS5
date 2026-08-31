@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <cstdarg>
+
 namespace common_fps::ps5 {
 
 /* Ensure the source-built renderer is resident in the current SceShellUI. */
