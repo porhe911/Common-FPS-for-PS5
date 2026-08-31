@@ -17,7 +17,7 @@ def main() -> int:
     dst.parent.mkdir(parents=True, exist_ok=True)
     with dst.open("w", encoding="utf-8", newline="\n") as out:
         out.write("#include <cstddef>\n#include <cstdint>\n\n")
-        out.write("alignas(16) const std::uint8_t commonfps_shellui_elf[] = {\n")
+        out.write("extern const std::uint8_t commonfps_shellui_elf[] = {\n")
         for offset in range(0, len(data), 16):
             chunk = data[offset:offset + 16]
             out.write("    ")
@@ -25,7 +25,7 @@ def main() -> int:
             out.write(",\n")
         out.write("};\n\n")
         out.write(
-            f"const std::size_t commonfps_shellui_elf_size = {len(data)}u;\n"
+            f"extern const std::size_t commonfps_shellui_elf_size = {len(data)}u;\n"
         )
 
     return 0
