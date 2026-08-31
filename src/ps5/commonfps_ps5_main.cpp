@@ -10,6 +10,7 @@
 #include "common_fps/wire.hpp"
 
 #include "ps5_platform.hpp"
+#include "shellui_injector.hpp"
 #include "state_sender.hpp"
 
 #include <cstdio>
@@ -39,10 +40,17 @@ int run_worker() {
     common_fps::Lifecycle lifecycle(platform, config);
 
     std::uint64_t sequence = 1;
+    bool renderer_online = false;
 
     for (;;) {
+        if (!renderer_online)
+            renderer_online = common_fps::ps5::ensure_shellui_renderer();
+
         const auto frame = lifecycle.tick();
-        sender.send(common_fps::make_wire_packet(frame, sequence++));
+
+        if (renderer_online)
+            sender.send(common_fps::make_wire_packet(frame, sequence++));
+
         platform.sleep_ms(1000);
     }
 }

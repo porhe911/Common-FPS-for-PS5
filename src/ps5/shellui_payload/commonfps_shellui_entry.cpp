@@ -1,39 +1,42 @@
+/*
+ * Common FPS for PS5
+ * Copyright (C) 2026 porhe911
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "commonfps_shellui.hpp"
-#include "HookedFuncs.hpp"
 
+#include <cstdio>
 #include <unistd.h>
-
-MonoImage* pui_img = nullptr;
-MonoObject* Game = nullptr;
 
 namespace {
 
-bool mono_context_ready()
-{
-    return Root_Domain != nullptr &&
-           pui_img != nullptr &&
-           Game != nullptr &&
-           mono_class_from_name != nullptr &&
-           mono_class_get_property_from_name != nullptr &&
-           mono_property_get_get_method != nullptr &&
-           mono_compile_method != nullptr &&
-           mono_string_new != nullptr;
+constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
+
+void write_online_marker() {
+    FILE* fp = std::fopen(kMarker, "w");
+    if (!fp)
+        return;
+    std::fprintf(fp, "%d\n", getpid());
+    std::fclose(fp);
 }
 
-}
+} // namespace
 
-int main(int, const char**)
-{
+extern "C" int main() {
     using namespace common_fps::ps5::shellui;
 
-    if (!initialize_receiver())
+    if (!initialize_runtime())
         return 1;
 
-    for (;;) {
-        if (mono_context_ready())
-            apply_latest_state();
+    if (!initialize_receiver())
+        return 2;
 
-        usleep(16000);
+    write_online_marker();
+
+    for (;;) {
+        apply_latest_state();
+        usleep(10000);
     }
 
     return 0;
