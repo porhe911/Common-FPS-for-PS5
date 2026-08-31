@@ -8,6 +8,7 @@
 #pragma once
 
 #include "common_fps/wire.hpp"
+#include <cstdarg>
 
 namespace common_fps::ps5::shellui {
 
