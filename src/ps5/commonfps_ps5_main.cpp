@@ -24,8 +24,15 @@
 
 namespace {
 
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+constexpr const char* kControllerLog =
+    "/data/CommonFPS_v111_sleep_recovery.log";
+constexpr const char kRuntimeHeader[] =
+    "Common FPS v1.1.1 sleep-recovery\n";
+#else
 constexpr const char* kControllerLog =
     "/data/CommonFPS_v110.log";
+#endif
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -183,6 +190,34 @@ void write_worker_ready_record(
         return;
 
     char record[1024]{};
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+    const int record_size = std::snprintf(
+        record,
+        sizeof(record),
+        "%s"
+        "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
+        "shellui_observation=sysctl_tdname_1s "
+        "renderer=shared_elf_etaHEN_update_hook "
+        "injection=target_stack_pthread ipc=udp_loopback_1s "
+        "mono_gc=pinned sampler=videoout_fw960_1s dmap=read_only "
+        "shutdown_trace=disabled "
+        "shutdown_writes=disabled signal_handlers=default "
+        "stop_path=disabled\n"
+        "Worker ready pid=%d ppid=%d first_shellui_pid=%d "
+        "size_rc=%d data_rc=%d errno=%d bytes=%zu records=%u "
+        "malformed=%u log_fd=closing periodic_log=disabled "
+        "platform_log=compile_time_disabled\n",
+        kRuntimeHeader,
+        getpid(),
+        getppid(),
+        first.pid,
+        first.size_query_rc,
+        first.data_query_rc,
+        first.saved_errno,
+        first.bytes,
+        first.records,
+        first.malformed_records);
+#else
     const int record_size = std::snprintf(
         record,
         sizeof(record),
@@ -208,6 +243,7 @@ void write_worker_ready_record(
         first.bytes,
         first.records,
         first.malformed_records);
+#endif
 
     if (record_size > 0) {
         const std::size_t safe_size =
@@ -220,6 +256,48 @@ void write_worker_ready_record(
     (void)fsync(fd);
     (void)close(fd);
 }
+
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+void append_shellui_lifecycle_record(
+    pid_t previous_pid,
+    pid_t current_pid) noexcept {
+
+    const int fd = open(
+        kControllerLog,
+        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
+        0644);
+    if (fd < 0)
+        return;
+
+    const char* transition =
+        previous_pid > 0 && current_pid <= 0
+            ? "terminated"
+            : previous_pid <= 0 && current_pid > 0
+                ? "recreated"
+                : "replaced";
+
+    char record[256]{};
+    const int record_size = std::snprintf(
+        record,
+        sizeof(record),
+        "ShellUI lifecycle previous_pid=%d current_pid=%d "
+        "transition=%s renderer_reset=1\n",
+        previous_pid,
+        current_pid,
+        transition);
+
+    if (record_size > 0) {
+        const std::size_t safe_size =
+            static_cast<std::size_t>(record_size) < sizeof(record)
+                ? static_cast<std::size_t>(record_size)
+                : sizeof(record) - 1;
+        write_all(fd, record, safe_size);
+    }
+
+    (void)fsync(fd);
+    (void)close(fd);
+}
+#endif
 
 void append_first_fps_record(
     pid_t game_pid,
@@ -263,6 +341,9 @@ void append_first_fps_record(
     common_fps::FpsSampler sampler(platform);
     common_fps::ps5::StateSender sender;
     pid_t reported_pid = -1;
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+    pid_t observed_shellui_pid = first.pid;
+#endif
     bool renderer_online = false;
     bool have_fps = false;
     int latest_fps = 0;
@@ -275,9 +356,25 @@ void append_first_fps_record(
      * etaHEN. There is no second internal fork, so etaHEN's PID file continues
      * to identify this worker. The only added path is the source-built ShellUI
      * renderer plus its one-way loopback state sender.
-     */
+    */
     for (;;) {
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+        const ShellUiObservation shellui = observe_shellui_once();
+        if (shellui.pid != observed_shellui_pid) {
+            append_shellui_lifecycle_record(
+                observed_shellui_pid,
+                shellui.pid);
+            observed_shellui_pid = shellui.pid;
+            renderer_online = false;
+            have_fps = false;
+        }
+
+        /* A missing ShellUI is a renderer outage, not a permanent success. */
+        if (shellui.pid <= 0)
+            renderer_online = false;
+#else
         (void)observe_shellui_once();
+#endif
 
         if (!renderer_online)
             renderer_online = common_fps::ps5::ensure_shellui_renderer();

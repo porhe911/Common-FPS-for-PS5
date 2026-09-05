@@ -61,6 +61,9 @@ constexpr const char* kLog =
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
+#elif defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+constexpr const char* kLog =
+    "/data/CommonFPS_v111_sleep_recovery.log";
 #else
 constexpr const char* kLog = "/data/CommonFPS_v110_source.log";
 #endif

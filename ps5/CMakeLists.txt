@@ -18,6 +18,22 @@ if(NOT COMMON_FPS_SHSRV_SOURCE)
     message(FATAL_ERROR "COMMON_FPS_SHSRV_SOURCE is required")
 endif()
 
+option(
+    COMMON_FPS_SLEEP_RECOVERY
+    "Build the v1.1.1 candidate with ShellUI PID recovery"
+    OFF
+)
+
+if(COMMON_FPS_SLEEP_RECOVERY)
+    set(COMMON_FPS_RENDERER_OUTPUT "Common_FPS_ShellUI_v1.1.1_sleep_recovery")
+    set(COMMON_FPS_CONTROLLER_OUTPUT "Common_FPS_PS5_v1.1.1_SLEEP_RECOVERY.elf")
+    set(COMMON_FPS_PLUGIN_OUTPUT "Common_FPS_PS5_etaHEN_v1.1.1_SLEEP_RECOVERY.plugin")
+else()
+    set(COMMON_FPS_RENDERER_OUTPUT "Common_FPS_ShellUI_v1.1.0")
+    set(COMMON_FPS_CONTROLLER_OUTPUT "Common_FPS_PS5_v1.1.0.elf")
+    set(COMMON_FPS_PLUGIN_OUTPUT "Common_FPS_PS5_etaHEN_v1.1.0.plugin")
+endif()
+
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(SDK "$ENV{PS5_PAYLOAD_SDK}")
 set(ETAHEN_ROOT "${COMMON_FPS_ETAHEN_SOURCE}/Source Code")
@@ -29,7 +45,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_v1.1.0"
+    OUTPUT_NAME "${COMMON_FPS_RENDERER_OUTPUT}"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -62,6 +78,12 @@ target_compile_options(common_fps_shellui PRIVATE
     -fdata-sections
 )
 
+if(COMMON_FPS_SLEEP_RECOVERY)
+    target_compile_definitions(common_fps_shellui PRIVATE
+        COMMON_FPS_V111_SLEEP_RECOVERY=1
+    )
+endif()
+
 target_link_options(common_fps_shellui PRIVATE
     -Wl,--gc-sections
     -Wl,-Bsymbolic
@@ -83,7 +105,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+            "${ROOT}/dist/${COMMON_FPS_RENDERER_OUTPUT}.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -107,7 +129,7 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.1.0.elf"
+    OUTPUT_NAME "${COMMON_FPS_CONTROLLER_OUTPUT}"
 )
 
 target_sources(common_fps_controller PRIVATE
@@ -130,7 +152,8 @@ target_sources(common_fps_controller PRIVATE
 )
 
 target_compile_definitions(common_fps_controller PRIVATE
-    COMMON_FPS_V110_STABLE=1
+    $<$<BOOL:${COMMON_FPS_SLEEP_RECOVERY}>:COMMON_FPS_V111_SLEEP_RECOVERY=1>
+    $<$<NOT:$<BOOL:${COMMON_FPS_SLEEP_RECOVERY}>>:COMMON_FPS_V110_STABLE=1>
     COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG=1
     COMMON_FPS_DIAGNOSTIC_SYSCTL_ONLY=1
 )
@@ -181,11 +204,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
+            "${ROOT}/dist/${COMMON_FPS_CONTROLLER_OUTPUT}"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
+            "${ROOT}/dist/${COMMON_FPS_CONTROLLER_OUTPUT}"
+            "${ROOT}/dist/${COMMON_FPS_PLUGIN_OUTPUT}"
             --title-id CFPS00050
             --version 1.39
 )

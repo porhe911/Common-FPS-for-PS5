@@ -12,7 +12,11 @@
 namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+constexpr const char* kLog = "/data/CommonFPS_v111_shellui_sleep_recovery.log";
+#else
 constexpr const char* kLog = "/data/CommonFPS_v110_shellui.log";
+#endif
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -68,7 +72,11 @@ void* elf_main(void* payload_args) {
 
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
+#if defined(COMMON_FPS_V111_SLEEP_RECOVERY)
+            "Common FPS v1.1.1 sleep-recovery target-thread bootstrap stack\n",
+#else
             "Common FPS v1.1.0 PARITY TEST13 target-thread bootstrap stack\n",
+#endif
             fp);
         std::fclose(fp);
     }

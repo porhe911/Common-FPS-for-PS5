@@ -1,0 +1,47 @@
+name: PS5 Sleep Recovery Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sleep-recovery-v1.1.1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Common FPS
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git wget unzip cmake meson pkg-config \
+            python3 python3-pyelftools \
+            clang-18 lld-18 xxd
+
+      - name: Prepare pinned PS5 source dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build sleep-recovery candidate
+        run: bash ./scripts/ps5_sleep_recovery_build.sh
+
+      - name: Upload sleep-recovery candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-for-PS5-v1.1.1-sleep-recovery
+          path: |
+            dist/Common_FPS_PS5_v1.1.1_SLEEP_RECOVERY.elf
+            dist/Common_FPS_PS5_etaHEN_v1.1.1_SLEEP_RECOVERY.plugin
+            dist/Common_FPS_ShellUI_v1.1.1_sleep_recovery.elf
+            dist/SHA256SUMS_v1.1.1_SLEEP_RECOVERY.txt
+            RESOLVED_BUILD_DEPENDENCIES.txt
+          if-no-files-found: error
