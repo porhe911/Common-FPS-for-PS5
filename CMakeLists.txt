@@ -48,3 +48,18 @@ if(COMMON_FPS_BUILD_TESTS)
     target_link_libraries(common_fps_autoload_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_autoload_tests COMMAND common_fps_autoload_tests)
 endif()
+
+if(COMMON_FPS_BUILD_TESTS)
+    # These tests use assert(), including calls inside assertions. Keep the
+    # checks active in Release builds used by CI.
+    foreach(common_fps_test_target IN ITEMS
+            common_fps_tests
+            common_fps_v1_parity_tests
+            common_fps_autoload_tests)
+        if(MSVC)
+            target_compile_options(${common_fps_test_target} PRIVATE /UNDEBUG)
+        else()
+            target_compile_options(${common_fps_test_target} PRIVATE -UNDEBUG)
+        endif()
+    endforeach()
+endif()

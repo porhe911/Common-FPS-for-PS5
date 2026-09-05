@@ -15,6 +15,7 @@
 namespace common_fps {
 
 inline constexpr std::uint32_t kWireMagic = 0x53465043; // "CFPS"
+inline constexpr std::uint32_t kWireShutdownMagic = 0x58465043; // "CFPX"
 inline constexpr std::uint16_t kWireVersion = 1;
 inline constexpr std::uint16_t kDefaultIpcPort = 39028;
 
@@ -39,6 +40,12 @@ struct WirePacket {
 WirePacket make_wire_packet(
     const OverlayFrame& frame,
     std::uint64_t sequence);
+
+/* Reserved controller-to-ShellUI quiesce packet; TEST31 never sends it. */
+WirePacket make_shutdown_wire_packet(std::uint64_t sequence);
+
+[[nodiscard]] bool
+is_shutdown_wire_packet(const WirePacket& packet) noexcept;
 
 std::optional<OverlayFrame>
 decode_wire_packet(const WirePacket& packet);

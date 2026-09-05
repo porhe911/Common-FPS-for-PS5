@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common_fps/constants.hpp"
 #include "common_fps/platform.hpp"
 
 #include <cstdint>
@@ -46,6 +47,7 @@ private:
     std::uintptr_t counter_address_ = 0;
 
     bool have_baseline_ = false;
+    unsigned warmup_deltas_remaining_ = kWarmupDeltasToDiscard;
     std::uint32_t previous_counter_ = 0;
     std::uint64_t previous_time_us_ = 0;
 };

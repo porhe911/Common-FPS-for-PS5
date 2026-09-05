@@ -1,0 +1,9 @@
+Common FPS v1.1.0 PARITY TEST31 tracked-process renderer A/B
+Mode=loader-tracked internal_fork=absent spawned_pid=resident shellui_observation=sysctl_tdname_1s renderer=shared_elf_etaHEN_update_hook injection=target_stack_pthread ipc=udp_loopback_1s mono_gc=pinned sampler=videoout_fw960_1s dmap=read_only shutdown_trace=disabled shutdown_writes=disabled signal_handlers=default stop_path=disabled
+Worker ready pid=119 ppid=106 first_shellui_pid=58 size_rc=0 data_rc=0 errno=0 bytes=87680 records=23 malformed=0 log_fd=closing periodic_log=disabled platform_log=compile_time_disabled
+ShellUI lookup pid=58 via=sysctl_tdname bytes=87680 records=23 malformed=0
+ShellUI inject start pid=58 payload_size=70968
+ShellUI bootstrap auth=1/1 attach=1 load=1 args=1 target_stack=1 thread=1 rc=0 detach=1 trace=1/1 imports=35/0 first=none elapsed_ms=5227
+ShellUI renderer online pid=58 total_ms=5249
+Sampler online pid=124 counter=0x80053d248 first_fps=59 event_log=once_per_game_pid log_fd=closing
+Sampler online pid=239 counter=0x800521248 first_fps=60 event_log=once_per_game_pid log_fd=closing

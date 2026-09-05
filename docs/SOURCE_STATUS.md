@@ -1,33 +1,24 @@
-# Source status
+# Source status — v1.1.0 / TEST31
 
-## v1.1.0-rc1
+This snapshot is the source for the hardware-validated v1.1.0 release.
 
-This repository is the clean source-built successor branch.
+The reference Release build produced:
 
-The source-built path contains no historical PHU renderer ELF/SO blob.
+```text
+2db81cb2f896eb5310e22715226cc065e1b2c22304f6376c0fdbac5ce32b9f3a  ELF
+fefdab4c49fc58eddfd798697d1479818367db67d6543f1994809d3002fcbc19  plugin
+```
 
-Common FPS-owned core, lifecycle, configuration, sampler and Safe Autoload
-logic are published directly as source.
+The snapshot is based on the hardware-validated TEST30 source. Its controller
+still has no internal `fork()` and keeps the sampler in etaHEN's tracked PID;
+TEST31 adds the exact 70,968-byte source renderer, target-stack bootstrap and
+loopback packet sender needed for the on-screen value.
 
-PS5-specific integration is built against pinned/open GPL upstream source.
+TEST30 passed the tracked-process boundary with two games and a normal restart.
+TEST31 then passed the combined gate: the on-screen counter was visible in two
+games (`59` and `60` FPS), and repeated normal system-menu restarts completed
+without an improper-shutdown warning. The retained evidence log is
+`docs/evidence/PARITY_TEST31_HARDWARE_20260905.log` with SHA-256
+`7a2c1f27835e31026b663fdbe44e58a3d59e6675d5963073a626838ecb90a95c`.
 
-## Hardware-stable baseline
-
-The existing public `v1.0.0` binary remains the hardware-stable baseline for
-manual activation on FW 9.60.
-
-Its historical binary was not originally produced from this clean source tree,
-so this repository does not pretend otherwise.
-
-## Promotion to v1.1.0 stable
-
-The RC becomes stable only when:
-
-1. GitHub `Host Source Tests` passes;
-2. GitHub `PS5 Source Build` passes;
-3. source-built ELF/plugin artifacts are produced;
-4. FW 9.60 manual-start testing passes;
-5. FW 9.60 etaHEN autoload testing passes;
-6. repeated game-switch lifecycle testing passes without KP.
-
-Until then the correct public version label is `v1.1.0-rc1`.
+See [PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md](PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md).

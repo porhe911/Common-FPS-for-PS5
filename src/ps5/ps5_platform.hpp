@@ -27,6 +27,17 @@ public:
 
     std::uint64_t monotonic_us() override;
     void sleep_ms(unsigned milliseconds) override;
+
+private:
+    ProcessId observed_game_pid_ = -1;
+    ProcessId module_attempt_pid_ = -1;
+    std::uintptr_t videoout_base_ = 0;
+    unsigned empty_lookup_count_ = 0;
+    unsigned module_attempt_count_ = 0;
+    unsigned read_failure_count_ = 0;
+    bool table_read_logged_ = false;
+    bool root_read_logged_ = false;
+    bool counter_read_logged_ = false;
 };
 
 } // namespace common_fps::ps5
