@@ -1,6 +1,6 @@
-# Common FPS for PS5 — v1.1.0-rc1
+# Common FPS for PS5 — v1.1.0
 
-> First public source-built release-candidate branch.
+> First public hardware-validated source-built release.
 
 ## Highlights
 
@@ -21,10 +21,10 @@
 The stable manual-start behavior of v1.0.0 is retained as the compatibility
 baseline.
 
-Safe etaHEN autoload is new in v1.1.x and requires hardware validation before
-promotion to stable.
+Safe etaHEN autoload is new in v1.1.x. The tracked-process renderer and visible
+FPS counter have now passed the hardware validation gate.
 
 ## Status
 
-Release Candidate. Do not replace v1.0.0 as the recommended stable binary until
-the FW 9.60 hardware checklist passes.
+Stable v1.1.0 source snapshot. The visually complete v1.0.0 release remains
+available as a compatibility fallback.
