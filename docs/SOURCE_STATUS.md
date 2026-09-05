@@ -5,8 +5,8 @@ This branch is the source snapshot for PARITY TEST31.
 The reference Release build produced:
 
 ```text
-360f9103d552b1c812febe4bcfc16647cf5497475592154d1273fdb379a6cfea  ELF
-b68f2242434773c2b65393b0f06b4b1db926e14e8f5d51b2e8b2e358d3e1832b  plugin
+2db81cb2f896eb5310e22715226cc065e1b2c22304f6376c0fdbac5ce32b9f3a  ELF
+fefdab4c49fc58eddfd798697d1479818367db67d6543f1994809d3002fcbc19  plugin
 ```
 
 The snapshot is based on the hardware-validated TEST30 source. Its controller
