@@ -1,59 +1,47 @@
-# Building Common FPS for PS5
+# Building the PARITY TEST20 source
 
-## Recommended: GitHub Actions
+## GitHub Actions
 
-Windows users do not need WSL.
+Open **Actions → PS5 Source Build → Run workflow**. The workflow prepares the
+pinned dependencies, runs host tests, builds the PS5 controller and verifies
+both output hashes.
 
-Upload this repository to GitHub, then:
-
-```text
-Actions
--> PS5 Source Build
--> Run workflow
-```
-
-The workflow downloads the pinned PS5 Payload SDK and GPL upstream source
-dependencies, runs source gates/tests, and prepares the PS5 build workspace.
-
-When the cross-build target succeeds, the workflow uploads:
+The downloadable artifact contains:
 
 ```text
-Common_FPS_PS5_v1.1.0.elf
-Common_FPS_PS5_etaHEN_v1.1.0.plugin
-```
-
-as workflow artifacts.
-
-## Host tests
-
-On a normal C++17 environment:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-Also run:
-
-```bash
-python3 tools/check_v1_source_gate.py
-python3 tests/test_plugin_wrapper.py
+Common_FPS_PS5_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.elf
+Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.plugin
+SHA256SUMS.txt
+RESOLVED_BUILD_DEPENDENCIES.txt
 ```
 
 ## Local PS5 build
 
-A POSIX build host is optional. The build environment is defined by
-`.github/workflows/ps5-source-build.yml`.
+On a POSIX host with the required build tools:
 
-Pinned dependencies are listed in:
-
-```text
-DEPENDENCIES.lock.json
+```bash
+bash ./scripts/prepare_ps5_deps.sh
+bash ./scripts/ps5_source_build.sh
 ```
 
-## Release rule
+`scripts/ps5_source_build.sh` invokes
+`tools/verify_test20_repro.py`. Success requires these exact digests:
 
-A successful compiler run is not enough to declare a stable PS5 release.
+```text
+b791baf6f85063d0c7ec57eebcbf60116dff58dfc4ec74aa6d9dedcc1ecc32ef  ELF
+7bdcc16cc582bd89c7f1680471436ef58fdc53bab159c7e36278a5e8f1c8fa49  plugin
+```
 
-The produced binaries must also pass `docs/HARDWARE_TEST_PLAN_FW960.md`.
+## Host tests
+
+```bash
+cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+cmake --build build-host
+ctest --test-dir build-host --output-on-failure
+python3 tests/test_plugin_wrapper.py
+```
+
+## Runtime limitation
+
+This exact TEST20 build samples FPS in the background and logs only the first
+valid result for each game PID. It intentionally has no on-screen overlay.

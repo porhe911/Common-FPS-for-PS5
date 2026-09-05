@@ -1,40 +1,15 @@
-# PS5 adapter status
+# PS5 TEST20 target
 
-This directory is the only remaining hardware-specific part of the clean rewrite.
+The active PS5 CMake target builds only the PARITY TEST20 controller:
 
-The Common FPS core is source-built and host-tested. The PS5 adapter must provide:
+- FW 9.60 `KERN_PROC` game discovery;
+- VideoOut module discovery with mandatory Auth-ID restoration;
+- read-only DMAP sampling;
+- one-second FPS calculation and game-PID reattachment;
+- startup and first-sample-per-game logging.
 
-1. `Platform::find_game_process()`
-2. `Platform::process_alive()`
-3. `Platform::find_module()`
-4. read-only `Platform::read_memory()`
-5. ShellUI/PUI `Renderer`
+ShellUI renderer, injection, overlay IPC and shutdown recorder sources are not
+linked into this target. No on-screen FPS counter is expected.
 
-## Upstream source basis
-
-Use GPL source from:
-
-- PS5 Payload SDK
-- etaHEN Plugin SDK
-- etaHEN ShellUI source
-
-Do **not** copy the historical PHU-derived binary renderer back into this tree.
-
-etaHEN's published ShellUI source already demonstrates:
-
-- Mono method hooking;
-- adding label widgets under `Scene.RootWidget`;
-- explicit Top Left / Top Right / Bottom Left / Bottom Right positions;
-- creating/removing overlay labels.
-
-Common FPS only needs two persistent labels:
-
-```text
-FPS:
-59
-```
-
-or one formatted logical pair, depending on renderer implementation.
-
-The next hardware milestone is to implement this adapter and compile it with
-the PS5/etaHEN SDKs.
+The build is accepted only when
+`tools/verify_test20_repro.py` confirms the two hardware-tested hashes.

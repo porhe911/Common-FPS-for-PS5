@@ -10,7 +10,7 @@ ETAHEN_COMMIT="d47f99bd37f349ae59b3c4b66e09e93ba69f56cd"
 
 mkdir -p "${DEPS}"
 
-echo "[1/4] PS5 Payload SDK v0.41"
+echo "[1/3] PS5 Payload SDK v0.41"
 wget -q \
   https://github.com/ps5-payload-dev/sdk/releases/download/v0.41/ps5-payload-sdk.zip \
   -O "${SDK_ZIP}"
@@ -21,7 +21,7 @@ sudo unzip -q "${SDK_ZIP}" -d /opt
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
 test -x "${PS5_PAYLOAD_SDK}/bin/prospero-cmake"
 
-echo "[2/4] etaHEN ${ETAHEN_VERSION} source (${ETAHEN_COMMIT})"
+echo "[2/3] etaHEN ${ETAHEN_VERSION} source (${ETAHEN_COMMIT})"
 rm -rf "${DEPS}/etahen"
 git clone -q https://github.com/etaHEN/etaHEN.git "${DEPS}/etahen"
 git -C "${DEPS}/etahen" checkout -q "${ETAHEN_COMMIT}"
@@ -34,16 +34,10 @@ if [ "${RESOLVED_ETAHEN}" != "${ETAHEN_COMMIT}" ]; then
   exit 1
 fi
 
-echo "[3/4] ps5-payload-dev/shsrv v0.20 source"
-rm -rf "${DEPS}/shsrv"
-git clone -q --branch v0.20 --depth 1 \
-  https://github.com/ps5-payload-dev/shsrv.git "${DEPS}/shsrv"
-
-echo "[4/4] Record exact resolved revisions"
+echo "[3/3] Record exact resolved revisions"
 {
   echo "PS5 Payload SDK: v0.41"
   echo "etaHEN: ${RESOLVED_ETAHEN} (${ETAHEN_VERSION})"
-  echo "shsrv: $(git -C "${DEPS}/shsrv" rev-parse HEAD)"
 } > "${ROOT}/RESOLVED_BUILD_DEPENDENCIES.txt"
 
 cat "${ROOT}/RESOLVED_BUILD_DEPENDENCIES.txt"

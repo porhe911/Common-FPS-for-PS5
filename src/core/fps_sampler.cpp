@@ -39,6 +39,7 @@ void FpsSampler::reset() {
     module_base_ = 0;
     counter_address_ = 0;
     have_baseline_ = false;
+    warmup_deltas_remaining_ = kWarmupDeltasToDiscard;
     previous_counter_ = 0;
     previous_time_us_ = 0;
 }
@@ -88,11 +89,11 @@ bool FpsSampler::resolve_counter_address() {
                 static_cast<std::uintptr_t>(pointer),
                 &root,
                 sizeof(root))) {
-            return false;
+            continue;
         }
 
         if (root == 0)
-            return false;
+            continue;
 
         counter_address_ =
             static_cast<std::uintptr_t>(root) + kVideoOutCounterOffset;
@@ -157,6 +158,16 @@ std::optional<int> FpsSampler::sample() {
 
     previous_counter_ = current_counter;
     previous_time_us_ = now_us;
+
+    /*
+     * The hardware-proven FW 9.60 producer discards one complete delta after
+     * establishing its initial baseline. This prevents a startup/scheduling
+     * spike from ever reaching the overlay.
+     */
+    if (warmup_deltas_remaining_ != 0) {
+        --warmup_deltas_remaining_;
+        return std::nullopt;
+    }
 
     if (tenths > kMaxTenthsFps)
         return std::nullopt;

@@ -2,10 +2,21 @@ name: PS5 Source Build
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "include/**"
+      - "ps5/**"
+      - "scripts/**"
+      - "tools/**"
+      - ".github/workflows/ps5-source-build.yml"
+      - "CMakeLists.txt"
+      - "DEPENDENCIES.lock.json"
   push:
-    tags:
-      - "v1.1.0-rc*"
-      - "v1.1.0"
+    branches:
+      - parity-test20-source
 
 jobs:
   build:
@@ -38,11 +49,10 @@ jobs:
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-for-PS5-v1.1.0-source-build
+          name: Common-FPS-PARITY-TEST20-byte-repro
           path: |
-            dist/Common_FPS_PS5_v1.1.0.elf
-            dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin
-            dist/Common_FPS_ShellUI_v1.1.0.elf
+            dist/Common_FPS_PS5_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.elf
+            dist/Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.plugin
             dist/SHA256SUMS.txt
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error

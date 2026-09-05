@@ -1,33 +1,20 @@
 # Source status
 
-## v1.1.0-rc1
+This branch is the byte-reproducible source snapshot for PARITY TEST20.
 
-This repository is the clean source-built successor branch.
+Verified Release builds reproduce both submitted artifacts exactly:
 
-The source-built path contains no historical PHU renderer ELF/SO blob.
+```text
+b791baf6f85063d0c7ec57eebcbf60116dff58dfc4ec74aa6d9dedcc1ecc32ef  ELF
+7bdcc16cc582bd89c7f1680471436ef58fdc53bab159c7e36278a5e8f1c8fa49  plugin
+```
 
-Common FPS-owned core, lifecycle, configuration, sampler and Safe Autoload
-logic are published directly as source.
+The snapshot includes the controller, FW 9.60 process discovery, VideoOut
+module lookup, DMAP reader, FPS calculation and exact etaHEN wrapper metadata.
+It does not include a linked or embedded ShellUI renderer.
 
-PS5-specific integration is built against pinned/open GPL upstream source.
+TEST20 passed one two-game lifecycle and normal-restart hardware run on FW
+9.60 with etaHEN 2.6. It is a diagnostic sampler baseline, not a complete
+visual FPS release.
 
-## Hardware-stable baseline
-
-The existing public `v1.0.0` binary remains the hardware-stable baseline for
-manual activation on FW 9.60.
-
-Its historical binary was not originally produced from this clean source tree,
-so this repository does not pretend otherwise.
-
-## Promotion to v1.1.0 stable
-
-The RC becomes stable only when:
-
-1. GitHub `Host Source Tests` passes;
-2. GitHub `PS5 Source Build` passes;
-3. source-built ELF/plugin artifacts are produced;
-4. FW 9.60 manual-start testing passes;
-5. FW 9.60 etaHEN autoload testing passes;
-6. repeated game-switch lifecycle testing passes without KP.
-
-Until then the correct public version label is `v1.1.0-rc1`.
+See [PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.md](PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.md).

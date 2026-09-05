@@ -14,16 +14,10 @@ if(NOT COMMON_FPS_ETAHEN_SOURCE)
     message(FATAL_ERROR "COMMON_FPS_ETAHEN_SOURCE is required")
 endif()
 
-if(NOT COMMON_FPS_SHSRV_SOURCE)
-    message(FATAL_ERROR "COMMON_FPS_SHSRV_SOURCE is required")
-endif()
-
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(SDK "$ENV{PS5_PAYLOAD_SDK}")
-
 set(ETAHEN_ROOT "${COMMON_FPS_ETAHEN_SOURCE}/Source Code")
 set(ETAHEN_FPS "${ETAHEN_ROOT}/fps_elf")
-set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
 
 # ------------------------------------------------------------------
 # Controller/plugin ELF.
@@ -31,28 +25,23 @@ set(ETAHEN_SHELLUI "${ETAHEN_ROOT}/shellui")
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.1.0.elf"
+    OUTPUT_NAME "Common_FPS_PS5_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    "${ROOT}/src/core/autoload_guard.cpp"
-    "${ROOT}/src/core/config.cpp"
+    # PARITY TEST20: observer plus the real FW 9.60 VideoOut/DMAP sampler.
+    # Renderer, injector, IPC and shutdown recorder are deliberately absent.
     "${ROOT}/src/core/fps_sampler.cpp"
-    "${ROOT}/src/core/layout.cpp"
-    "${ROOT}/src/core/lifecycle.cpp"
-    "${ROOT}/src/core/scene_guard.cpp"
-    "${ROOT}/src/core/wire.cpp"
-
-    "${ROOT}/src/ps5/ps5_platform.cpp"
-    "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp"
+    "${ROOT}/src/ps5/ps5_platform.cpp"
+    "${ROOT}/src/ps5/stable_sampler/process_sysctl.cpp"
+    "${ROOT}/src/ps5/stable_sampler/proc_rw_v960.cpp"
+    "${ROOT}/src/ps5/stable_sampler/videoout_module.cpp"
+)
 
-    # GPL etaHEN source dependency for process/module enumeration.
-    "${ETAHEN_FPS}/src/proc.cpp"
-
-    # GPL shsrv ptrace implementation:
-    # pt_attach(), pt_detach(), pt_copyout().
-    "${COMMON_FPS_SHSRV_SOURCE}/pt.c"
+target_compile_definitions(common_fps_controller PRIVATE
+    COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG=1
+    COMMON_FPS_DIAGNOSTIC_SYSCTL_ONLY=1
 )
 
 target_include_directories(common_fps_controller PRIVATE
@@ -60,7 +49,6 @@ target_include_directories(common_fps_controller PRIVATE
     "${ROOT}/src/ps5"
     "${ETAHEN_ROOT}/include"
     "${ETAHEN_FPS}/include"
-    "${COMMON_FPS_SHSRV_SOURCE}"
     "${SDK}"
     "${SDK}/include"
 )
@@ -70,85 +58,25 @@ target_compile_options(common_fps_controller PRIVATE
     -DPS5
     -fPIC
     -fPIE
+    -ffunction-sections
+    -fdata-sections
     -march=znver2
     -O2
     -Wall
     -Wextra
+)
+
+target_link_options(common_fps_controller PRIVATE
+    -Wl,--gc-sections
 )
 
 target_link_libraries(common_fps_controller PRIVATE
     kernel_sys
     SceLibcInternal
-    SceSystemService
-    SceNet
-    SceSysmodule
-    SceUserService
-    SceNetCtl
 )
 
 # ------------------------------------------------------------------
-# Source-only ShellUI renderer target.
-#
-# This target intentionally contains no PHU binary blob. The Common FPS
-# renderer source is compiled together with etaHEN's GPL ShellUI support
-# source. The exact minimal set can be reduced further after FW 9.60 tests.
-# ------------------------------------------------------------------
-add_executable(common_fps_shellui)
-
-set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_v1.1.0.elf"
-)
-
-target_sources(common_fps_shellui PRIVATE
-    "${ROOT}/src/core/layout.cpp"
-    "${ROOT}/src/core/wire.cpp"
-    "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
-    "${ROOT}/src/ps5/shellui_payload/commonfps_shellui_entry.cpp"
-
-    "${ETAHEN_SHELLUI}/src/MonoUtils.cpp"
-    "${ETAHEN_SHELLUI}/src/external_symbols.cpp"
-    "${ETAHEN_SHELLUI}/src/Detour.cpp"
-    "${ETAHEN_SHELLUI}/src/hde64.cpp"
-)
-
-target_include_directories(common_fps_shellui PRIVATE
-    "${ROOT}/include"
-    "${ROOT}/src/ps5/shellui_payload"
-    "${ETAHEN_ROOT}/include"
-    "${ETAHEN_SHELLUI}/include"
-    "${SDK}"
-    "${SDK}/include"
-)
-
-target_compile_options(common_fps_shellui PRIVATE
-    --target=x86_64-sie-ps5
-    -DPS5
-    -fPIC
-    -fPIE
-    -march=znver2
-    -O2
-    -Wall
-    -Wextra
-    -ffunction-sections
-    -fdata-sections
-    -Wno-c++11-narrowing
-)
-
-target_link_options(common_fps_shellui PRIVATE
-    -Wl,--gc-sections
-)
-
-target_link_libraries(common_fps_shellui PRIVATE
-    kernel_sys
-    SceNet
-    SceSysmodule
-    SceSystemService
-)
-
-# ------------------------------------------------------------------
-# Package controller as etaHEN .plugin.
-# The renderer ELF remains a source-built companion artifact until the
-# controller-side loader embedding step is validated.
+# Package the controller as one etaHEN .plugin.
 # ------------------------------------------------------------------
 add_custom_command(
     TARGET common_fps_controller
@@ -156,20 +84,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
-            --title-id CFPS00021
-            --version 1.10
-)
-
-add_custom_command(
-    TARGET common_fps_shellui
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
-    COMMAND ${CMAKE_COMMAND} -E copy
-            "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST20_SAMPLER_ONLY_NO_RECORDER_AB.plugin"
+            --title-id CFPS00039
+            --version 1.28
 )
