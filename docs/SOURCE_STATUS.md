@@ -1,33 +1,20 @@
-# Source status
+# Source status — TEST31
 
-## v1.1.0-rc1
+This branch is the source snapshot for PARITY TEST31.
 
-This repository is the clean source-built successor branch.
+The reference Release build produced:
 
-The source-built path contains no historical PHU renderer ELF/SO blob.
+```text
+360f9103d552b1c812febe4bcfc16647cf5497475592154d1273fdb379a6cfea  ELF
+b68f2242434773c2b65393b0f06b4b1db926e14e8f5d51b2e8b2e358d3e1832b  plugin
+```
 
-Common FPS-owned core, lifecycle, configuration, sampler and Safe Autoload
-logic are published directly as source.
+The snapshot is based on the hardware-validated TEST30 source. Its controller
+still has no internal `fork()` and keeps the sampler in etaHEN's tracked PID;
+TEST31 adds the exact 70,968-byte source renderer, target-stack bootstrap and
+loopback packet sender needed for the on-screen value.
 
-PS5-specific integration is built against pinned/open GPL upstream source.
+TEST30 already passed a two-game hardware run and normal restart. TEST31 is a
+diagnostic candidate until its combined visible-FPS/restart gate passes.
 
-## Hardware-stable baseline
-
-The existing public `v1.0.0` binary remains the hardware-stable baseline for
-manual activation on FW 9.60.
-
-Its historical binary was not originally produced from this clean source tree,
-so this repository does not pretend otherwise.
-
-## Promotion to v1.1.0 stable
-
-The RC becomes stable only when:
-
-1. GitHub `Host Source Tests` passes;
-2. GitHub `PS5 Source Build` passes;
-3. source-built ELF/plugin artifacts are produced;
-4. FW 9.60 manual-start testing passes;
-5. FW 9.60 etaHEN autoload testing passes;
-6. repeated game-switch lifecycle testing passes without KP.
-
-Until then the correct public version label is `v1.1.0-rc1`.
+See [PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md](PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md).

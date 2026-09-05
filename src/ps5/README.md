@@ -1,40 +1,20 @@
-# PS5 adapter status
+# PS5 TEST31 target
 
-This directory is the only remaining hardware-specific part of the clean rewrite.
+The active PS5 CMake target builds the TEST30 tracked worker and restores the
+proven source-built ShellUI renderer. Common FPS does not call `fork()` after
+etaHEN has already spawned the plugin process.
 
-The Common FPS core is source-built and host-tested. The PS5 adapter must provide:
+- FW 9.60 `KERN_PROC` game discovery;
+- VideoOut module discovery with mandatory Auth-ID restoration;
+- read-only DMAP sampling;
+- one-second FPS calculation and game-PID reattachment;
+- startup and first-sample-per-game logging.
+- source-built shared ShellUI renderer with pinned Mono/PUI handles;
+- target-stack bootstrap and one-way loopback UDP overlay IPC.
 
-1. `Platform::find_game_process()`
-2. `Platform::process_alive()`
-3. `Platform::find_module()`
-4. read-only `Platform::read_memory()`
-5. ShellUI/PUI `Renderer`
+The shutdown recorder and all explicit stop/unload paths remain disabled.
+The expected on-screen value is an integer `FPS: 59`/`FPS: 60` after the
+sampler warm-up.
 
-## Upstream source basis
-
-Use GPL source from:
-
-- PS5 Payload SDK
-- etaHEN Plugin SDK
-- etaHEN ShellUI source
-
-Do **not** copy the historical PHU-derived binary renderer back into this tree.
-
-etaHEN's published ShellUI source already demonstrates:
-
-- Mono method hooking;
-- adding label widgets under `Scene.RootWidget`;
-- explicit Top Left / Top Right / Bottom Left / Bottom Right positions;
-- creating/removing overlay labels.
-
-Common FPS only needs two persistent labels:
-
-```text
-FPS:
-59
-```
-
-or one formatted logical pair, depending on renderer implementation.
-
-The next hardware milestone is to implement this adapter and compile it with
-the PS5/etaHEN SDKs.
+`tools/verify_test31_artifact.py` confirms wrapper metadata, exact hashes,
+embedded renderer markers, the no-fork controller boundary and log path.

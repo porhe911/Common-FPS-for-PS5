@@ -165,6 +165,11 @@ static void test_exact_counter_algorithm_and_lifecycle() {
     f = life.tick();
     assert(f.loading);
 
+    // Hardware-proven sampler discards the first complete delta as warmup.
+    p.advance(60, 1000);
+    f = life.tick();
+    assert(f.loading);
+
     // 60 frame increments during exactly one second -> 60.0 FPS.
     p.advance(60, 1000);
     f = life.tick();
@@ -193,6 +198,10 @@ static void test_exact_counter_algorithm_and_lifecycle() {
 
     f = life.tick();
     assert(f.loading); // new baseline
+
+    p.advance(30, 1000);
+    f = life.tick();
+    assert(f.loading); // discarded warmup delta
 
     p.advance(30, 1000);
     f = life.tick();
@@ -236,6 +245,10 @@ static void test_integer_only_fps() {
 
     // 596 frame increments over 10 seconds = 59.6 FPS internally.
     // Public/displayed result must be integer 60.
+    p.advance(596, 10000);
+    f = life.tick();
+    assert(f.loading); // discarded warmup delta
+
     p.advance(596, 10000);
     f = life.tick();
 

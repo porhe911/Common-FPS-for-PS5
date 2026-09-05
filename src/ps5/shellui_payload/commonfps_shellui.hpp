@@ -8,16 +8,17 @@
 #pragma once
 
 #include "common_fps/wire.hpp"
+#include <cstdarg>
 
 namespace common_fps::ps5::shellui {
 
-bool initialize_receiver();
-void shutdown_receiver();
+/* Resolve the already-loaded ShellUI Mono runtime and PUI assemblies. */
+bool initialize_runtime();
 
-/*
- * Call from a ShellUI-safe update/render context.
- * It applies the newest packet only when sequence changes.
- */
-void apply_latest_state();
+/* Bind the loopback UDP receiver used by the controller. */
+bool initialize_receiver();
+
+/* Remain blocked on IPC for the complete SceShellUI process lifetime. */
+[[noreturn]] void run_receiver_loop();
 
 } // namespace common_fps::ps5::shellui

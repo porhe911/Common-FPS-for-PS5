@@ -37,7 +37,10 @@ inline constexpr int kDefaultFontSize = 26;
 inline constexpr int kMinFontSize = 18;
 inline constexpr int kMaxFontSize = 36;
 
-/* Matches the stable binary's sanity bound: 3000 tenths = 300.0 FPS. */
-inline constexpr std::uint32_t kMaxTenthsFps = 3000;
+/* Hardware-proven v11 filter: PS5 output is at most 120 Hz. */
+inline constexpr std::uint32_t kMaxTenthsFps = 1300;
+
+/* Baseline read + one discarded delta suppresses the startup spike. */
+inline constexpr unsigned kWarmupDeltasToDiscard = 1;
 
 } // namespace common_fps

@@ -49,6 +49,20 @@ WirePacket make_wire_packet(
     return packet;
 }
 
+WirePacket make_shutdown_wire_packet(std::uint64_t sequence) {
+    WirePacket packet{};
+    packet.magic = kWireShutdownMagic;
+    packet.sequence = sequence;
+    packet.loading = 1;
+    return packet;
+}
+
+bool is_shutdown_wire_packet(const WirePacket& packet) noexcept {
+    return packet.magic == kWireShutdownMagic &&
+        packet.version == kWireVersion &&
+        packet.size == sizeof(WirePacket);
+}
+
 std::optional<OverlayFrame>
 decode_wire_packet(const WirePacket& packet) {
     if (packet.magic != kWireMagic ||

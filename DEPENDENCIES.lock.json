@@ -1,6 +1,6 @@
 {
   "project": "Common FPS for PS5",
-  "version": "1.1.0-rc1",
+  "version": "1.1.0-parity-test31",
   "license": "GPL-3.0-or-later",
   "ps5_payload_sdk": {
     "repository": "https://github.com/ps5-payload-dev/sdk",
@@ -12,11 +12,12 @@
     "repository": "https://github.com/etaHEN/etaHEN",
     "version": "2.4B",
     "commit": "d47f99bd37f349ae59b3c4b66e09e93ba69f56cd",
-    "purpose": "Pinned GPL source baseline for PS5 process and ShellUI/PUI integration; 2.4B introduced Game Overlay and 8.40-10.01 fixes without the later 2.5B dumper/WebMAN IPC mismatch encountered by the Common FPS minimal renderer build."
+    "purpose": "Pinned GPL source baseline used by the TEST20 process/module sampling adapter. Runtime hardware test used etaHEN 2.6."
   },
   "ps5_payload_shsrv": {
     "repository": "https://github.com/ps5-payload-dev/shsrv",
     "version": "v0.20",
-    "purpose": "GPL reference/source for ptrace ELF loader and payload-args contract"
+    "commit": "6f320637d56d344a0e7797753099e33238bbf146",
+    "purpose": "Pinned GPL ptrace and ELF-loader primitives used by the source-built ShellUI bootstrap."
   }
 }
