@@ -1,4 +1,4 @@
-# Common FPS for PS5 — v1.1.0 (PARITY TEST31)
+# Common FPS for PS5 — v1.1.0
 
 This hardware-validated source snapshot combines TEST30's tracked-process
 lifecycle with the source-built renderer/IPC path that produces the visible
