@@ -1,9 +1,9 @@
-# PARITY TEST31: tracked-process renderer, no internal fork
+# PARITY TEST31: hardware-validated tracked-process renderer
 
 TEST30 established the clean process boundary: the etaHEN-created worker stayed
 resident, sampled two games, and the PS5 restarted normally. It deliberately
-omitted the renderer, so no on-screen value was possible. TEST31 changes only
-that missing presentation path.
+omitted the renderer, so no on-screen value was possible. TEST31 added only
+that missing presentation path and has now passed the combined hardware gate.
 
 ## What TEST31 contains
 
@@ -65,6 +65,14 @@ contains no `fork` call, and writes `dist/SHA256SUMS.txt`.
 Also report whether the overlay was visible in both games and whether the
 restart completed automatically without an improper-shutdown warning.
 
+## Confirmed hardware result
+
+The submitted run completed the renderer bootstrap and displayed real FPS in
+two games: `first_fps=59` and `first_fps=60`. The user then performed repeated
+normal system-menu restarts; the console did not show an improper-shutdown
+warning. The complete retained log is
+`docs/evidence/PARITY_TEST31_HARDWARE_20260905.log`.
+
 ## Expected controller log shape
 
 ```text
@@ -79,5 +87,5 @@ Sampler online pid=... first_fps=...
 Sampler online pid=... first_fps=...
 ```
 
-The test is diagnostic. Keep the public, hardware-stable v1.0.0 release as a
-fallback until TEST31 has passed repeated restart checks.
+TEST31 is the promoted v1.1.0 source snapshot. Keep the public v1.0.0 release
+available as a fallback for rollback if a future runtime environment differs.

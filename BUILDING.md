@@ -1,4 +1,4 @@
-# Building PARITY TEST31
+# Building v1.1.0 (PARITY TEST31)
 
 ## GitHub Actions
 

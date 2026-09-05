@@ -1,4 +1,4 @@
-# PS5 TEST31 target
+# PS5 v1.1.0 target
 
 The active PS5 CMake target builds the TEST30 tracked worker and restores the
 proven source-built ShellUI renderer. Common FPS does not call `fork()` after

@@ -1,7 +1,8 @@
-# Common FPS for PS5 — PARITY TEST31 tracked renderer
+# Common FPS for PS5 — v1.1.0 (PARITY TEST31)
 
-This experimental branch contains TEST30's tracked-process lifecycle and the
-source-built renderer/IPC path that previously produced the visible counter:
+This hardware-validated source snapshot combines TEST30's tracked-process
+lifecycle with the source-built renderer/IPC path that produces the visible
+counter:
 
 ```text
 Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf
@@ -20,7 +21,7 @@ embedded 70,968-byte source renderer and one-way state packets.
 
 ## Scope
 
-TEST31 is a diagnostic visual-counter test, not a stable release. It:
+The TEST31 implementation:
 
 - preserves the source-reproduced TEST20 sampler and observer;
 - removes only Common FPS's internal `fork()`;
@@ -36,16 +37,17 @@ TEST31 is a diagnostic visual-counter test, not a stable release. It:
 - injects it with the target-stack bootstrap and restores controller Auth-ID;
 - sends one validated loopback state packet per second;
 - creates and updates the integer FPS widget on ShellUI's update hook;
-- contains no shutdown recorder or shutdown-time file writes.
+- contains no shutdown recorder or shutdown-time file writes;
+- passed repeated PS5 runs with a visible counter in two games and normal
+  system-menu restarts.
 
-TEST30 was hardware-validated with two games and a normal restart. TEST31 still
-requires the combined hardware gate: visible integer FPS in both games and a
-normal restart. The source-identical TEST20 baseline remains on branch
-`parity-test20-source`.
+The submitted TEST31 log records `ShellUI renderer online`, `first_fps=59` and
+`first_fps=60` for two game PIDs. The user also confirmed repeated normal
+restarts without an improper-shutdown warning. The source-identical TEST20
+baseline remains on branch `parity-test20-source`.
 
-The public, visually complete `v1.0.0` remains the stable user release. The
-renderer-enabled v1.1.x experiments remain experimental because their restart
-regression is unresolved.
+The visually complete `v1.0.0` release remains available as a fallback. TEST31
+is the promoted v1.1.0 source snapshot.
 
 ## Build
 
@@ -60,6 +62,9 @@ For local build details, see [BUILDING.md](BUILDING.md).
 
 The exact hardware procedure is in
 [docs/PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md](docs/PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md).
+The submitted run is retained at
+[docs/evidence/PARITY_TEST31_HARDWARE_20260905.log](docs/evidence/PARITY_TEST31_HARDWARE_20260905.log)
+(`sha256=7a2c1f27835e31026b663fdbe44e58a3d59e6675d5963073a626838ecb90a95c`).
 
 ## License
 
