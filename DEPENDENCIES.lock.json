@@ -12,7 +12,7 @@
     "repository": "https://github.com/etaHEN/etaHEN",
     "version": "2.4B",
     "commit": "d47f99bd37f349ae59b3c4b66e09e93ba69f56cd",
-    "purpose": "Pinned GPL source baseline used by the TEST20 process/module sampling adapter. Runtime hardware test used etaHEN 2.6."
+    "purpose": "Pinned GPL source baseline used by the process/module sampling adapter. Runtime hardware test used etaHEN 2.6."
   },
   "ps5_payload_shsrv": {
     "repository": "https://github.com/ps5-payload-dev/shsrv",

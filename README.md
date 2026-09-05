@@ -1,29 +1,29 @@
 # Common FPS for PS5 — 1.1.0
 
-This hardware-validated source snapshot combines TEST30's tracked-process
-lifecycle with the source-built renderer/IPC path that produces the visible
-counter:
+This hardware-validated source snapshot combines the tracked-process lifecycle
+with the source-built renderer/IPC path that produces the visible counter:
 
 ```text
-Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf
-Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.plugin
+Common_FPS_PS5_v1.1.0.elf
+Common_FPS_PS5_etaHEN_v1.1.0.plugin
 ```
 
 The controller runs in the process already spawned and recorded by etaHEN
 instead of creating an untracked child with a second `fork()`. The sampler is
-unchanged from the hardware-successful TEST30 run. TEST31 adds only the
+unchanged from the hardware-successful tracked-process run. v1.1.0 adds only the
 embedded 70,968-byte source renderer and one-way state packets.
 
 | Artifact | Expected SHA-256 |
 |---|---|
-| ELF | `2db81cb2f896eb5310e22715226cc065e1b2c22304f6376c0fdbac5ce32b9f3a` |
-| plugin | `fefdab4c49fc58eddfd798697d1479818367db67d6543f1994809d3002fcbc19` |
+| ELF | `4f544fa00f7a430e64c4c8d0ed42d0463d2370c81dabd9141599c27c4f3f99d6` |
+| plugin | `39333081ecd93ade60d1b75fb0032a1e996fcf17ad47a9adfc0290591596e44e` |
+| ShellUI renderer | `7880aec891cb95cc860753d5a3fed1dfbb23caf526b6106275c3b2cc02b8e465` |
 
 ## Scope
 
-The TEST31 implementation:
+The v1.1.0 implementation:
 
-- preserves the source-reproduced TEST20 sampler and observer;
+- preserves the source-reproduced sampler and observer;
 - removes only Common FPS's internal `fork()`;
 - keeps the etaHEN-spawned PID resident and trackable;
 - discovers `eboot.bin` through the FW 9.60 `KERN_PROC` layout;
@@ -41,13 +41,13 @@ The TEST31 implementation:
 - passed repeated PS5 runs with a visible counter in two games and normal
   system-menu restarts.
 
-The submitted TEST31 log records `ShellUI renderer online`, `first_fps=59` and
+The submitted v1.1.0 log records `ShellUI renderer online`, `first_fps=59` and
 `first_fps=60` for two game PIDs. The user also confirmed repeated normal
-restarts without an improper-shutdown warning. The source-identical TEST20
-baseline remains on branch `parity-test20-source`.
+restarts without an improper-shutdown warning. The earlier sampler-only
+baseline remains available in the repository history.
 
-The visually complete `v1.0.0` release remains available as a fallback. TEST31
-is the promoted v1.1.0 source snapshot.
+The visually complete `v1.0.0` release remains available as a fallback. This is
+the promoted v1.1.0 source snapshot.
 
 ## Build
 
@@ -61,9 +61,9 @@ For local build details, see [BUILDING.md](BUILDING.md).
 ## Evidence
 
 The exact hardware procedure is in
-[docs/PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md](docs/PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.md).
+[docs/V1_1_0_RELEASE.md](docs/V1_1_0_RELEASE.md).
 The submitted run is retained at
-[docs/evidence/PARITY_TEST31_HARDWARE_20260905.log](docs/evidence/PARITY_TEST31_HARDWARE_20260905.log)
+[docs/evidence/V1_1_0_HARDWARE_20260905.log](docs/evidence/V1_1_0_HARDWARE_20260905.log)
 (`sha256=7a2c1f27835e31026b663fdbe44e58a3d59e6675d5963073a626838ecb90a95c`).
 
 ## License

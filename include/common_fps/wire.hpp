@@ -41,7 +41,7 @@ WirePacket make_wire_packet(
     const OverlayFrame& frame,
     std::uint64_t sequence);
 
-/* Reserved controller-to-ShellUI quiesce packet; TEST31 never sends it. */
+/* Reserved controller-to-ShellUI quiesce packet; v1.1.0 never sends it. */
 WirePacket make_shutdown_wire_packet(std::uint64_t sequence);
 
 [[nodiscard]] bool

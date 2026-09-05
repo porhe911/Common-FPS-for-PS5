@@ -1,6 +1,6 @@
 # PS5 v1.1.0 target
 
-The active PS5 CMake target builds the TEST30 tracked worker and restores the
+The active PS5 CMake target builds the tracked worker and restores the
 proven source-built ShellUI renderer. Common FPS does not call `fork()` after
 etaHEN has already spawned the plugin process.
 
@@ -16,5 +16,5 @@ The shutdown recorder and all explicit stop/unload paths remain disabled.
 The expected on-screen value is an integer `FPS: 59`/`FPS: 60` after the
 sampler warm-up.
 
-`tools/verify_test31_artifact.py` confirms wrapper metadata, exact hashes,
+`tools/verify_v1_1_0_artifact.py` confirms wrapper metadata, exact hashes,
 embedded renderer markers, the no-fork controller boundary and log path.

@@ -1,4 +1,4 @@
-# Building v1.1.0 (PARITY TEST31)
+# Building v1.1.0
 
 ## GitHub Actions
 
@@ -9,8 +9,9 @@ the output wrapper and diagnostic boundary.
 The downloadable artifact contains:
 
 ```text
-Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf
-Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.plugin
+Common_FPS_PS5_v1.1.0.elf
+Common_FPS_PS5_etaHEN_v1.1.0.plugin
+Common_FPS_ShellUI_v1.1.0.elf
 SHA256SUMS.txt
 RESOLVED_BUILD_DEPENDENCIES.txt
 ```
@@ -25,11 +26,12 @@ bash ./scripts/ps5_source_build.sh
 ```
 
 `scripts/ps5_source_build.sh` invokes
-`tools/verify_test31_artifact.py`. The reference build produced:
+`tools/verify_v1_1_0_artifact.py`. The reference build produced:
 
 ```text
-2db81cb2f896eb5310e22715226cc065e1b2c22304f6376c0fdbac5ce32b9f3a  ELF
-fefdab4c49fc58eddfd798697d1479818367db67d6543f1994809d3002fcbc19  plugin
+4f544fa00f7a430e64c4c8d0ed42d0463d2370c81dabd9141599c27c4f3f99d6  ELF
+39333081ecd93ade60d1b75fb0032a1e996fcf17ad47a9adfc0290591596e44e  plugin
+7880aec891cb95cc860753d5a3fed1dfbb23caf526b6106275c3b2cc02b8e465  ShellUI renderer
 ```
 
 ## Host tests
@@ -43,5 +45,5 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime limitation
 
-TEST31 samples FPS in the background and sends integer state to the embedded
+The v1.1.0 controller samples FPS in the background and sends integer state to the embedded
 ShellUI renderer. The first valid result for each game PID is also logged.

@@ -25,7 +25,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_v110_test31_tracked_renderer.log";
+    "/data/CommonFPS_v110.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,7 +186,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS v1.1.0 PARITY TEST31 tracked-process renderer A/B\n"
+        "Common FPS v1.1.0 tracked-process renderer\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s "
         "renderer=shared_elf_etaHEN_update_hook "
@@ -270,7 +270,7 @@ void append_first_fps_record(
     const common_fps::OverlayConfig overlay_config{};
 
     /*
-     * TEST31 keeps TEST30's process-lifecycle correction: the sampler and
+     * v1.1.0 keeps the tracked-process lifecycle correction: the sampler and
      * renderer controller run in the process already spawned and tracked by
      * etaHEN. There is no second internal fork, so etaHEN's PID file continues
      * to identify this worker. The only added path is the source-built ShellUI

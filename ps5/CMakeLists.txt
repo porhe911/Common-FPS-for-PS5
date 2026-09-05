@@ -107,11 +107,11 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf"
+    OUTPUT_NAME "Common_FPS_PS5_v1.1.0.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # TEST30 tracked-process lifecycle and FW 9.60 VideoOut sampler.
+    # v1.1.0 tracked-process lifecycle and FW 9.60 VideoOut sampler.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
@@ -130,7 +130,7 @@ target_sources(common_fps_controller PRIVATE
 )
 
 target_compile_definitions(common_fps_controller PRIVATE
-    COMMON_FPS_TEST31_TRACKED_RENDERER=1
+    COMMON_FPS_V110_STABLE=1
     COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG=1
     COMMON_FPS_DIAGNOSTIC_SYSCTL_ONLY=1
 )
@@ -181,11 +181,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0_PARITY_TEST31_TRACKED_RENDERER_NO_FORK_AB.plugin"
+            "${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
             --title-id CFPS00050
             --version 1.39
 )
