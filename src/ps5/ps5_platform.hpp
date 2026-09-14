@@ -38,6 +38,7 @@ private:
     bool table_read_logged_ = false;
     bool root_read_logged_ = false;
     bool counter_read_logged_ = false;
+    bool read_backend_logged_ = false;
 };
 
 } // namespace common_fps::ps5
