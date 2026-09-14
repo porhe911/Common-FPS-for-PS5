@@ -8,6 +8,7 @@
 #include "common_fps/fps_sampler.hpp"
 #include "common_fps/constants.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdarg>
 #include <cstdio>
