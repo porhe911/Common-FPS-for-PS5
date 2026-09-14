@@ -300,8 +300,8 @@ bool FpsSampler::resolve_counter_address() {
 
     std::size_t selected = candidate_count;
     unsigned selected_score = std::numeric_limits<unsigned>::max();
-    unsigned selected_delta1 = 0;
-    unsigned selected_delta2 = 0;
+    [[maybe_unused]] unsigned selected_delta1 = 0;
+    [[maybe_unused]] unsigned selected_delta2 = 0;
 
     for (std::size_t i = 0; i < candidate_count; ++i) {
         const Candidate& candidate = candidates[i];
