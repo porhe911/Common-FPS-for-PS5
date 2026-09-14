@@ -16,27 +16,30 @@ def digest(data: bytes) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print(
-            "usage: verify_stage8_artifact.py stage8.elf stage8.plugin",
+            "usage: verify_stage8_artifact.py "
+            "stage8.elf stage8.plugin stage8_renderer.elf",
             file=sys.stderr,
         )
         return 2
 
     elf_path = pathlib.Path(sys.argv[1])
     plugin_path = pathlib.Path(sys.argv[2])
+    renderer_path = pathlib.Path(sys.argv[3])
+
     elf = elf_path.read_bytes()
     plugin = plugin_path.read_bytes()
-
-    renderer_offset = elf.find(b"\x7fELF", 1)
-    renderer = elf[renderer_offset:] if renderer_offset >= 0 else b""
+    renderer = renderer_path.read_bytes()
+    renderer_offset = elf.find(renderer)
 
     checks = [
         (elf.startswith(b"\x7fELF"), "controller is not an ELF"),
+        (renderer.startswith(b"\x7fELF"), "renderer is not an ELF"),
         (plugin.startswith(PLUGIN_HEADER), "plugin metadata mismatch"),
         (plugin[len(PLUGIN_HEADER):] == elf, "plugin body differs from ELF"),
-        (renderer_offset > 0, "embedded renderer ELF missing"),
-        (len(renderer) > 4096, "embedded renderer ELF is unexpectedly small"),
+        (renderer_offset > 0, "exact renderer ELF is not embedded"),
+        (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
             b"Common FPS Universal Stage 8 self-hook dynamic VideoOut scan"
             in elf,
@@ -62,6 +65,11 @@ def main() -> int:
         (b"native-selfhook" in renderer, "native hook mode missing"),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
+            b"__atomic_compare_exchange" not in renderer
+            and b"__atomic_compare_exchange_16" not in renderer,
+            "atomic patch was emitted as an unresolved helper",
+        ),
+        (
             b"PARITY TEST13 target-thread bootstrap stack" not in renderer,
             "stale Stage 7 renderer marker present",
         ),
@@ -75,7 +83,11 @@ def main() -> int:
 
     print(f"verified ELF      {digest(elf)}")
     print(f"verified plugin   {digest(plugin)}")
-    print(f"embedded renderer offset=0x{renderer_offset:x} size={len(renderer)}")
+    print(f"verified renderer {digest(renderer)}")
+    print(
+        f"embedded renderer offset=0x{renderer_offset:x} "
+        f"size={len(renderer)}"
+    )
     return 0
 
 
