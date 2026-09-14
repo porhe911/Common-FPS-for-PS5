@@ -29,7 +29,8 @@ test -f "${ELF}"
 test -f "${PLUGIN}"
 test -f "${RENDERER}"
 
-python3 "${ROOT}/tools/verify_stage8_artifact.py" "${ELF}" "${PLUGIN}"
+python3 "${ROOT}/tools/verify_stage8_artifact.py" \
+  "${ELF}" "${PLUGIN}" "${RENDERER}"
 
 if objdump -d --disassemble=main "${ELF}" | grep -q '<fork>'; then
   echo "ERROR: main still calls fork" >&2
