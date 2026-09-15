@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8 universal diagnostic ELF/plugin boundary."""
+"""Verify the Stage 8.1 universal diagnostic ELF/plugin boundary."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pathlib
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00050\0" + b"1.48\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00050\0" + b"1.49\0"
 
 
 def digest(data: bytes) -> str:
@@ -19,7 +19,7 @@ def main() -> int:
     if len(sys.argv) != 4:
         print(
             "usage: verify_stage8_artifact.py "
-            "stage8.elf stage8.plugin stage8_renderer.elf",
+            "stage8_1.elf stage8_1.plugin stage8_1_renderer.elf",
             file=sys.stderr,
         )
         return 2
@@ -41,9 +41,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8 self-hook dynamic VideoOut scan"
+            b"Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan"
             in elf,
-            "Stage 8 runtime marker missing",
+            "Stage 8.1 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -51,17 +51,22 @@ def main() -> int:
             "atomic self-hook marker missing",
         ),
         (b"stability_gate=10" in elf, "startup stability gate missing"),
-        (b"sampler=videoout_dynamic_1s" in elf, "dynamic sampler marker missing"),
+        (b"sampler=videoout_wide_dynamic_1s" in elf, "dynamic sampler marker missing"),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8.log" in elf,
+            b"/data/CommonFPS_universal_stage8_1.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_1_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (b"Application.Update hook online" in renderer, "hook code missing"),
+        (b"mono_mprotect" in renderer, "Mono page-protection import missing"),
+        (
+            b"kernel_mprotect" not in renderer,
+            "unsafe SDK kernel_mprotect import is still present",
+        ),
         (b"native-selfhook" in renderer, "native hook mode missing"),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
