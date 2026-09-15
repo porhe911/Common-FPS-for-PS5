@@ -50,6 +50,10 @@ private:
     unsigned warmup_deltas_remaining_ = kWarmupDeltasToDiscard;
     std::uint32_t previous_counter_ = 0;
     std::uint64_t previous_time_us_ = 0;
+
+    /* Avoid repeating the wide read-only discovery scan every second. */
+    ProcessId discovery_failed_pid_ = -1;
+    std::uint64_t discovery_retry_after_us_ = 0;
 };
 
 } // namespace common_fps
