@@ -25,7 +25,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8.log";
+    "/data/CommonFPS_universal_stage8_1.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,12 +186,12 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8 self-hook dynamic VideoOut scan\n"
+        "Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "renderer=shared_elf_atomic_selfhook "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_dynamic_1s read=mdbg "
+        "mono_gc=pinned sampler=videoout_wide_dynamic_1s read=mdbg "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"
