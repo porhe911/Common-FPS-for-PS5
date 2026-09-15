@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8 keeps the source-built PUI renderer and moves the
+ * Stage 8.1 keeps the source-built PUI renderer and moves the
  * Application.Update hook into ShellUI itself.  Native Sony prologues are
  * accepted only when a conservative decoder proves that a complete 14..16
  * byte prefix is safe to relocate.  The live patch is one atomic 16-byte
@@ -26,7 +26,6 @@
 #include <cstring>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -69,6 +68,7 @@ using mono_compile_method_t = void* (*)(MonoMethod*);
 using mono_gchandle_new_t = std::uint32_t (*)(MonoObject*, int);
 using mono_gchandle_get_target_t = MonoObject* (*)(std::uint32_t);
 using mono_gchandle_free_t = void (*)(std::uint32_t);
+using mono_mprotect_t = int (*)(void*, std::size_t, int);
 
 /*
  * The injector resolves these imports against ShellUI's already-loaded Mono
@@ -96,6 +96,7 @@ void* mono_compile_method(MonoMethod*);
 std::uint32_t mono_gchandle_new(MonoObject*, int);
 MonoObject* mono_gchandle_get_target(std::uint32_t);
 void mono_gchandle_free(std::uint32_t);
+int mono_mprotect(void*, std::size_t, int);
 }
 
 mono_get_root_domain_t mono_get_root_domain_ = mono_get_root_domain;
@@ -124,6 +125,7 @@ mono_gchandle_new_t mono_gchandle_new_ = mono_gchandle_new;
 mono_gchandle_get_target_t mono_gchandle_get_target_ =
     mono_gchandle_get_target;
 mono_gchandle_free_t mono_gchandle_free_ = mono_gchandle_free;
+mono_mprotect_t mono_mprotect_ = mono_mprotect;
 
 MonoDomain* g_domain{};
 MonoImage* g_pui_image{};
@@ -151,7 +153,7 @@ constexpr const char* kAppSystemDll =
     "/system_ex/common_ex/lib/Sce.Vsh.ShellUI.AppSystem.dll";
 
 /*
- * Stage 8 installs the render hook from inside ShellUI.  There is no
+ * Stage 8.1 installs the render hook from inside ShellUI.  There is no
  * cross-process PT_IO write: the injected renderer changes only its own
  * Application.Update code page.
  *
@@ -174,6 +176,9 @@ void commonfps_update_trampoline() {
 
 void application_update_hook(MonoObject* instance);
 
+constexpr int kProtectRead = 1;
+constexpr int kProtectWrite = 2;
+constexpr int kProtectExec = 4;
 constexpr std::size_t kAbsoluteJumpSize = 14;
 constexpr std::size_t kAtomicPatchSize = 16;
 constexpr std::size_t kTrampolineCapacity = 128;
@@ -200,10 +205,11 @@ bool protect_range(void* address, std::size_t size, int protection) noexcept {
         (reinterpret_cast<std::uintptr_t>(address) + size + page - 1U) &
         ~(static_cast<std::uintptr_t>(page) - 1U);
 
-    return mprotect(
-        reinterpret_cast<void*>(first),
-        static_cast<std::size_t>(last - first),
-        protection) == 0;
+    return mono_mprotect_ &&
+        mono_mprotect_(
+            reinterpret_cast<void*>(first),
+            static_cast<std::size_t>(last - first),
+            protection) == 0;
 }
 
 void encode_absolute_jump(
@@ -235,7 +241,7 @@ bool prepare_trampoline(
     if (!protect_range(
             trampoline,
             kTrampolineCapacity,
-            PROT_READ | PROT_WRITE | PROT_EXEC)) {
+            kProtectRead | kProtectWrite | kProtectExec)) {
         return false;
     }
 
@@ -252,7 +258,7 @@ bool prepare_trampoline(
     (void)protect_range(
         trampoline,
         kTrampolineCapacity,
-        PROT_READ | PROT_EXEC);
+        kProtectRead | kProtectExec);
     return true;
 }
 
@@ -272,7 +278,7 @@ bool patch_method_atomically(
     if (!protect_range(
             address,
             kAtomicPatchSize,
-            PROT_READ | PROT_WRITE | PROT_EXEC)) {
+            kProtectRead | kProtectWrite | kProtectExec)) {
         return false;
     }
 
@@ -298,7 +304,7 @@ bool patch_method_atomically(
     protection_restored = protect_range(
         address,
         kAtomicPatchSize,
-        PROT_READ | PROT_EXEC);
+        kProtectRead | kProtectExec);
     return exchanged;
 }
 
@@ -461,7 +467,7 @@ std::size_t native_patch_length(
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_1_shellui.log", "a");
     if (!fp)
         return;
 
