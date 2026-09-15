@@ -12,7 +12,8 @@
 namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
-constexpr const char* kLog = "/data/CommonFPS_v110_shellui.log";
+constexpr const char* kLog =
+    "/data/CommonFPS_universal_stage8_1_shellui.log";
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -32,11 +33,10 @@ void write_online_marker() {
     }
 
     /*
-     * TEST8 demonstrated that returning an injected ShellUI ELF thread can
-     * KP the console. Even a compatibility or socket failure must therefore
-     * remain inert and resident instead of returning through the loader.
-     * TEST13 retains the TEST12 receive timeout/stale-state transition; it
-     * does not reintroduce a remote-thread return path.
+     * Returning an injected ShellUI ELF thread can destabilize the console.
+     * A compatibility or socket failure therefore remains inert and resident
+     * instead of returning through the loader. Stage 8.1 preserves that proven
+     * lifecycle while rejecting unsupported hook prologues before any write.
      */
     for (;;)
         usleep(1000000);
@@ -68,7 +68,7 @@ void* elf_main(void* payload_args) {
 
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
-            "Common FPS v1.1.0 PARITY TEST13 target-thread bootstrap stack\n",
+            "Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan\n",
             fp);
         std::fclose(fp);
     }

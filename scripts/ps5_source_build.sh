@@ -21,15 +21,16 @@ cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
 mkdir -p "${ROOT}/dist"
 
-ELF="${ROOT}/dist/Common_FPS_PS5_v1.1.0.elf"
-PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.1.0.plugin"
-RENDERER="${ROOT}/dist/Common_FPS_ShellUI_v1.1.0.elf"
+ELF="${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
+PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.plugin"
+RENDERER="${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
 
 test -f "${ELF}"
 test -f "${PLUGIN}"
 test -f "${RENDERER}"
 
-python3 "${ROOT}/tools/verify_v1_1_0_artifact.py" "${ELF}" "${PLUGIN}"
+python3 "${ROOT}/tools/verify_stage8_artifact.py" \
+  "${ELF}" "${PLUGIN}" "${RENDERER}"
 
 if objdump -d --disassemble=main "${ELF}" | grep -q '<fork>'; then
   echo "ERROR: main still calls fork" >&2

@@ -8,9 +8,10 @@
 /*
  * PS5 adapter for Common FPS.
  *
- * FW 9.60 adapter for the hardware-proven Common FPS sampler:
+ * Universal diagnostic adapter:
  *   KERN_PROC PID discovery -> short debugger Auth window for module lookup
- *   -> original Auth restore -> read-only DMAP process reads.
+ *   -> original Auth restore -> read-only MDBG process reads.
+ * The direct-map reader is used only as a FW 9.60 compatibility fallback.
  *
  * This file is GPL-3.0-or-later and is intended to be built against
  * the etaHEN Plugin SDK / PS5 Payload SDK.
@@ -23,6 +24,10 @@
 #include "stable_sampler/proc_rw_v960.hpp"
 #include "stable_sampler/videoout_module.hpp"
 
+extern "C" {
+#include <ps5/mdbg.h>
+}
+
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -33,10 +38,8 @@ namespace common_fps::ps5 {
 namespace {
 
 constexpr const char* kVideoOutModule = "libSceVideoOut.sprx";
-#if !defined(COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG)
 constexpr std::size_t kProbeTableSize =
     kVideoOutProbeEntryCount * kVideoOutProbeEntrySize;
-#endif
 
 #if defined(COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG)
 
@@ -45,7 +48,8 @@ constexpr std::size_t kProbeTableSize =
 
 #else
 
-constexpr const char* kLog = "/data/CommonFPS_v110_source.log";
+constexpr const char* kLog =
+    "/data/CommonFPS_universal_stage8_1.log";
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(kLog, "a");
@@ -81,6 +85,7 @@ std::optional<ProcessId> Ps5Platform::find_game_process() {
             table_read_logged_ = false;
             root_read_logged_ = false;
             counter_read_logged_ = false;
+            read_backend_logged_ = false;
             read_failure_count_ = 0;
 
             log_line(
@@ -131,6 +136,7 @@ bool Ps5Platform::process_alive(ProcessId pid) {
     table_read_logged_ = false;
     root_read_logged_ = false;
     counter_read_logged_ = false;
+    read_backend_logged_ = false;
     return false;
 }
 
@@ -179,6 +185,7 @@ Ps5Platform::find_module(ProcessId pid, const char* module_name) {
         table_read_logged_ = false;
         root_read_logged_ = false;
         counter_read_logged_ = false;
+        read_backend_logged_ = false;
         read_failure_count_ = 0;
     }
 
@@ -191,22 +198,47 @@ bool Ps5Platform::read_memory(
     void* out,
     std::size_t size) {
 
-    const bool read_ok = stable_sampler::proc_read(
+    if (!out || size == 0)
+        return false;
+
+    const std::uint32_t sdk =
+        stable_sampler::firmware_sdk_version();
+
+    /*
+     * MDBG is the firmware-neutral process read primitive.  Stage 6 proved
+     * this path on FW 7.60.  The old direct-map reader is retained only as a
+     * FW 9.60 fallback, where its kernel layout is hardware-proven.
+     */
+    const int mdbg_rc = mdbg_copyout(
         pid,
-        address,
+        static_cast<unsigned long>(address),
         out,
-        size);
+        static_cast<unsigned long>(size));
+
+    bool read_ok = mdbg_rc == 0;
+    bool used_dmap = false;
+    if (!read_ok && (sdk & 0xffff0000U) == 0x09600000U) {
+        used_dmap = true;
+        read_ok = stable_sampler::proc_read(
+            pid,
+            address,
+            out,
+            size);
+    }
 
     if (!read_ok) {
         ++read_failure_count_;
-        if (read_failure_count_ == 1 || read_failure_count_ % 10 == 0) {
+        if (read_failure_count_ == 1 || read_failure_count_ % 25 == 0) {
             log_line(
-                "Sampler DMAP read failed pid=%d address=0x%llx "
-                "size=%zu sdk=0x%08x dmap=0x%llx failures=%u",
+                "Sampler read failed pid=%d address=0x%llx size=%zu "
+                "sdk=0x%08x mdbg_rc=%d dmap_attempt=%d "
+                "dmap=0x%llx failures=%u",
                 pid,
                 hex_address(address),
                 size,
-                stable_sampler::firmware_sdk_version(),
+                sdk,
+                mdbg_rc,
+                used_dmap ? 1 : 0,
                 hex_address(stable_sampler::dmap_base()),
                 read_failure_count_);
         }
@@ -214,6 +246,16 @@ bool Ps5Platform::read_memory(
     }
 
     read_failure_count_ = 0;
+    if (!read_backend_logged_) {
+        read_backend_logged_ = true;
+        log_line(
+            "Sampler read backend pid=%d sdk=0x%08x backend=%s "
+            "mdbg_rc=%d",
+            pid,
+            sdk,
+            used_dmap ? "fw960-dmap-fallback" : "mdbg",
+            mdbg_rc);
+    }
 
 #if !defined(COMMON_FPS_DIAGNOSTIC_NO_PLATFORM_LOG)
     if (size == kProbeTableSize &&
@@ -237,30 +279,31 @@ bool Ps5Platform::read_memory(
 
         table_read_logged_ = true;
         log_line(
-            "Sampler table read pid=%d address=0x%llx size=%zu "
-            "sdk=0x%08x dmap=0x%llx enabled=%u first=0x%llx",
+            "Sampler fixed table pid=%d address=0x%llx size=%zu "
+            "sdk=0x%08x enabled=%u first=0x%llx",
             pid,
             hex_address(address),
             size,
-            stable_sampler::firmware_sdk_version(),
-            hex_address(stable_sampler::dmap_base()),
+            sdk,
             enabled_records,
             static_cast<unsigned long long>(first_pointer));
     } else if (size == sizeof(std::uint64_t) && !root_read_logged_) {
         std::uint64_t root = 0;
         std::memcpy(&root, out, sizeof(root));
         root_read_logged_ = root != 0;
-        log_line(
-            "Sampler probe root pid=%d pointer=0x%llx root=0x%llx",
-            pid,
-            hex_address(address),
-            static_cast<unsigned long long>(root));
+        if (root != 0) {
+            log_line(
+                "Sampler probe root pid=%d pointer=0x%llx root=0x%llx",
+                pid,
+                hex_address(address),
+                static_cast<unsigned long long>(root));
+        }
     } else if (size == sizeof(std::uint32_t) && !counter_read_logged_) {
         std::uint32_t counter = 0;
         std::memcpy(&counter, out, sizeof(counter));
         counter_read_logged_ = true;
         log_line(
-            "Sampler counter online pid=%d address=0x%llx value=%u",
+            "Sampler counter read pid=%d address=0x%llx value=%u",
             pid,
             hex_address(address),
             counter);
