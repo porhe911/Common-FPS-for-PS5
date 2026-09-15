@@ -13,7 +13,7 @@ namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_shellui.log";
+    "/data/CommonFPS_universal_stage8_1_shellui.log";
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -35,7 +35,7 @@ void write_online_marker() {
     /*
      * Returning an injected ShellUI ELF thread can destabilize the console.
      * A compatibility or socket failure therefore remains inert and resident
-     * instead of returning through the loader. Stage 8 preserves that proven
+     * instead of returning through the loader. Stage 8.1 preserves that proven
      * lifecycle while rejecting unsupported hook prologues before any write.
      */
     for (;;)
@@ -68,7 +68,7 @@ void* elf_main(void* payload_args) {
 
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
-            "Common FPS Universal Stage 8 self-hook dynamic VideoOut scan\n",
+            "Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan\n",
             fp);
         std::fclose(fp);
     }
