@@ -21,7 +21,7 @@ namespace {
 #if defined(PS5)
 void sampler_log(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8.log",
+        "/data/CommonFPS_universal_stage8_1.log",
         "a");
     if (!fp)
         return;
@@ -53,6 +53,14 @@ FpsSampler::FpsSampler(Platform& platform)
     : platform_(platform) {}
 
 bool FpsSampler::attach(ProcessId pid) {
+#if defined(PS5)
+    const std::uint64_t attempt_time_us = platform_.monotonic_us();
+    if (pid == discovery_failed_pid_ &&
+        attempt_time_us < discovery_retry_after_us_) {
+        return false;
+    }
+#endif
+
     reset();
 
     const auto module = platform_.find_module(pid, "libSceVideoOut.sprx");
@@ -63,10 +71,19 @@ bool FpsSampler::attach(ProcessId pid) {
     module_base_ = module->base;
 
     if (!resolve_counter_address()) {
+#if defined(PS5)
+        discovery_failed_pid_ = pid;
+        discovery_retry_after_us_ =
+            platform_.monotonic_us() + 10'000'000ULL;
+#endif
         reset();
         return false;
     }
 
+#if defined(PS5)
+    discovery_failed_pid_ = -1;
+    discovery_retry_after_us_ = 0;
+#endif
     return true;
 }
 
@@ -148,23 +165,42 @@ bool FpsSampler::resolve_counter_address() {
     }
 
     /*
-     * Firmware-independent fallback.  Scan only the small writable-data
-     * neighbourhood used by libSceVideoOut, never executable game code.  A
-     * structural match is not trusted until its counter advances at a stable
-     * display-like rate in two independent 250 ms windows.
+     * FW 7.60 proved that the 9.60 table offset may contain only zeroes.
+     * Stage 8.1 therefore scans a wider read-only VideoOut image window and
+     * accepts four conservative record layouts.  Every possible chain is
+     * still rejected unless its uint32 counter advances at a display-like
+     * rate in two independent 250 ms windows.
+     *
+     * No game memory is written by this discovery path.
      */
-    constexpr std::uintptr_t kScanBegin = 0x18000;
-    constexpr std::uintptr_t kScanEnd = 0x70000;
+    constexpr std::uintptr_t kScanBegin = 0x10000;
+    constexpr std::uintptr_t kScanEnd = 0x200000;
     constexpr std::size_t kScanStep = 0x2000;
-    constexpr std::size_t kScanReadSize = kScanStep + kTableSize;
-    constexpr std::size_t kMaxCandidates = 64;
+    constexpr std::size_t kLayoutLookahead = 0x20;
+    constexpr std::size_t kScanReadSize =
+        kScanStep + kLayoutLookahead;
+    constexpr std::size_t kMaxCandidates = 128;
+
+    struct Layout {
+        std::size_t enabled_offset;
+        std::size_t pointer_offset;
+        const char* name;
+    };
+
+    constexpr std::array<Layout, 4> kLayouts{{
+        {0x00, 0x08, "e0-p8"},
+        {0x04, 0x08, "e4-p8"},
+        {0x00, 0x10, "e0-p10"},
+        {0x04, 0x10, "e4-p10"},
+    }};
 
     struct Candidate {
-        std::uintptr_t table = 0;
-        std::size_t record = 0;
+        std::uintptr_t record = 0;
+        const char* layout = "none";
         std::uint64_t pointer = 0;
         std::uint64_t root = 0;
         std::uintptr_t counter = 0;
+        unsigned chain_depth = 0;
         std::uint32_t first = 0;
         std::uint32_t second = 0;
         std::uint32_t third = 0;
@@ -174,25 +210,18 @@ bool FpsSampler::resolve_counter_address() {
 
     std::array<Candidate, kMaxCandidates> candidates{};
     std::size_t candidate_count = 0;
+    std::size_t pointer_matches = 0;
+    std::size_t indirect_roots = 0;
+    bool candidates_truncated = false;
     std::array<std::uint8_t, kScanReadSize> window{};
 
-    auto add_candidate = [&](std::uintptr_t table_address,
-                             std::size_t record_index,
-                             std::uint64_t pointer) {
-        if (candidate_count == candidates.size() ||
-            !plausible_user_pointer(pointer)) {
+    auto add_candidate = [&](std::uintptr_t record_address,
+                             const char* layout_name,
+                             std::uint64_t pointer,
+                             std::uint64_t root,
+                             unsigned chain_depth) {
+        if (!plausible_user_pointer(root))
             return;
-        }
-
-        std::uint64_t root = 0;
-        if (!platform_.read_memory(
-                pid_,
-                static_cast<std::uintptr_t>(pointer),
-                &root,
-                sizeof(root)) ||
-            !plausible_user_pointer(root)) {
-            return;
-        }
 
         const std::uintptr_t counter =
             static_cast<std::uintptr_t>(root) +
@@ -212,17 +241,23 @@ bool FpsSampler::resolve_counter_address() {
             return;
         }
 
+        if (candidate_count == candidates.size()) {
+            candidates_truncated = true;
+            return;
+        }
+
         Candidate& candidate = candidates[candidate_count++];
-        candidate.table = table_address;
-        candidate.record = record_index;
+        candidate.record = record_address;
+        candidate.layout = layout_name;
         candidate.pointer = pointer;
         candidate.root = root;
         candidate.counter = counter;
+        candidate.chain_depth = chain_depth;
         candidate.first = first;
     };
 
     for (std::uintptr_t offset = kScanBegin;
-         offset < kScanEnd && candidate_count < kMaxCandidates;
+         offset < kScanEnd;
          offset += kScanStep) {
         const std::uintptr_t address = module_base_ + offset;
         if (!platform_.read_memory(
@@ -234,46 +269,72 @@ bool FpsSampler::resolve_counter_address() {
         }
 
         for (std::size_t local = 0;
-             local + kTableSize <= window.size() &&
-             candidate_count < kMaxCandidates;
+             local + kLayoutLookahead <= window.size();
              local += sizeof(std::uint64_t)) {
-            const auto* table = window.data() + local;
+            const auto* record = window.data() + local;
 
-            for (std::size_t record = 0;
-                 record < kVideoOutProbeEntryCount;
-                 ++record) {
-                const auto* entry =
-                    table + record * kVideoOutProbeEntrySize;
+            for (const Layout& layout : kLayouts) {
                 std::uint32_t enabled = 0;
                 std::uint64_t pointer = 0;
                 std::memcpy(
                     &enabled,
-                    entry + 0x00,
+                    record + layout.enabled_offset,
                     sizeof(enabled));
                 std::memcpy(
                     &pointer,
-                    entry + 0x08,
+                    record + layout.pointer_offset,
                     sizeof(pointer));
 
-                if (enabled == 0 || enabled > 4)
+                if (enabled == 0 || enabled > 8 ||
+                    !plausible_user_pointer(pointer)) {
                     continue;
+                }
+
+                ++pointer_matches;
+
+                /*
+                 * Known 9.60 builds use one pointer indirection.  Also test a
+                 * direct object pointer because older VideoOut layouts may
+                 * store the object itself in the record.
+                 */
+                std::uint64_t indirect_root = 0;
+                if (platform_.read_memory(
+                        pid_,
+                        static_cast<std::uintptr_t>(pointer),
+                        &indirect_root,
+                        sizeof(indirect_root)) &&
+                    plausible_user_pointer(indirect_root)) {
+                    ++indirect_roots;
+                    add_candidate(
+                        address + local,
+                        layout.name,
+                        pointer,
+                        indirect_root,
+                        2);
+                }
 
                 add_candidate(
                     address + local,
-                    record,
-                    pointer);
+                    layout.name,
+                    pointer,
+                    pointer,
+                    1);
             }
         }
     }
 
     sampler_log(
-        "Sampler dynamic scan pid=%d module=0x%llx range=0x%llx-0x%llx "
-        "candidates=%zu",
+        "Sampler wide scan pid=%d module=0x%llx range=0x%llx-0x%llx "
+        "pointer_matches=%zu indirect_roots=%zu candidates=%zu "
+        "truncated=%d",
         pid_,
         static_cast<unsigned long long>(module_base_),
         static_cast<unsigned long long>(module_base_ + kScanBegin),
         static_cast<unsigned long long>(module_base_ + kScanEnd),
-        candidate_count);
+        pointer_matches,
+        indirect_roots,
+        candidate_count,
+        candidates_truncated ? 1 : 0);
 
     if (candidate_count == 0)
         return false;
@@ -315,8 +376,28 @@ bool FpsSampler::resolve_counter_address() {
             static_cast<std::uint32_t>(
                 candidate.third - candidate.second);
 
-        if (delta1 == 0 || delta1 > 40 ||
-            delta2 == 0 || delta2 > 40) {
+        if (i < 8) {
+            sampler_log(
+                "Sampler wide candidate pid=%d index=%zu layout=%s "
+                "depth=%u record=0x%llx pointer=0x%llx root=0x%llx "
+                "counter=0x%llx values=%u/%u/%u deltas=%u/%u",
+                pid_,
+                i,
+                candidate.layout,
+                candidate.chain_depth,
+                static_cast<unsigned long long>(candidate.record),
+                static_cast<unsigned long long>(candidate.pointer),
+                static_cast<unsigned long long>(candidate.root),
+                static_cast<unsigned long long>(candidate.counter),
+                candidate.first,
+                candidate.second,
+                candidate.third,
+                delta1,
+                delta2);
+        }
+
+        if (delta1 == 0 || delta1 > 45 ||
+            delta2 == 0 || delta2 > 45) {
             continue;
         }
 
@@ -325,7 +406,6 @@ bool FpsSampler::resolve_counter_address() {
         if (jitter > 4)
             continue;
 
-        /* Prefer stable rates near common 30/60/120 Hz modes. */
         const unsigned estimated_fps =
             static_cast<unsigned>(delta1 + delta2) * 2U;
         const unsigned rate_distance =
@@ -334,7 +414,15 @@ bool FpsSampler::resolve_counter_address() {
                 std::min(
                     unsigned_distance(estimated_fps, 60U),
                     unsigned_distance(estimated_fps, 120U)));
-        const unsigned score = jitter * 100U + rate_distance;
+
+        /*
+         * Prefer the proven indirect chain when two counters have the same
+         * rate and jitter.  The direct form remains a compatibility fallback.
+         */
+        const unsigned chain_penalty =
+            candidate.chain_depth == 2 ? 0U : 5U;
+        const unsigned score =
+            jitter * 1000U + rate_distance * 10U + chain_penalty;
 
         if (score < selected_score) {
             selected = i;
@@ -346,7 +434,7 @@ bool FpsSampler::resolve_counter_address() {
 
     if (selected == candidate_count) {
         sampler_log(
-            "Sampler dynamic validation failed pid=%d candidates=%zu",
+            "Sampler wide validation failed pid=%d candidates=%zu",
             pid_,
             candidate_count);
         return false;
@@ -355,13 +443,14 @@ bool FpsSampler::resolve_counter_address() {
     const Candidate& winner = candidates[selected];
     counter_address_ = winner.counter;
     sampler_log(
-        "Sampler dynamic chain selected pid=%d table=0x%llx "
-        "offset=0x%llx record=%zu pointer=0x%llx root=0x%llx "
+        "Sampler wide chain selected pid=%d layout=%s depth=%u "
+        "record=0x%llx offset=0x%llx pointer=0x%llx root=0x%llx "
         "counter=0x%llx deltas=%u/%u estimated_fps=%u",
         pid_,
-        static_cast<unsigned long long>(winner.table),
-        static_cast<unsigned long long>(winner.table - module_base_),
-        winner.record,
+        winner.layout,
+        winner.chain_depth,
+        static_cast<unsigned long long>(winner.record),
+        static_cast<unsigned long long>(winner.record - module_base_),
         static_cast<unsigned long long>(winner.pointer),
         static_cast<unsigned long long>(winner.root),
         static_cast<unsigned long long>(winner.counter),
