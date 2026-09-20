@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.1 universal diagnostic ELF/plugin boundary."""
+"""Verify the Stage 8.2 universal diagnostic ELF/plugin boundary."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pathlib
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00050\0" + b"1.49\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00050\0" + b"1.50\0"
 
 
 def digest(data: bytes) -> str:
@@ -19,7 +19,7 @@ def main() -> int:
     if len(sys.argv) != 4:
         print(
             "usage: verify_stage8_artifact.py "
-            "stage8_1.elf stage8_1.plugin stage8_1_renderer.elf",
+            "stage8_2.elf stage8_2.plugin stage8_2_renderer.elf",
             file=sys.stderr,
         )
         return 2
@@ -41,38 +41,54 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan"
+            b"Common FPS Universal Stage 8.2 stopped MDBG hook + indirect scan"
             in elf,
-            "Stage 8.1 runtime marker missing",
+            "Stage 8.2 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
-            b"renderer=shared_elf_atomic_selfhook" in elf,
-            "atomic self-hook marker missing",
+            b"renderer=shared_elf_stopped_mdbg_hook" in elf,
+            "stopped MDBG hook marker missing",
         ),
         (b"stability_gate=10" in elf, "startup stability gate missing"),
-        (b"sampler=videoout_wide_dynamic_1s" in elf, "dynamic sampler marker missing"),
+        (
+            b"sampler=videoout_indirect_dynamic_1s" in elf,
+            "indirect sampler marker missing",
+        ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8_1.log" in elf,
+            b"/data/CommonFPS_universal_stage8_2.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_1_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_2_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (b"Application.Update hook online" in renderer, "hook code missing"),
-        (b"mono_mprotect" in renderer, "Mono page-protection import missing"),
+        (
+            b"mono_mprotect" not in renderer,
+            "unsafe live page-protection import is still present",
+        ),
         (
             b"kernel_mprotect" not in renderer,
             "unsafe SDK kernel_mprotect import is still present",
         ),
-        (b"native-selfhook" in renderer, "native hook mode missing"),
+        (
+            b"native-stopped-mdbg" in renderer,
+            "stopped native hook mode missing",
+        ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"__atomic_compare_exchange" not in renderer
-            and b"__atomic_compare_exchange_16" not in renderer,
-            "atomic patch was emitted as an unresolved helper",
+            b"commonfps_stage8_2_hook_request.bin" in renderer,
+            "renderer hook request protocol missing",
+        ),
+        (
+            b"mdbg_copyin" in elf,
+            "controller MDBG patch primitive missing",
+        ),
+        (
+            b"native-selfhook" not in renderer,
+            "unsafe native self-hook path is still present",
         ),
         (
             b"PARITY TEST13 target-thread bootstrap stack" not in renderer,

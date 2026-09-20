@@ -13,7 +13,7 @@ namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_1_shellui.log";
+    "/data/CommonFPS_universal_stage8_2_shellui.log";
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -35,8 +35,8 @@ void write_online_marker() {
     /*
      * Returning an injected ShellUI ELF thread can destabilize the console.
      * A compatibility or socket failure therefore remains inert and resident
-     * instead of returning through the loader. Stage 8.1 preserves that proven
-     * lifecycle while rejecting unsupported hook prologues before any write.
+     * instead of returning through the loader. Stage 8.2 preserves that proven
+     * lifecycle and patches a native hook only while ShellUI is stopped.
      */
     for (;;)
         usleep(1000000);
@@ -68,7 +68,7 @@ void* elf_main(void* payload_args) {
 
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
-            "Common FPS Universal Stage 8.1 Mono-protect wide VideoOut scan\n",
+            "Common FPS Universal Stage 8.2 stopped MDBG hook + indirect scan\n",
             fp);
         std::fclose(fp);
     }

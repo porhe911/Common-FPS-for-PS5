@@ -29,7 +29,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN"
+    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -55,7 +55,6 @@ target_compile_options(common_fps_shellui PRIVATE
     -fPIC
     -fvisibility=hidden
     -march=znver2
-    -mcx16
     -O2
     -Wall
     -Wextra
@@ -84,7 +83,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -108,11 +107,11 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
+    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # Stage 8.1 tracked lifecycle, MDBG reads and dynamic VideoOut scan.
+    # Stage 8.2 tracked lifecycle, stopped MDBG hook and indirect scan.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
@@ -120,6 +119,7 @@ target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/ps5/ps5_platform.cpp"
     "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/shellui_injector.cpp"
+    "${ROOT}/src/ps5/shellui_hook_controller.cpp"
     "${ROOT}/src/ps5/stable_shellui_injector.cpp"
     "${ROOT}/src/ps5/remote_call.cpp"
     "${ROOT}/src/ps5/stable_elfldr_bridge.c"
@@ -181,11 +181,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_1_MONO_PROTECT_WIDE_SCAN.plugin"
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_2_STOPPED_MDBG_INDIRECT_SCAN.plugin"
             --title-id CFPS00050
-            --version 1.49
+            --version 1.50
 )

@@ -7,8 +7,10 @@
 
 #include "common_fps/config.hpp"
 #include "common_fps/constants.hpp"
+#include "common_fps/fps_sampler.hpp"
 #include "common_fps/layout.hpp"
 #include "common_fps/lifecycle.hpp"
+#include "common_fps/shellui_hook_protocol.hpp"
 #include "common_fps/wire.hpp"
 
 #include <cassert>
@@ -104,6 +106,110 @@ public:
 
     void advance(unsigned frames, unsigned ms) {
         counter += frames;
+        now_us += static_cast<std::uint64_t>(ms) * 1000ULL;
+    }
+};
+
+class DynamicScanPlatform final : public Platform {
+public:
+    static constexpr ProcessId kPid = 760;
+    static constexpr std::uintptr_t kModule = 0x40000000;
+    static constexpr std::uintptr_t kRealRecordOffset = 0x1f0100;
+    static constexpr std::uintptr_t kRealPointer = 0x51000000;
+    static constexpr std::uintptr_t kRealRoot = 0x52000000;
+
+    std::uint32_t counter = 2000;
+    std::uint64_t now_us = 1'000'000;
+
+    std::optional<ProcessId> find_game_process() override {
+        return kPid;
+    }
+
+    bool process_alive(ProcessId pid) override {
+        return pid == kPid;
+    }
+
+    std::optional<ModuleInfo>
+    find_module(ProcessId pid, const char* name) override {
+        if (!process_alive(pid))
+            return std::nullopt;
+        return ModuleInfo{kModule, name};
+    }
+
+    bool read_memory(
+        ProcessId pid,
+        std::uintptr_t address,
+        void* out,
+        std::size_t size) override {
+
+        if (!process_alive(pid))
+            return false;
+
+        const std::uintptr_t fixed_table =
+            kModule + kVideoOutProbeTableOffset;
+        if (address == fixed_table) {
+            std::memset(out, 0, size);
+            return true;
+        }
+
+        constexpr std::uintptr_t scan_begin = 0x10000;
+        constexpr std::uintptr_t scan_end = 0x200000;
+        constexpr std::size_t scan_step = 0x2000;
+        constexpr std::size_t scan_read_size = 0x2020;
+        if (address >= kModule + scan_begin &&
+            address < kModule + scan_end &&
+            ((address - kModule - scan_begin) % scan_step) == 0 &&
+            size == scan_read_size) {
+            auto* bytes = static_cast<std::uint8_t*>(out);
+            std::memset(bytes, 0, size);
+
+            /*
+             * Every window contains a plausible direct-pointer decoy. The
+             * Stage 8.1 mixed queue filled before reaching the real late
+             * indirect chain; Stage 8.2 must not enqueue these decoys.
+             */
+            const std::uint32_t enabled = 1;
+            const std::uint64_t decoy =
+                0x60000000ULL + (address - kModule);
+            std::memcpy(bytes, &enabled, sizeof(enabled));
+            std::memcpy(bytes + 0x08, &decoy, sizeof(decoy));
+
+            const std::uintptr_t real_record =
+                kModule + kRealRecordOffset;
+            if (real_record >= address &&
+                real_record + 0x20 <= address + size) {
+                const std::size_t local =
+                    static_cast<std::size_t>(real_record - address);
+                std::memcpy(bytes + local, &enabled, sizeof(enabled));
+                std::memcpy(
+                    bytes + local + 0x08,
+                    &kRealPointer,
+                    sizeof(kRealPointer));
+            }
+            return true;
+        }
+
+        if (address == kRealPointer && size == sizeof(kRealRoot)) {
+            std::memcpy(out, &kRealRoot, sizeof(kRealRoot));
+            return true;
+        }
+
+        if (address == kRealRoot + kVideoOutCounterOffset &&
+            size == sizeof(counter)) {
+            std::memcpy(out, &counter, sizeof(counter));
+            return true;
+        }
+
+        return false;
+    }
+
+    std::uint64_t monotonic_us() override {
+        return now_us;
+    }
+
+    void sleep_ms(unsigned ms) override {
+        counter += static_cast<std::uint32_t>(
+            (static_cast<std::uint64_t>(ms) * 60ULL) / 1000ULL);
         now_us += static_cast<std::uint64_t>(ms) * 1000ULL;
     }
 };
@@ -256,12 +362,40 @@ static void test_integer_only_fps() {
     assert(f.fps == 60);
 }
 
+static void test_dynamic_scan_prioritizes_indirect_chain() {
+    DynamicScanPlatform platform;
+    FpsSampler sampler(platform);
+
+    assert(sampler.attach(DynamicScanPlatform::kPid));
+    assert(sampler.counter_address() ==
+        DynamicScanPlatform::kRealRoot + kVideoOutCounterOffset);
+}
+
+static void test_shellui_hook_protocol_checksum() {
+    ShellUiHookRequest request{};
+    request.pid = 57;
+    request.nonce = 0x12345678ULL;
+    request.method_address = 0x100000ULL;
+    request.hook_address = 0x200000ULL;
+    request.trampoline_address = 0x300000ULL;
+    request.displaced_size = 16;
+    request.expected[0] = 0x55;
+    request.desired[0] = 0xff;
+    request.checksum = shellui_hook_request_checksum(request);
+
+    assert(request.checksum == shellui_hook_request_checksum(request));
+    request.expected[1] ^= 1U;
+    assert(request.checksum != shellui_hook_request_checksum(request));
+}
+
 int main() {
     test_config();
     test_layout_all_corners();
     test_exact_counter_algorithm_and_lifecycle();
     test_wire_roundtrip();
     test_integer_only_fps();
+    test_dynamic_scan_prioritizes_indirect_chain();
+    test_shellui_hook_protocol_checksum();
 
     std::cout << "Common FPS alpha2 core tests: PASS\n";
     return 0;

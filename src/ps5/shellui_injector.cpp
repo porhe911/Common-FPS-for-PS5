@@ -14,6 +14,7 @@
 #include "shellui_attach_probe.hpp"
 #else
 #include "shellui_blob.hpp"
+#include "shellui_hook_controller.hpp"
 #include "stable_shellui_injector.hpp"
 #endif
 
@@ -60,7 +61,7 @@ constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
 #elif defined(COMMON_FPS_UNIVERSAL_STAGE8)
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_1.log";
+    "/data/CommonFPS_universal_stage8_2.log";
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -488,6 +489,7 @@ bool ensure_shellui_renderer() {
         static_cast<unsigned long long>(now_ms() - probe_started_ms));
     return true;
 #else
+    clear_shellui_hook_protocol_files();
     log_line(
         "ShellUI inject start pid=%d payload_size=%zu",
         pid,
@@ -620,6 +622,30 @@ bool ensure_shellui_renderer() {
                 static_cast<unsigned long long>(
                     now_ms() - inject_started_ms));
             return true;
+        }
+
+        ShellUiHookPatchReport hook_report{};
+        const ShellUiHookPollResult hook_result =
+            poll_and_apply_shellui_hook(pid, hook_report);
+        if (hook_result != ShellUiHookPollResult::NoRequest) {
+            log_line(
+                "ShellUI native hook request pid=%d sdk=0x%08x "
+                "method=0x%llx displaced=%u status=%d "
+                "read_rc=%d write_rc=%d expected=%d verified=%d "
+                "restored=%d detached=%d auth_restored=%d",
+                pid,
+                hook_report.sdk_version,
+                static_cast<unsigned long long>(
+                    hook_report.method_address),
+                hook_report.displaced_size,
+                static_cast<int>(hook_report.status),
+                hook_report.read_rc,
+                hook_report.write_rc,
+                hook_report.expected_matched ? 1 : 0,
+                hook_report.verified ? 1 : 0,
+                hook_report.restored ? 1 : 0,
+                hook_report.detached ? 1 : 0,
+                hook_report.auth_restored ? 1 : 0);
         }
         usleep(20000);
     }

@@ -8,14 +8,15 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.1 keeps the source-built PUI renderer and moves the
- * Application.Update hook into ShellUI itself.  Native Sony prologues are
- * accepted only when a conservative decoder proves that a complete 14..16
- * byte prefix is safe to relocate.  The live patch is one atomic 16-byte
- * transaction, so an unsupported firmware fails closed.
+ * Stage 8.2 keeps the source-built PUI renderer, but never patches a native
+ * Sony method while SceShellUI is running. Native prologues are decoded and
+ * relocated here, then a checked request asks the controller to stop
+ * SceShellUI and apply the 16-byte patch through MDBG. The hardware-proven
+ * etaHEN chain remains an in-process eight-byte destination update.
  */
 
 #include "commonfps_shellui.hpp"
+#include "common_fps/shellui_hook_protocol.hpp"
 
 #include <arpa/inet.h>
 #include <array>
@@ -68,7 +69,6 @@ using mono_compile_method_t = void* (*)(MonoMethod*);
 using mono_gchandle_new_t = std::uint32_t (*)(MonoObject*, int);
 using mono_gchandle_get_target_t = MonoObject* (*)(std::uint32_t);
 using mono_gchandle_free_t = void (*)(std::uint32_t);
-using mono_mprotect_t = int (*)(void*, std::size_t, int);
 
 /*
  * The injector resolves these imports against ShellUI's already-loaded Mono
@@ -96,7 +96,6 @@ void* mono_compile_method(MonoMethod*);
 std::uint32_t mono_gchandle_new(MonoObject*, int);
 MonoObject* mono_gchandle_get_target(std::uint32_t);
 void mono_gchandle_free(std::uint32_t);
-int mono_mprotect(void*, std::size_t, int);
 }
 
 mono_get_root_domain_t mono_get_root_domain_ = mono_get_root_domain;
@@ -125,7 +124,6 @@ mono_gchandle_new_t mono_gchandle_new_ = mono_gchandle_new;
 mono_gchandle_get_target_t mono_gchandle_get_target_ =
     mono_gchandle_get_target;
 mono_gchandle_free_t mono_gchandle_free_ = mono_gchandle_free;
-mono_mprotect_t mono_mprotect_ = mono_mprotect;
 
 MonoDomain* g_domain{};
 MonoImage* g_pui_image{};
@@ -135,6 +133,7 @@ std::uint32_t g_value_handle{};
 
 using application_update_t = void (*)(MonoObject*);
 application_update_t g_application_update_original{};
+bool g_hook_install_confirmed = false;
 
 std::atomic_bool g_runtime_ready{false};
 std::atomic_bool g_have_packet{false};
@@ -153,17 +152,12 @@ constexpr const char* kAppSystemDll =
     "/system_ex/common_ex/lib/Sce.Vsh.ShellUI.AppSystem.dll";
 
 /*
- * Stage 8.1 installs the render hook from inside ShellUI.  There is no
- * cross-process PT_IO write: the injected renderer changes only its own
- * Application.Update code page.
+ * Stage 8.2 uses two deliberately separate paths:
  *
- * Two inputs are accepted:
- *   1. etaHEN's existing 14-byte absolute jump (chain mode);
- *   2. a native, position-independent Sony prologue whose complete
- *      instructions fit in the first 14..16 bytes (self-hook mode).
- *
- * The live method is replaced with one aligned CMPXCHG16B transaction.  An
- * unknown or relocation-sensitive prologue is rejected without changing it.
+ *   1. etaHEN's existing 14-byte absolute jump is chained exactly like the
+ *      hardware-proven v1.1.0 renderer;
+ *   2. a native, position-independent Sony prologue is never changed here.
+ *      A request is published for a stopped-process MDBG patch instead.
  */
 extern "C" __attribute__((naked, noinline, used, aligned(16)))
 void commonfps_update_trampoline() {
@@ -176,41 +170,9 @@ void commonfps_update_trampoline() {
 
 void application_update_hook(MonoObject* instance);
 
-constexpr int kProtectRead = 1;
-constexpr int kProtectWrite = 2;
-constexpr int kProtectExec = 4;
 constexpr std::size_t kAbsoluteJumpSize = 14;
 constexpr std::size_t kAtomicPatchSize = 16;
 constexpr std::size_t kTrampolineCapacity = 128;
-
-using atomic_patch_word_t = unsigned __int128;
-static_assert(sizeof(atomic_patch_word_t) == kAtomicPatchSize);
-
-std::size_t page_size() noexcept {
-    const long queried = sysconf(_SC_PAGESIZE);
-    return queried > 0
-        ? static_cast<std::size_t>(queried)
-        : static_cast<std::size_t>(0x4000);
-}
-
-bool protect_range(void* address, std::size_t size, int protection) noexcept {
-    if (!address || size == 0)
-        return false;
-
-    const std::size_t page = page_size();
-    const std::uintptr_t first =
-        reinterpret_cast<std::uintptr_t>(address) &
-        ~(static_cast<std::uintptr_t>(page) - 1U);
-    const std::uintptr_t last =
-        (reinterpret_cast<std::uintptr_t>(address) + size + page - 1U) &
-        ~(static_cast<std::uintptr_t>(page) - 1U);
-
-    return mono_mprotect_ &&
-        mono_mprotect_(
-            reinterpret_cast<void*>(first),
-            static_cast<std::size_t>(last - first),
-            protection) == 0;
-}
 
 void encode_absolute_jump(
     std::uint8_t* output,
@@ -238,13 +200,6 @@ bool prepare_trampoline(
 
     auto* trampoline = reinterpret_cast<std::uint8_t*>(
         &commonfps_update_trampoline);
-    if (!protect_range(
-            trampoline,
-            kTrampolineCapacity,
-            kProtectRead | kProtectWrite | kProtectExec)) {
-        return false;
-    }
-
     std::memcpy(trampoline, original, original_size);
     std::size_t written = original_size;
     if (continuation) {
@@ -255,57 +210,7 @@ bool prepare_trampoline(
     __builtin___clear_cache(
         reinterpret_cast<char*>(trampoline),
         reinterpret_cast<char*>(trampoline + written));
-    (void)protect_range(
-        trampoline,
-        kTrampolineCapacity,
-        kProtectRead | kProtectExec);
     return true;
-}
-
-bool patch_method_atomically(
-    std::uint8_t* address,
-    const std::array<std::uint8_t, kAtomicPatchSize>& expected_bytes,
-    const std::array<std::uint8_t, kAtomicPatchSize>& desired_bytes,
-    bool& protection_restored) noexcept {
-
-    protection_restored = false;
-    if (!address ||
-        (reinterpret_cast<std::uintptr_t>(address) &
-         (kAtomicPatchSize - 1U)) != 0) {
-        return false;
-    }
-
-    if (!protect_range(
-            address,
-            kAtomicPatchSize,
-            kProtectRead | kProtectWrite | kProtectExec)) {
-        return false;
-    }
-
-    atomic_patch_word_t expected = 0;
-    atomic_patch_word_t desired = 0;
-    std::memcpy(&expected, expected_bytes.data(), sizeof(expected));
-    std::memcpy(&desired, desired_bytes.data(), sizeof(desired));
-
-    const bool exchanged = __atomic_compare_exchange_n(
-        reinterpret_cast<atomic_patch_word_t*>(address),
-        &expected,
-        desired,
-        false,
-        __ATOMIC_SEQ_CST,
-        __ATOMIC_SEQ_CST);
-
-    if (exchanged) {
-        __builtin___clear_cache(
-            reinterpret_cast<char*>(address),
-            reinterpret_cast<char*>(address + kAtomicPatchSize));
-    }
-
-    protection_restored = protect_range(
-        address,
-        kAtomicPatchSize,
-        kProtectRead | kProtectExec);
-    return exchanged;
 }
 
 std::size_t decode_relocatable_instruction(
@@ -465,9 +370,104 @@ std::size_t native_patch_length(
     return length <= kAtomicPatchSize ? length : 0;
 }
 
+template <typename T>
+bool write_exact_file_atomic(
+    const char* temporary_path,
+    const char* final_path,
+    const T& value) noexcept {
+
+    FILE* fp = std::fopen(temporary_path, "wb");
+    if (!fp)
+        return false;
+
+    const bool complete =
+        std::fwrite(&value, 1, sizeof(value), fp) == sizeof(value) &&
+        std::fflush(fp) == 0;
+    const bool closed = std::fclose(fp) == 0;
+    if (!complete || !closed) {
+        (void)unlink(temporary_path);
+        return false;
+    }
+
+    if (std::rename(temporary_path, final_path) != 0) {
+        (void)unlink(temporary_path);
+        return false;
+    }
+    return true;
+}
+
+template <typename T>
+bool read_exact_file(const char* path, T& value) noexcept {
+    FILE* fp = std::fopen(path, "rb");
+    if (!fp)
+        return false;
+
+    const std::size_t count = std::fread(&value, 1, sizeof(value), fp);
+    const int trailing = std::fgetc(fp);
+    std::fclose(fp);
+    return count == sizeof(value) && trailing == EOF;
+}
+
+bool publish_native_hook_request(
+    std::uint8_t* method,
+    const std::array<std::uint8_t, kAtomicPatchSize>& expected,
+    const std::array<std::uint8_t, kAtomicPatchSize>& desired,
+    std::size_t displaced_size,
+    std::uint64_t& nonce) noexcept {
+
+    ShellUiHookRequest request{};
+    request.pid = getpid();
+    request.method_address =
+        reinterpret_cast<std::uint64_t>(method);
+    request.hook_address =
+        reinterpret_cast<std::uint64_t>(&application_update_hook);
+    request.trampoline_address =
+        reinterpret_cast<std::uint64_t>(&commonfps_update_trampoline);
+    request.displaced_size = static_cast<std::uint32_t>(displaced_size);
+    std::memcpy(request.expected, expected.data(), expected.size());
+    std::memcpy(request.desired, desired.data(), desired.size());
+    request.nonce = request.method_address ^ request.hook_address ^
+        request.trampoline_address ^
+        (static_cast<std::uint64_t>(request.pid) << 32U) ^
+        0x8d4f23a76c19e502ULL;
+    if (request.nonce == 0)
+        request.nonce = 1;
+    request.checksum = shellui_hook_request_checksum(request);
+    nonce = request.nonce;
+
+    (void)unlink(kShellUiHookAckPath);
+    (void)unlink(kShellUiHookAckTempPath);
+    return write_exact_file_atomic(
+        kShellUiHookRequestTempPath,
+        kShellUiHookRequestPath,
+        request);
+}
+
+bool wait_for_native_hook_ack(
+    pid_t pid,
+    std::uint64_t nonce,
+    ShellUiHookAck& ack) noexcept {
+
+    for (int attempt = 0; attempt < 1000; ++attempt) {
+        ShellUiHookAck candidate{};
+        if (read_exact_file(kShellUiHookAckPath, candidate) &&
+            candidate.magic == kShellUiHookAckMagic &&
+            candidate.version == kShellUiHookProtocolVersion &&
+            candidate.pid == pid &&
+            candidate.nonce == nonce &&
+            candidate.checksum == shellui_hook_ack_checksum(candidate)) {
+            ack = candidate;
+            (void)unlink(kShellUiHookAckPath);
+            return true;
+        }
+        usleep(20000);
+    }
+    return false;
+}
+
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_1_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_2_shellui.log", "a");
     if (!fp)
         return;
 
@@ -885,13 +885,8 @@ bool install_update_hook(MonoClass* application_class) {
             kAbsoluteJumpPrefix,
             sizeof(kAbsoluteJumpPrefix)) == 0;
 
-    std::size_t displaced_size = 0;
-    const void* continuation = nullptr;
-    const char* mode = nullptr;
-    std::uint64_t previous_destination = 0;
-
     if (eta_chain) {
-        displaced_size = kAbsoluteJumpSize;
+        std::uint64_t previous_destination = 0;
         std::memcpy(
             &previous_destination,
             expected.data() + sizeof(kAbsoluteJumpPrefix),
@@ -899,7 +894,8 @@ bool install_update_hook(MonoClass* application_class) {
 
         if (previous_destination ==
             reinterpret_cast<std::uint64_t>(&application_update_hook)) {
-            if (g_application_update_original) {
+            if (g_application_update_original &&
+                g_hook_install_confirmed) {
                 log_line(
                     "Application.Update hook already online method=%p",
                     static_cast<void*>(address));
@@ -920,35 +916,66 @@ bool install_update_hook(MonoClass* application_class) {
                 reinterpret_cast<void*>(previous_destination));
             return false;
         }
-        mode = "etahen-chain";
-    } else {
-        displaced_size = native_patch_length(address);
-        if (displaced_size == 0) {
+
+        if (!prepare_trampoline(
+                expected.data(),
+                kAbsoluteJumpSize,
+                nullptr)) {
             log_line(
-                "Application.Update native prologue rejected "
-                "method=%p bytes="
-                "%02x%02x%02x%02x%02x%02x%02x%02x"
-                "%02x%02x%02x%02x%02x%02x%02x%02x",
+                "Application.Update trampoline prepare failed method=%p "
+                "mode=etahen-chain displaced=%zu",
                 static_cast<void*>(address),
-                expected[0], expected[1], expected[2], expected[3],
-                expected[4], expected[5], expected[6], expected[7],
-                expected[8], expected[9], expected[10], expected[11],
-                expected[12], expected[13], expected[14], expected[15]);
+                kAbsoluteJumpSize);
             return false;
         }
-        continuation = address + displaced_size;
-        mode = "native-selfhook";
+
+        g_application_update_original =
+            reinterpret_cast<application_update_t>(
+                &commonfps_update_trampoline);
+        const std::uint64_t destination =
+            reinterpret_cast<std::uint64_t>(&application_update_hook);
+        std::memcpy(
+            address + sizeof(kAbsoluteJumpPrefix),
+            &destination,
+            sizeof(destination));
+        __builtin___clear_cache(
+            reinterpret_cast<char*>(address),
+            reinterpret_cast<char*>(address + kAbsoluteJumpSize));
+
+        log_line(
+            "Application.Update hook online method=%p mode=etahen-chain "
+            "previous=%p hook=%p displaced=%zu stopped_patch=0",
+            static_cast<void*>(address),
+            reinterpret_cast<void*>(previous_destination),
+            reinterpret_cast<void*>(&application_update_hook),
+            kAbsoluteJumpSize);
+        g_hook_install_confirmed = true;
+        return true;
+    }
+
+    const std::size_t displaced_size = native_patch_length(address);
+    if (displaced_size == 0) {
+        log_line(
+            "Application.Update native prologue rejected "
+            "method=%p bytes="
+            "%02x%02x%02x%02x%02x%02x%02x%02x"
+            "%02x%02x%02x%02x%02x%02x%02x%02x",
+            static_cast<void*>(address),
+            expected[0], expected[1], expected[2], expected[3],
+            expected[4], expected[5], expected[6], expected[7],
+            expected[8], expected[9], expected[10], expected[11],
+            expected[12], expected[13], expected[14], expected[15]);
+        return false;
     }
 
     if (!prepare_trampoline(
             expected.data(),
             displaced_size,
-            continuation)) {
+            address + displaced_size)) {
         log_line(
             "Application.Update trampoline prepare failed method=%p "
-            "mode=%s displaced=%zu",
+            "mode=native-stopped-mdbg displaced=%zu",
             static_cast<void*>(address),
-            mode,
             displaced_size);
         return false;
     }
@@ -963,37 +990,85 @@ bool install_update_hook(MonoClass* application_class) {
         desired[i] = 0x90;
     }
 
+    /*
+     * Publish the original target before the controller can resume ShellUI.
+     * The new hook may execute immediately after PT_DETACH, before this
+     * renderer thread observes the acknowledgement.
+     */
     g_application_update_original =
         reinterpret_cast<application_update_t>(
             &commonfps_update_trampoline);
 
-    bool protection_restored = false;
-    if (!patch_method_atomically(
+    std::uint64_t nonce = 0;
+    if (!publish_native_hook_request(
             address,
             expected,
             desired,
-            protection_restored)) {
-        g_application_update_original = nullptr;
+            displaced_size,
+            nonce)) {
         log_line(
-            "Application.Update atomic patch failed method=%p "
-            "mode=%s aligned=%d",
-            static_cast<void*>(address),
-            mode,
-            (reinterpret_cast<std::uintptr_t>(address) & 0x0fU) == 0
-                ? 1
-                : 0);
+            "Application.Update native request publish failed method=%p",
+            static_cast<void*>(address));
         return false;
     }
 
     log_line(
-        "Application.Update hook online method=%p mode=%s "
-        "previous=%p hook=%p displaced=%zu atomic16=1 protect_restore=%d",
+        "Application.Update native request ready method=%p hook=%p "
+        "trampoline=%p displaced=%zu nonce=0x%llx",
         static_cast<void*>(address),
-        mode,
-        reinterpret_cast<void*>(previous_destination),
         reinterpret_cast<void*>(&application_update_hook),
+        reinterpret_cast<void*>(&commonfps_update_trampoline),
         displaced_size,
-        protection_restored ? 1 : 0);
+        static_cast<unsigned long long>(nonce));
+
+    ShellUiHookAck ack{};
+    if (!wait_for_native_hook_ack(getpid(), nonce, ack)) {
+        log_line(
+            "Application.Update native request timeout method=%p "
+            "nonce=0x%llx",
+            static_cast<void*>(address),
+            static_cast<unsigned long long>(nonce));
+        return false;
+    }
+
+    if (ack.status != static_cast<std::int32_t>(
+            ShellUiHookStatus::Success) ||
+        ack.verified == 0 || ack.detached == 0 ||
+        ack.auth_restored == 0) {
+        log_line(
+            "Application.Update native request failed method=%p "
+            "status=%d read_rc=%d write_rc=%d verified=%u "
+            "restored=%u detached=%u auth_restored=%u",
+            static_cast<void*>(address),
+            ack.status,
+            ack.read_rc,
+            ack.write_rc,
+            static_cast<unsigned>(ack.verified),
+            static_cast<unsigned>(ack.restored),
+            static_cast<unsigned>(ack.detached),
+            static_cast<unsigned>(ack.auth_restored));
+        return false;
+    }
+
+    if (std::memcmp(address, desired.data(), desired.size()) != 0) {
+        log_line(
+            "Application.Update native readback changed method=%p",
+            static_cast<void*>(address));
+        return false;
+    }
+    __builtin___clear_cache(
+        reinterpret_cast<char*>(address),
+        reinterpret_cast<char*>(address + desired.size()));
+
+    log_line(
+        "Application.Update hook online method=%p "
+        "mode=native-stopped-mdbg previous=%p hook=%p "
+        "displaced=%zu stopped_patch=1 verified=1",
+        static_cast<void*>(address),
+        nullptr,
+        reinterpret_cast<void*>(&application_update_hook),
+        displaced_size);
+    g_hook_install_confirmed = true;
     return true;
 }
 

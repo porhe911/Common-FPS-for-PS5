@@ -21,7 +21,7 @@ namespace {
 #if defined(PS5)
 void sampler_log(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_1.log",
+        "/data/CommonFPS_universal_stage8_2.log",
         "a");
     if (!fp)
         return;
@@ -166,10 +166,12 @@ bool FpsSampler::resolve_counter_address() {
 
     /*
      * FW 7.60 proved that the 9.60 table offset may contain only zeroes.
-     * Stage 8.1 therefore scans a wider read-only VideoOut image window and
-     * accepts four conservative record layouts.  Every possible chain is
-     * still rejected unless its uint32 counter advances at a display-like
-     * rate in two independent 250 ms windows.
+     * Stage 8.1 proved that mixing thousands of direct-pointer false matches
+     * into one bounded array can evict every real indirect VideoOut chain.
+     * Stage 8.2 therefore scans the same read-only window, but records only
+     * the one-indirection shape used by the hardware-proven implementation.
+     * Every candidate is still rejected unless its uint32 counter advances
+     * at a display-like rate in two independent 250 ms windows.
      *
      * No game memory is written by this discovery path.
      */
@@ -179,7 +181,7 @@ bool FpsSampler::resolve_counter_address() {
     constexpr std::size_t kLayoutLookahead = 0x20;
     constexpr std::size_t kScanReadSize =
         kScanStep + kLayoutLookahead;
-    constexpr std::size_t kMaxCandidates = 128;
+    constexpr std::size_t kMaxCandidates = 256;
 
     struct Layout {
         std::size_t enabled_offset;
@@ -292,11 +294,7 @@ bool FpsSampler::resolve_counter_address() {
 
                 ++pointer_matches;
 
-                /*
-                 * Known 9.60 builds use one pointer indirection.  Also test a
-                 * direct object pointer because older VideoOut layouts may
-                 * store the object itself in the record.
-                 */
+                /* The proven producer is record -> pointer -> root. */
                 std::uint64_t indirect_root = 0;
                 if (platform_.read_memory(
                         pid_,
@@ -312,19 +310,12 @@ bool FpsSampler::resolve_counter_address() {
                         indirect_root,
                         2);
                 }
-
-                add_candidate(
-                    address + local,
-                    layout.name,
-                    pointer,
-                    pointer,
-                    1);
             }
         }
     }
 
     sampler_log(
-        "Sampler wide scan pid=%d module=0x%llx range=0x%llx-0x%llx "
+        "Sampler indirect scan pid=%d module=0x%llx range=0x%llx-0x%llx "
         "pointer_matches=%zu indirect_roots=%zu candidates=%zu "
         "truncated=%d",
         pid_,
@@ -376,9 +367,9 @@ bool FpsSampler::resolve_counter_address() {
             static_cast<std::uint32_t>(
                 candidate.third - candidate.second);
 
-        if (i < 8) {
+        if (i < 12) {
             sampler_log(
-                "Sampler wide candidate pid=%d index=%zu layout=%s "
+                "Sampler indirect candidate pid=%d index=%zu layout=%s "
                 "depth=%u record=0x%llx pointer=0x%llx root=0x%llx "
                 "counter=0x%llx values=%u/%u/%u deltas=%u/%u",
                 pid_,
@@ -415,14 +406,8 @@ bool FpsSampler::resolve_counter_address() {
                     unsigned_distance(estimated_fps, 60U),
                     unsigned_distance(estimated_fps, 120U)));
 
-        /*
-         * Prefer the proven indirect chain when two counters have the same
-         * rate and jitter.  The direct form remains a compatibility fallback.
-         */
-        const unsigned chain_penalty =
-            candidate.chain_depth == 2 ? 0U : 5U;
         const unsigned score =
-            jitter * 1000U + rate_distance * 10U + chain_penalty;
+            jitter * 1000U + rate_distance * 10U;
 
         if (score < selected_score) {
             selected = i;
@@ -434,7 +419,7 @@ bool FpsSampler::resolve_counter_address() {
 
     if (selected == candidate_count) {
         sampler_log(
-            "Sampler wide validation failed pid=%d candidates=%zu",
+            "Sampler indirect validation failed pid=%d candidates=%zu",
             pid_,
             candidate_count);
         return false;
@@ -443,7 +428,7 @@ bool FpsSampler::resolve_counter_address() {
     const Candidate& winner = candidates[selected];
     counter_address_ = winner.counter;
     sampler_log(
-        "Sampler wide chain selected pid=%d layout=%s depth=%u "
+        "Sampler indirect chain selected pid=%d layout=%s depth=%u "
         "record=0x%llx offset=0x%llx pointer=0x%llx root=0x%llx "
         "counter=0x%llx deltas=%u/%u estimated_fps=%u",
         pid_,
