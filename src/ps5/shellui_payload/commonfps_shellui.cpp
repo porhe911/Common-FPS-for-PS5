@@ -371,12 +371,11 @@ std::size_t native_patch_length(
 }
 
 template <typename T>
-bool write_exact_file_atomic(
-    const char* temporary_path,
-    const char* final_path,
+bool write_exact_file(
+    const char* path,
     const T& value) noexcept {
 
-    FILE* fp = std::fopen(temporary_path, "wb");
+    FILE* fp = std::fopen(path, "wb");
     if (!fp)
         return false;
 
@@ -384,16 +383,7 @@ bool write_exact_file_atomic(
         std::fwrite(&value, 1, sizeof(value), fp) == sizeof(value) &&
         std::fflush(fp) == 0;
     const bool closed = std::fclose(fp) == 0;
-    if (!complete || !closed) {
-        (void)unlink(temporary_path);
-        return false;
-    }
-
-    if (std::rename(temporary_path, final_path) != 0) {
-        (void)unlink(temporary_path);
-        return false;
-    }
-    return true;
+    return complete && closed;
 }
 
 template <typename T>
@@ -403,9 +393,8 @@ bool read_exact_file(const char* path, T& value) noexcept {
         return false;
 
     const std::size_t count = std::fread(&value, 1, sizeof(value), fp);
-    const int trailing = std::fgetc(fp);
     std::fclose(fp);
-    return count == sizeof(value) && trailing == EOF;
+    return count == sizeof(value);
 }
 
 bool publish_native_hook_request(
@@ -435,10 +424,8 @@ bool publish_native_hook_request(
     request.checksum = shellui_hook_request_checksum(request);
     nonce = request.nonce;
 
-    (void)unlink(kShellUiHookAckPath);
-    (void)unlink(kShellUiHookAckTempPath);
-    return write_exact_file_atomic(
-        kShellUiHookRequestTempPath,
+    /* The controller ignores short/checksum-invalid in-progress reads. */
+    return write_exact_file(
         kShellUiHookRequestPath,
         request);
 }
@@ -457,7 +444,6 @@ bool wait_for_native_hook_ack(
             candidate.nonce == nonce &&
             candidate.checksum == shellui_hook_ack_checksum(candidate)) {
             ack = candidate;
-            (void)unlink(kShellUiHookAckPath);
             return true;
         }
         usleep(20000);
