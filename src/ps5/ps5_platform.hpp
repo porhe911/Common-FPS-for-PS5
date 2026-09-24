@@ -25,6 +25,8 @@ public:
         void* out,
         std::size_t size) override;
 
+    std::uint32_t firmware_sdk_version() noexcept override;
+
     std::uint64_t monotonic_us() override;
     void sleep_ms(unsigned milliseconds) override;
 
@@ -38,6 +40,7 @@ private:
     bool table_read_logged_ = false;
     bool root_read_logged_ = false;
     bool counter_read_logged_ = false;
+    bool read_backend_logged_ = false;
 };
 
 } // namespace common_fps::ps5
