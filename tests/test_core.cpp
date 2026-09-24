@@ -27,6 +27,8 @@ class MockPlatform final : public Platform {
 public:
     std::optional<ProcessId> active_pid;
     bool alive = false;
+    std::uint32_t sdk_version = 0x09600000U;
+    unsigned fixed_table_reads = 0;
 
     std::uintptr_t module_base = 0x10000000;
     std::uintptr_t record_pointer = 0x20000000;
@@ -51,6 +53,10 @@ public:
         return ModuleInfo{module_base, name};
     }
 
+    std::uint32_t firmware_sdk_version() noexcept override {
+        return sdk_version;
+    }
+
     bool read_memory(
         ProcessId pid,
         std::uintptr_t address,
@@ -64,6 +70,7 @@ public:
             module_base + kVideoOutProbeTableOffset;
 
         if (address == table_address) {
+            ++fixed_table_reads;
             const std::size_t expected =
                 kVideoOutProbeEntryCount * kVideoOutProbeEntrySize;
             assert(size == expected);
@@ -120,6 +127,10 @@ public:
 
     std::uint32_t counter = 2000;
     std::uint64_t now_us = 1'000'000;
+
+    std::uint32_t firmware_sdk_version() noexcept override {
+        return 0x07600007U;
+    }
 
     std::optional<ProcessId> find_game_process() override {
         return kPid;
@@ -371,6 +382,26 @@ static void test_dynamic_scan_prioritizes_indirect_chain() {
         DynamicScanPlatform::kRealRoot + kVideoOutCounterOffset);
 }
 
+static void test_fixed_table_is_only_used_on_proven_firmware() {
+    for (const std::uint32_t sdk : {0U, 0x07600007U, 0x10000000U}) {
+        MockPlatform platform;
+        platform.active_pid = 300;
+        platform.alive = true;
+        platform.sdk_version = sdk;
+
+        FpsSampler sampler(platform);
+        assert(!sampler.attach(300));
+        assert(platform.fixed_table_reads == 0);
+    }
+
+    MockPlatform proven;
+    proven.active_pid = 300;
+    proven.alive = true;
+    FpsSampler sampler(proven);
+    assert(sampler.attach(300));
+    assert(proven.fixed_table_reads == 1);
+}
+
 static void test_shellui_hook_protocol_checksum() {
     ShellUiHookRequest request{};
     request.pid = 57;
@@ -395,6 +426,7 @@ int main() {
     test_wire_roundtrip();
     test_integer_only_fps();
     test_dynamic_scan_prioritizes_indirect_chain();
+    test_fixed_table_is_only_used_on_proven_firmware();
     test_shellui_hook_protocol_checksum();
 
     std::cout << "Common FPS alpha2 core tests: PASS\n";

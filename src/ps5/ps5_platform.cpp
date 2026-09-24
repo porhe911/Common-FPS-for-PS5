@@ -313,6 +313,10 @@ bool Ps5Platform::read_memory(
     return true;
 }
 
+std::uint32_t Ps5Platform::firmware_sdk_version() noexcept {
+    return stable_sampler::firmware_sdk_version();
+}
+
 std::uint64_t Ps5Platform::monotonic_us() {
     timeval tv{};
     gettimeofday(&tv, nullptr);

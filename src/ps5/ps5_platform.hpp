@@ -25,6 +25,8 @@ public:
         void* out,
         std::size_t size) override;
 
+    std::uint32_t firmware_sdk_version() noexcept override;
+
     std::uint64_t monotonic_us() override;
     void sleep_ms(unsigned milliseconds) override;
 

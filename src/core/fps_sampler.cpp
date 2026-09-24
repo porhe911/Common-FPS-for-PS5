@@ -119,7 +119,11 @@ bool FpsSampler::resolve_counter_address() {
      * Keep the hardware-proven FW 9.60 fast path byte-for-byte compatible.
      * It avoids any discovery delay on the firmware where +0x34980 is known.
      */
-    if (platform_.read_memory(
+    constexpr std::uint32_t kProvenFixedTableSdk = 0x09600000U;
+    const std::uint32_t sdk_version =
+        platform_.firmware_sdk_version();
+    if ((sdk_version & 0xffff0000U) == kProvenFixedTableSdk &&
+        platform_.read_memory(
             pid_,
             module_base_ + kVideoOutProbeTableOffset,
             fixed_table.data(),
