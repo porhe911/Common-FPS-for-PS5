@@ -25,7 +25,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_v110.log";
+    "/data/CommonFPS_universal_stage8_5.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,19 +186,21 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS v1.1.0 tracked-process renderer\n"
+        "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
-        "shellui_observation=sysctl_tdname_1s "
-        "renderer=shared_elf_etaHEN_update_hook "
+        "shellui_observation=sysctl_tdname_1s stability_gate=10 "
+        "game_gate=process_present_stable_3s "
+        "renderer_injection=deferred_until_game "
+        "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_fw960_1s dmap=read_only "
+        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s read=mdbg "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"
         "Worker ready pid=%d ppid=%d first_shellui_pid=%d "
         "size_rc=%d data_rc=%d errno=%d bytes=%zu records=%u "
         "malformed=%u log_fd=closing periodic_log=disabled "
-        "platform_log=compile_time_disabled\n",
+        "platform_log=enabled\n",
         getpid(),
         getppid(),
         first.pid,
@@ -263,6 +265,10 @@ void append_first_fps_record(
     common_fps::FpsSampler sampler(platform);
     common_fps::ps5::StateSender sender;
     pid_t reported_pid = -1;
+    pid_t stable_shellui_pid = -1;
+    unsigned stable_shellui_observations = 0;
+    pid_t stable_game_pid = -1;
+    unsigned stable_game_observations = 0;
     bool renderer_online = false;
     bool have_fps = false;
     int latest_fps = 0;
@@ -270,23 +276,57 @@ void append_first_fps_record(
     const common_fps::OverlayConfig overlay_config{};
 
     /*
-     * v1.1.0 keeps the tracked-process lifecycle correction: the sampler and
-     * renderer controller run in the process already spawned and tracked by
-     * etaHEN. There is no second internal fork, so etaHEN's PID file continues
-     * to identify this worker. The only added path is the source-built ShellUI
-     * renderer plus its one-way loopback state sender.
+     * The controller remains in etaHEN's tracked process: no second fork,
+     * signal handler, shutdown write or stop path is introduced.  Stage 8
+     * requires ten identical one-second ShellUI observations before the first
+     * injection.  A changed PID after rest mode restarts the same gate.
      */
     for (;;) {
-        (void)observe_shellui_once();
+        const ShellUiObservation shellui = observe_shellui_once();
+        if (shellui.pid > 0) {
+            if (shellui.pid == stable_shellui_pid) {
+                if (stable_shellui_observations < 10)
+                    ++stable_shellui_observations;
+            } else {
+                stable_shellui_pid = shellui.pid;
+                stable_shellui_observations = 1;
+                renderer_online = false;
+            }
+        } else {
+            stable_shellui_pid = -1;
+            stable_shellui_observations = 0;
+            renderer_online = false;
+        }
 
-        if (!renderer_online)
-            renderer_online = common_fps::ps5::ensure_shellui_renderer();
+        /*
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.5
+         * proved that resolving and patching Application.Update before a
+         * game owns the "Game" container can make ShellUI restart.  The
+         * controller remains loaded, but the renderer is started only after
+         * the process sampler has observed the same real game process for
+         * three consecutive one-second polls.  This also keeps autoload
+         * completely inert between games and across reboot.
+         */
+        const auto observed_game_pid = platform.find_game_process();
+        if (observed_game_pid) {
+            if (*observed_game_pid == stable_game_pid) {
+                if (stable_game_observations < 3)
+                    ++stable_game_observations;
+            } else {
+                stable_game_pid = *observed_game_pid;
+                stable_game_observations = 1;
+            }
+        } else {
+            stable_game_pid = -1;
+            stable_game_observations = 0;
+        }
+        const bool game_process_ready =
+            stable_game_pid > 0 && stable_game_observations >= 3;
 
         if (!sampler.attached()) {
             have_fps = false;
-            const auto game_pid = platform.find_game_process();
-            if (game_pid)
-                (void)sampler.attach(*game_pid);
+            if (observed_game_pid)
+                (void)sampler.attach(*observed_game_pid);
         } else {
             const auto fps = sampler.sample();
             if (fps) {
@@ -300,6 +340,12 @@ void append_first_fps_record(
                         *fps);
                 }
             }
+        }
+
+        if (!renderer_online && game_process_ready &&
+            stable_shellui_observations >= 10) {
+            renderer_online =
+                common_fps::ps5::ensure_shellui_renderer();
         }
 
         if (renderer_online) {

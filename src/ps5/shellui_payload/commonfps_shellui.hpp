@@ -12,6 +12,9 @@
 
 namespace common_fps::ps5::shellui {
 
+/* Persist the last reached startup stage even when /data logging fails. */
+void record_stage(const char* stage) noexcept;
+
 /* Resolve the already-loaded ShellUI Mono runtime and PUI assemblies. */
 bool initialize_runtime();
 

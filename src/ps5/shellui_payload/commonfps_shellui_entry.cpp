@@ -5,6 +5,7 @@
  */
 
 #include "commonfps_shellui.hpp"
+#include "common_fps/shellui_stage.hpp"
 
 #include <cstdio>
 #include <unistd.h>
@@ -12,7 +13,8 @@
 namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
-constexpr const char* kLog = "/data/CommonFPS_v110_shellui.log";
+constexpr const char* kLog =
+    "/data/CommonFPS_universal_stage8_5_shellui.log";
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -32,17 +34,27 @@ void write_online_marker() {
     }
 
     /*
-     * TEST8 demonstrated that returning an injected ShellUI ELF thread can
-     * KP the console. Even a compatibility or socket failure must therefore
-     * remain inert and resident instead of returning through the loader.
-     * TEST13 retains the TEST12 receive timeout/stale-state transition; it
-     * does not reintroduce a remote-thread return path.
+     * Returning an injected ShellUI ELF thread can destabilize the console.
+     * A compatibility or socket failure therefore remains inert and resident
+     * instead of returning through the loader. Stage 8.5 game-gated mode preserves that proven
+     * lifecycle and patches a native hook only while ShellUI is stopped.
      */
     for (;;)
         usleep(1000000);
 }
 
 } // namespace
+
+namespace common_fps::ps5::shellui {
+
+void record_stage(const char* stage) noexcept {
+    if (FILE* fp = std::fopen(kShellUiStagePath, "w")) {
+        std::fprintf(fp, "%d %.47s\n", getpid(), stage);
+        std::fclose(fp);
+    }
+}
+
+} // namespace common_fps::ps5::shellui
 
 #if defined(COMMON_FPS_TEST23_PARK_BEFORE_RUNTIME)
 extern "C" {
@@ -66,9 +78,11 @@ void* elf_main(void* payload_args) {
     /* A shared renderer does not start the PS5 payload CRT in SceShellUI. */
     (void)payload_args;
 
+    record_stage("entry");
+
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
-            "Common FPS v1.1.0 PARITY TEST13 target-thread bootstrap stack\n",
+            "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n",
             fp);
         std::fclose(fp);
     }
@@ -98,8 +112,12 @@ void* elf_main(void* payload_args) {
     if (!runtime_ready)
         park_renderer_failure("runtime");
 
+    record_stage("runtime_ready");
+
     if (!initialize_receiver())
         park_renderer_failure("receiver");
+
+    record_stage("receiver_ready");
 
     write_online_marker();
     run_receiver_loop();

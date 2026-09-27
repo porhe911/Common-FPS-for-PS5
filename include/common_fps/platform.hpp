@@ -41,6 +41,9 @@ public:
         void* out,
         std::size_t size) = 0;
 
+    /* Unknown (0) must not opt in to firmware-specific memory layouts. */
+    virtual std::uint32_t firmware_sdk_version() noexcept { return 0; }
+
     /* Monotonic time used to calculate a counter delta into FPS. */
     virtual std::uint64_t monotonic_us() = 0;
 
