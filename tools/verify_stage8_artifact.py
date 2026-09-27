@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.6 legacy-safe universal renderer boundary."""
+"""Verify the Stage 8.7 hybrid DCE/high-firmware renderer boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00054\0" + b"1.55\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00055\0" + b"1.56\0"
 
 
 def digest(data: bytes) -> str:
@@ -51,7 +51,7 @@ def main() -> int:
     if len(sys.argv) != 4:
         print(
             "usage: verify_stage8_artifact.py "
-            "game_gated.elf game_gated.plugin game_gated_renderer.elf",
+            "hybrid.elf hybrid.plugin hybrid_renderer.elf",
             file=sys.stderr,
         )
         return 2
@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.6 legacy-safe renderer + indirect scan"
+            b"Common FPS Universal Stage 8.7 legacy-safe renderer + indirect scan"
             in elf,
-            "Stage 8.6 runtime marker missing",
+            "Stage 8.7 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -92,16 +92,28 @@ def main() -> int:
             "deferred renderer injection marker missing",
         ),
         (
-            b"sampler=videoout_indirect_dynamic_1s" in elf,
-            "indirect sampler marker missing",
+            b"sampler=videoout_indirect_dynamic_1s+dce_fallback" in elf,
+            "hybrid sampler marker missing",
+        ),
+        (
+            b"DCE sampler online" in elf,
+            "DCE fallback sampler missing",
+        ),
+        (
+            b"/dev/dce" in elf,
+            "DCE device path missing",
+        ),
+        (
+            b"highfw_guard=ptrace_io_1byte" in elf,
+            "high firmware guard marker missing",
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8_6.log" in elf,
+            b"/data/CommonFPS_universal_stage8_7.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_6_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_7_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -136,7 +148,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_stage8_6_hook_request.bin" in renderer,
+            b"commonfps_stage8_7_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (
