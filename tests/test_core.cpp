@@ -477,8 +477,11 @@ static void test_shellui_hook_probe_request() {
 
     assert(shellui_hook_request_is_probe(request));
     assert(shellui_hook_probe_request_is_valid(request, 55));
+    assert(shellui_hook_probe_backend(0x01000001U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x04510001U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x09600000U) == ShellUiHookBackend::PtraceIo);
+    assert(shellui_hook_probe_backend(0x10200000U) == ShellUiHookBackend::PtraceIo);
+    assert(shellui_hook_probe_backend(0x11000000U) == ShellUiHookBackend::Unsupported);
 
     request.desired[0] = 1;
     request.checksum = shellui_hook_request_checksum(request);
@@ -501,11 +504,19 @@ static void test_legacy_main_thread_guard_request() {
     assert(shellui_hook_request_is_main_thread_guard(request));
     assert(shellui_main_thread_guard_request_is_valid(request, 76));
     assert(!shellui_main_thread_guard_request_is_valid(request, 77));
+    assert(shellui_main_thread_guard_backend(0x01000001U) ==
+        ShellUiHookBackend::Mdbg);
     assert(shellui_main_thread_guard_backend(0x04510001U) ==
         ShellUiHookBackend::Mdbg);
     assert(shellui_main_thread_guard_backend(0x07600007U) ==
         ShellUiHookBackend::Mdbg);
+    assert(shellui_main_thread_guard_backend(0x09000000U) ==
+        ShellUiHookBackend::PtraceIo);
     assert(shellui_main_thread_guard_backend(0x09600000U) ==
+        ShellUiHookBackend::Unsupported);
+    assert(shellui_main_thread_guard_backend(0x10200000U) ==
+        ShellUiHookBackend::PtraceIo);
+    assert(shellui_main_thread_guard_backend(0x11000000U) ==
         ShellUiHookBackend::Unsupported);
 
     const auto valid = request;
