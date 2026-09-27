@@ -20,8 +20,9 @@ ShellUI changed before marker ... quarantine=1
 То есть probe и запись прошли, но они выполнялись на рабочем столе. После
 перезапуска ShellUI рендерер не доходил до `runtime_ready`; поэтому вторая
 копия лога после запуска игры уже не могла показать FPS. Контроллер Stage 8.5
-Game-Gated теперь сначала наблюдает настоящий game PID, и только затем
-вызывает `ensure_shellui_renderer()`. Пока игры нет, нет Mono-lookup, probe,
+Game-Gated теперь сначала наблюдает один и тот же настоящий game PID в трёх
+последовательных опросах (около 3 секунд), и только затем вызывает
+`ensure_shellui_renderer()`. Пока игры нет или PID ещё нестабилен, нет Mono-lookup, probe,
 ptrace/MDBG hook и UI-операций.
 
 Это исправляет ранний ShellUI restart, но не обещает автоматически найти поле
@@ -176,7 +177,7 @@ ShellUI renderer online ...
 ```
 
 До запуска игры таких строк быть не должно. Вместо этого основной лог должен
-содержать `game_gate=process_present renderer_injection=deferred_until_game` в
+содержать `game_gate=process_present_stable_3s renderer_injection=deferred_until_game` в
 строке готовности контроллера, а поиск игры должен оставаться `empty`.
 
 Значение `status=0` относится к записи hook. Полный FPS подтверждается только

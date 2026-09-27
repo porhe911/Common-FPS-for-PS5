@@ -189,7 +189,8 @@ void write_worker_ready_record(
         "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
-        "game_gate=process_present renderer_injection=deferred_until_game "
+        "game_gate=process_present_stable_3s "
+        "renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
         "mono_gc=pinned sampler=videoout_indirect_dynamic_1s read=mdbg "
@@ -266,6 +267,8 @@ void append_first_fps_record(
     pid_t reported_pid = -1;
     pid_t stable_shellui_pid = -1;
     unsigned stable_shellui_observations = 0;
+    pid_t stable_game_pid = -1;
+    unsigned stable_game_observations = 0;
     bool renderer_online = false;
     bool have_fps = false;
     int latest_fps = 0;
@@ -300,19 +303,31 @@ void append_first_fps_record(
          * proved that resolving and patching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
-         * the process sampler has observed a real game process.  This also
-         * keeps autoload completely inert between games and across reboot.
+         * the process sampler has observed the same real game process for
+         * three consecutive one-second polls.  This also keeps autoload
+         * completely inert between games and across reboot.
          */
-        bool game_active = false;
-        if (!sampler.attached()) {
-            have_fps = false;
-            const auto game_pid = platform.find_game_process();
-            if (game_pid) {
-                game_active = true;
-                (void)sampler.attach(*game_pid);
+        const auto observed_game_pid = platform.find_game_process();
+        if (observed_game_pid) {
+            if (*observed_game_pid == stable_game_pid) {
+                if (stable_game_observations < 3)
+                    ++stable_game_observations;
+            } else {
+                stable_game_pid = *observed_game_pid;
+                stable_game_observations = 1;
             }
         } else {
-            game_active = true;
+            stable_game_pid = -1;
+            stable_game_observations = 0;
+        }
+        const bool game_process_ready =
+            stable_game_pid > 0 && stable_game_observations >= 3;
+
+        if (!sampler.attached()) {
+            have_fps = false;
+            if (observed_game_pid)
+                (void)sampler.attach(*observed_game_pid);
+        } else {
             const auto fps = sampler.sample();
             if (fps) {
                 have_fps = true;
@@ -325,11 +340,9 @@ void append_first_fps_record(
                         *fps);
                 }
             }
-            /* sample() resets the sampler when the game closes. */
-            game_active = sampler.attached();
         }
 
-        if (!renderer_online && game_active &&
+        if (!renderer_online && game_process_ready &&
             stable_shellui_observations >= 10) {
             renderer_online =
                 common_fps::ps5::ensure_shellui_renderer();

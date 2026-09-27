@@ -83,7 +83,10 @@ def main() -> int:
             "stopped MDBG hook marker missing",
         ),
         (b"stability_gate=10" in elf, "startup stability gate missing"),
-        (b"game_gate=process_present" in elf, "game-process injection gate missing"),
+        (
+            b"game_gate=process_present_stable_3s" in elf,
+            "stable game-process injection gate missing",
+        ),
         (
             b"renderer_injection=deferred_until_game" in elf,
             "deferred renderer injection marker missing",
