@@ -1,5 +1,33 @@
 # Common FPS for PS5 — 1.1.0
 
+> Universal development branch: **Stage 8.9 DCE Standby**.
+>
+> FW 4.51 is now hardware-confirmed with visible real FPS in both PS4 and PS5
+> games. Stage 8.9 keeps the successful Stage 8.8 DCE adaptive fallback but
+> puts expensive VideoOut discovery into a 60-second standby after DCE is
+> online, with immediate wake after repeated DCE misses.
+
+## Universal branch status
+
+| System software | Status | Renderer / FPS path |
+|---|---|---|
+| 4.51 | Hardware confirmed | stopped MDBG ShellUI guard + adaptive DCE; PS4 and PS5 games confirmed |
+| 9.60 | Hardware confirmed baseline | existing tracked-process VideoOut + Application.Update chain |
+| 7.60 | Regression pending | universal path requires fresh hardware test |
+| 10.xx | Experimental | stopped ptrace-I/O guard + adaptive DCE; hardware validation pending |
+
+Current development artifacts:
+
+```text
+Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf
+Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin
+```
+
+FW 4.51 hardware evidence is documented in
+[docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md](docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md).
+The Stage 8.9 design and test procedure are in
+[docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md](docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md).
+
 This hardware-validated source snapshot combines the tracked-process lifecycle
 with the source-built renderer/IPC path that produces the visible counter:
 
