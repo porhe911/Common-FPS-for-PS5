@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.3 universal diagnostic ELF/plugin boundary."""
+"""Verify the Stage 8.4 universal diagnostic ELF/plugin boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00051\0" + b"1.51\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00052\0" + b"1.52\0"
 
 
 def digest(data: bytes) -> str:
@@ -51,7 +51,7 @@ def main() -> int:
     if len(sys.argv) != 4:
         print(
             "usage: verify_stage8_artifact.py "
-            "stage8_3.elf stage8_3.plugin stage8_3_renderer.elf",
+            "stage8_4.elf stage8_4.plugin stage8_4_renderer.elf",
             file=sys.stderr,
         )
         return 2
@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.3 stopped chain hook + indirect scan"
+            b"Common FPS Universal Stage 8.4 stopped chain hook + indirect scan"
             in elf,
-            "Stage 8.3 runtime marker missing",
+            "Stage 8.4 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -89,11 +89,11 @@ def main() -> int:
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8_3.log" in elf,
+            b"/data/CommonFPS_universal_stage8_4.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_3_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_4_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (b"Application.Update hook online" in renderer, "hook code missing"),
@@ -116,7 +116,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_stage8_3_hook_request.bin" in renderer,
+            b"commonfps_stage8_4_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (

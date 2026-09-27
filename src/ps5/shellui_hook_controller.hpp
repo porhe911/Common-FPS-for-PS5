@@ -35,7 +35,7 @@ struct ShellUiHookPatchReport {
     bool auth_restored = false;
 };
 
-/* Remove stale Stage 8.3 request/ack files before a new renderer starts. */
+/* Remove stale Stage 8.4 request/ack files before a new renderer starts. */
 void clear_shellui_hook_protocol_files() noexcept;
 
 /*

@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.3 never writes Sony method memory from the renderer. Both native
+ * Stage 8.4 never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
@@ -28,6 +28,10 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+extern "C" {
+#include <ps5/mdbg.h>
+}
 
 namespace common_fps::ps5::shellui {
 
@@ -353,12 +357,12 @@ std::size_t decode_relocatable_instruction(
 }
 
 std::size_t native_patch_length(
-    const std::uint8_t* address) noexcept {
+    const std::uint8_t* code) noexcept {
 
     std::size_t length = 0;
     while (length < kAbsoluteJumpSize) {
         const std::size_t decoded = decode_relocatable_instruction(
-            address + length,
+            code + length,
             kAtomicPatchSize - length);
         if (decoded == 0)
             return 0;
@@ -366,6 +370,32 @@ std::size_t native_patch_length(
     }
 
     return length <= kAtomicPatchSize ? length : 0;
+}
+
+/*
+ * A compiled Mono method can be in a page whose direct user-mode read is not
+ * safe at the instant the method is published.  The old memcpy() path turned
+ * that race into a ShellUI crash before the stopped controller could inspect
+ * the method.  MDBG returns an error for an unreadable range instead of
+ * delivering SIGSEGV, so a bad method is rejected and the renderer parks.
+ */
+bool copy_from_self(
+    const void* source,
+    void* destination,
+    std::size_t size,
+    int& rc) noexcept {
+
+    if (!source || !destination || size == 0) {
+        rc = -1;
+        return false;
+    }
+
+    rc = mdbg_copyout(
+        getpid(),
+        reinterpret_cast<intptr_t>(source),
+        destination,
+        size);
+    return rc == 0;
 }
 
 template <typename T>
@@ -452,7 +482,7 @@ bool wait_for_native_hook_ack(
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_3_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_4_shellui.log", "a");
     if (!fp)
         return;
 
@@ -859,9 +889,17 @@ bool install_update_hook(MonoClass* application_class) {
         return false;
     }
 
-    record_stage("hook_read");
+    record_stage("hook_read_start");
     std::array<std::uint8_t, kAtomicPatchSize> expected{};
-    std::memcpy(expected.data(), address, expected.size());
+    int read_rc = 0;
+    if (!copy_from_self(address, expected.data(), expected.size(), read_rc)) {
+        log_line(
+            "Application.Update safe read failed method=%p rc=%d",
+            static_cast<void*>(address),
+            read_rc);
+        return false;
+    }
+    record_stage("hook_read_ok");
 
     static constexpr std::uint8_t kAbsoluteJumpPrefix[6] = {
         0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
@@ -915,7 +953,7 @@ bool install_update_hook(MonoClass* application_class) {
         original_call = reinterpret_cast<application_update_t>(
             previous_destination);
     } else {
-        displaced_size = native_patch_length(address);
+        displaced_size = native_patch_length(expected.data());
         if (displaced_size == 0) {
             log_line(
                 "Application.Update native prologue rejected "
@@ -1019,10 +1057,18 @@ bool install_update_hook(MonoClass* application_class) {
     }
 
     record_stage("hook_readback");
-    if (std::memcmp(address, desired.data(), desired.size()) != 0) {
+    std::array<std::uint8_t, kAtomicPatchSize> readback{};
+    int readback_rc = 0;
+    if (!copy_from_self(
+            address,
+            readback.data(),
+            readback.size(),
+            readback_rc) ||
+        std::memcmp(readback.data(), desired.data(), desired.size()) != 0) {
         log_line(
-            "Application.Update readback changed method=%p",
-            static_cast<void*>(address));
+            "Application.Update safe readback failed method=%p rc=%d",
+            static_cast<void*>(address),
+            readback_rc);
         return false;
     }
     __builtin___clear_cache(
