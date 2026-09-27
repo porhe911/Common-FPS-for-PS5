@@ -21,9 +21,9 @@ cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
 mkdir -p "${ROOT}/dist"
 
-ELF="${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_5_GAME_GATED.elf"
-PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_5_GAME_GATED.plugin"
-RENDERER="${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_5_GAME_GATED.elf"
+ELF="${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
+PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_6_LEGACY_SAFE.plugin"
+RENDERER="${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
 
 test -f "${ELF}"
 test -f "${PLUGIN}"
