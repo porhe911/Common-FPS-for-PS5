@@ -77,9 +77,12 @@ void write_ack(
     ack.restored = report.restored ? 1U : 0U;
     ack.detached = report.detached ? 1U : 0U;
     ack.auth_restored = report.auth_restored ? 1U : 0U;
-    ack.phase = static_cast<std::uint8_t>(report.probe
-        ? ShellUiHookAckPhase::Probe
-        : ShellUiHookAckPhase::Patch);
+    ack.phase = static_cast<std::uint8_t>(
+        report.probe
+            ? ShellUiHookAckPhase::Probe
+            : (report.main_thread_guard
+                ? ShellUiHookAckPhase::MainThreadGuard
+                : ShellUiHookAckPhase::Patch));
     std::memcpy(
         ack.observed,
         report.observed.data(),
@@ -117,19 +120,29 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
     report.displaced_size = request.displaced_size;
 
     report.probe = shellui_hook_request_is_probe(request);
+    report.main_thread_guard =
+        shellui_hook_request_is_main_thread_guard(request);
     const bool valid = report.probe
         ? shellui_hook_probe_request_is_valid(request, shellui_pid)
-        : shellui_hook_request_is_valid(request, shellui_pid);
+        : (report.main_thread_guard
+            ? shellui_main_thread_guard_request_is_valid(
+                request, shellui_pid)
+            : shellui_hook_request_is_valid(request, shellui_pid));
     if (!valid) {
         report.status = ShellUiHookStatus::InvalidRequest;
         write_ack(request, report);
         return ShellUiHookPollResult::Failed;
     }
 
-    report.eta_chain = !report.probe && shellui_hook_is_eta_chain(request);
+    report.eta_chain =
+        !report.probe &&
+        !report.main_thread_guard &&
+        shellui_hook_is_eta_chain(request);
     const ShellUiHookBackend backend = report.probe
         ? shellui_hook_probe_backend(report.sdk_version)
-        : shellui_hook_backend(report.sdk_version, report.eta_chain);
+        : (report.main_thread_guard
+            ? shellui_main_thread_guard_backend(report.sdk_version)
+            : shellui_hook_backend(report.sdk_version, report.eta_chain));
     if (backend == ShellUiHookBackend::Unsupported) {
         report.status = ShellUiHookStatus::UnsupportedFirmware;
         write_ack(request, report);
@@ -146,9 +159,16 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
             static_cast<intptr_t>(request.method_address), destination, size);
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
-        /* An existing absolute jump only needs its destination replaced. */
-        const std::size_t offset = report.eta_chain ? 6U : 0U;
-        const std::size_t size = report.eta_chain ? 8U : kShellUiHookPatchSize;
+        /*
+         * Legacy UI-thread guard changes one verified byte only.
+         * An existing etaHEN absolute jump changes only its destination.
+         * Native Application.Update keeps the full verified 16-byte write.
+         */
+        const std::size_t offset =
+            report.main_thread_guard ? 0U : (report.eta_chain ? 6U : 0U);
+        const std::size_t size =
+            report.main_thread_guard ? 1U :
+            (report.eta_chain ? 8U : kShellUiHookPatchSize);
         const intptr_t address =
             static_cast<intptr_t>(request.method_address + offset);
         if (backend == ShellUiHookBackend::Mdbg)
