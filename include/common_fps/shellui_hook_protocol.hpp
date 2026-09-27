@@ -51,11 +51,11 @@ inline ShellUiHookBackend shellui_hook_backend(
 }
 
 /*
- * Legacy 3.00-8.20 fallback does not replace Application.Update.  It only
- * changes the first byte of Diagnostics.CheckRunningOnMainThread to RET while
- * ShellUI is ptrace-stopped.  MDBG is the already-established write backend
- * for this firmware range.  Newer firmware deliberately fails closed and
- * keeps the existing Application.Update path.
+ * The background-PUI path never replaces Application.Update. It changes only
+ * the first byte of Diagnostics.CheckRunningOnMainThread to RET while ShellUI
+ * is ptrace-stopped. FW 1.xx-8.20 uses MDBG; selected higher firmware uses
+ * ptrace I/O. FW 9.60 deliberately keeps the hardware-proven update-chain
+ * backend. Unknown future firmware fails closed.
  */
 inline ShellUiHookBackend shellui_main_thread_guard_backend(
     std::uint32_t sdk) noexcept {
