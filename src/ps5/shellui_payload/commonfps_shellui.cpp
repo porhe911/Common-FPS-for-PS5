@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.5 game-gated mode never writes Sony method memory from the renderer. Both native
+ * Stage 8.6 legacy-safe mode never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
@@ -128,6 +128,8 @@ MonoImage* g_pui_image{};
 std::uint32_t g_game_scene_handle{};
 std::uint32_t g_label_handle{};
 std::uint32_t g_value_handle{};
+MonoMethod* g_find_scene_method{};
+bool g_background_render_mode = false;
 
 using application_update_t = void (*)(MonoObject*);
 application_update_t g_application_update_original{};
@@ -149,6 +151,8 @@ constexpr const char* kPuiDll =
     "/system_ex/common_ex/lib/Sce.PlayStation.PUI.dll";
 constexpr const char* kAppSystemDll =
     "/system_ex/common_ex/lib/Sce.Vsh.ShellUI.AppSystem.dll";
+constexpr const char* kCoreDll =
+    "/system_ex/common_ex/lib/Sce.PlayStation.Core.dll";
 
 /*
  * Two original-call paths:
@@ -507,9 +511,135 @@ bool wait_for_native_hook_ack(
     return false;
 }
 
+enum class MainThreadGuardResult {
+    Installed,
+    Unsupported,
+    Failed,
+};
+
+bool publish_main_thread_guard_request(
+    std::uint8_t* method,
+    const std::array<std::uint8_t, kAtomicPatchSize>& expected,
+    std::uint64_t& nonce) noexcept {
+
+    ShellUiHookRequest request{};
+    request.pid = getpid();
+    request.method_address = reinterpret_cast<std::uint64_t>(method);
+    request.hook_address = request.method_address;
+    request.original_call_address = 0;
+    request.displaced_size = 1;
+    std::memcpy(request.expected, expected.data(), expected.size());
+    std::memcpy(request.desired, expected.data(), expected.size());
+    request.desired[0] = 0xc3;
+    request.nonce = request.method_address ^
+        (static_cast<std::uint64_t>(request.pid) << 32U) ^
+        0x6d9bc2f1a54837e0ULL;
+    if (request.nonce == 0)
+        request.nonce = 1;
+    request.checksum = shellui_hook_request_checksum(request);
+    nonce = request.nonce;
+    return write_exact_file(kShellUiHookRequestPath, request);
+}
+
+MainThreadGuardResult install_main_thread_guard() {
+    record_stage("legacy_guard_lookup");
+
+    MonoImage* core = open_image(kCoreDll);
+    if (!core) {
+        log_line("legacy guard: core image unavailable");
+        return MainThreadGuardResult::Failed;
+    }
+
+    MonoClass* diagnostics = mono_class_from_name_(
+        core,
+        "Sce.PlayStation.Core.Runtime",
+        "Diagnostics");
+    MonoMethod* check = diagnostics
+        ? mono_class_get_method_from_name_(
+              diagnostics,
+              "CheckRunningOnMainThread",
+              0)
+        : nullptr;
+    if (!check) {
+        log_line("legacy guard: CheckRunningOnMainThread unavailable");
+        return MainThreadGuardResult::Failed;
+    }
+
+    record_stage("legacy_guard_compile");
+    auto* address = static_cast<std::uint8_t*>(mono_compile_method_(check));
+    if (!address) {
+        log_line("legacy guard: compile failed");
+        return MainThreadGuardResult::Failed;
+    }
+
+    std::array<std::uint8_t, kAtomicPatchSize> expected{};
+    record_stage("legacy_guard_probe");
+    if (!probe_hook_bytes(address, expected)) {
+        log_line("legacy guard: probe failed method=%p",
+                 static_cast<void*>(address));
+        return MainThreadGuardResult::Failed;
+    }
+
+    if (expected[0] == 0xc3) {
+        log_line("legacy guard already disabled method=%p",
+                 static_cast<void*>(address));
+        record_stage("legacy_guard_ready");
+        return MainThreadGuardResult::Installed;
+    }
+
+    std::uint64_t nonce = 0;
+    record_stage("legacy_guard_request");
+    if (!publish_main_thread_guard_request(address, expected, nonce)) {
+        log_line("legacy guard: request publish failed method=%p",
+                 static_cast<void*>(address));
+        return MainThreadGuardResult::Failed;
+    }
+
+    ShellUiHookAck ack{};
+    record_stage("legacy_guard_ack_wait");
+    if (!wait_for_native_hook_ack(getpid(), nonce, ack)) {
+        log_line("legacy guard: request timeout method=%p",
+                 static_cast<void*>(address));
+        return MainThreadGuardResult::Failed;
+    }
+
+    if (ack.status ==
+        static_cast<std::int32_t>(ShellUiHookStatus::UnsupportedFirmware)) {
+        log_line("legacy guard unsupported by controller method=%p",
+                 static_cast<void*>(address));
+        return MainThreadGuardResult::Unsupported;
+    }
+
+    if (ack.phase != static_cast<std::uint8_t>(
+            ShellUiHookAckPhase::MainThreadGuard) ||
+        ack.status != static_cast<std::int32_t>(ShellUiHookStatus::Success) ||
+        ack.verified == 0 || ack.detached == 0 || ack.auth_restored == 0) {
+        log_line(
+            "legacy guard failed method=%p status=%d read_rc=%d write_rc=%d "
+            "verified=%u restored=%u detached=%u auth_restored=%u phase=%u",
+            static_cast<void*>(address),
+            ack.status,
+            ack.read_rc,
+            ack.write_rc,
+            static_cast<unsigned>(ack.verified),
+            static_cast<unsigned>(ack.restored),
+            static_cast<unsigned>(ack.detached),
+            static_cast<unsigned>(ack.auth_restored),
+            static_cast<unsigned>(ack.phase));
+        return MainThreadGuardResult::Failed;
+    }
+
+    log_line(
+        "legacy main-thread guard online method=%p stopped_patch=1 "
+        "bytes_changed=1 verified=1",
+        static_cast<void*>(address));
+    record_stage("legacy_guard_ready");
+    return MainThreadGuardResult::Installed;
+}
+
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_5_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_6_shellui.log", "a");
     if (!fp)
         return;
 
@@ -585,6 +715,40 @@ bool replace_managed_handle(
     /* Match the hardware-stable v1.0.0 renderer: retain a pinned object. */
     handle = mono_gchandle_new_(object, 1);
     return handle != 0 && managed_target(handle) == object;
+}
+
+void release_managed_handle(std::uint32_t& handle) {
+    if (handle != 0 && mono_gchandle_free_)
+        mono_gchandle_free_(handle);
+    handle = 0;
+}
+
+bool refresh_game_scene() {
+    if (!g_domain || !g_find_scene_method || !mono_string_new_)
+        return false;
+
+    MonoDomain* active_domain = mono_domain_get_();
+    MonoString* game_path = mono_string_new_(
+        active_domain ? active_domain : g_domain,
+        "Game");
+    void* find_args[1] = {game_path};
+    MonoObject* game_scene = invoke(
+        g_find_scene_method, nullptr, find_args);
+    if (!game_scene)
+        return false;
+
+    if (managed_target(g_game_scene_handle) != game_scene) {
+        release_managed_handle(g_label_handle);
+        release_managed_handle(g_value_handle);
+        if (!replace_managed_handle(g_game_scene_handle, game_scene))
+            return false;
+        log_line(
+            "Game ContainerScene refreshed scene=%p handle=%u mode=%s",
+            static_cast<void*>(game_scene),
+            g_game_scene_handle,
+            g_background_render_mode ? "legacy-background" : "update-hook");
+    }
+    return true;
 }
 
 template <typename T>
@@ -776,6 +940,9 @@ bool set_label_text(MonoObject* label, const char* text) {
 bool apply_packet_on_render(const WirePacket& packet) {
     const auto decoded = decode_wire_packet(packet);
     if (!decoded)
+        return false;
+
+    if (!refresh_game_scene())
         return false;
 
     const OverlayFrame& frame = *decoded;
@@ -1127,50 +1294,65 @@ bool initialize_runtime() {
         app_system,
         "Sce.Vsh.ShellUI.AppSystem",
         "LayerManager");
-    MonoMethod* find_scene = layer_manager
+    g_find_scene_method = layer_manager
         ? mono_class_get_method_from_name_(
               layer_manager,
               "FindContainerSceneByPath",
               1)
         : nullptr;
-    if (!find_scene) {
+    if (!g_find_scene_method) {
         log_line("FindContainerSceneByPath unavailable");
         return false;
     }
 
-    MonoDomain* active_domain = mono_domain_get_();
-    MonoString* game_path = mono_string_new_(
-        active_domain ? active_domain : g_domain,
-        "Game");
-    void* find_args[1] = {game_path};
-    MonoObject* game_scene = invoke(find_scene, nullptr, find_args);
-    if (!game_scene) {
+    if (!refresh_game_scene()) {
         log_line("Game ContainerScene unavailable");
-        return false;
-    }
-    if (!replace_managed_handle(g_game_scene_handle, game_scene)) {
-        log_line("Game ContainerScene GC handle failed");
         return false;
     }
 
     record_stage("scene_ready");
 
-    MonoClass* application_class = mono_class_from_name_(
-        g_pui_image,
-        "Sce.PlayStation.PUI",
-        "Application");
-    record_stage("hook_setup");
+    /*
+     * Stage 8.6 first asks the controller for a one-byte, stopped-process
+     * legacy UI-thread guard.  Firmware 3.00-8.20 uses that path and never
+     * compiles or replaces Application.Update.  On newer firmware the guard
+     * request is rejected and the established Application.Update renderer is
+     * retained.
+     */
     g_hook_attempted = true;
-    if (!application_class || !install_update_hook(application_class)) {
-        log_line("Application.Update universal hook unavailable");
+    const MainThreadGuardResult guard = install_main_thread_guard();
+    if (guard == MainThreadGuardResult::Installed) {
+        g_background_render_mode = true;
+        log_line(
+            "renderer backend selected mode=legacy-background-pui "
+            "Application.Update=untouched");
+    } else if (guard == MainThreadGuardResult::Unsupported) {
+        MonoClass* application_class = mono_class_from_name_(
+            g_pui_image,
+            "Sce.PlayStation.PUI",
+            "Application");
+        record_stage("hook_setup");
+        if (!application_class || !install_update_hook(application_class)) {
+            log_line("Application.Update universal hook unavailable");
+            return false;
+        }
+        g_background_render_mode = false;
+        log_line("renderer backend selected mode=application-update-hook");
+    } else {
+        log_line(
+            "renderer backend selection failed; fail-closed without "
+            "Application.Update write");
         return false;
     }
 
     g_runtime_ready.store(true);
     log_line(
-        "runtime ready pid=%d scene_handle=%u gc_mode=pinned",
+        "runtime ready pid=%d scene_handle=%u gc_mode=pinned backend=%s",
         getpid(),
-        g_game_scene_handle);
+        g_game_scene_handle,
+        g_background_render_mode
+            ? "legacy-background-pui"
+            : "application-update-hook");
     return true;
 }
 
@@ -1269,6 +1451,14 @@ bool initialize_receiver() {
 
         g_sequence.store(packet.sequence);
         g_have_packet.store(true);
+
+        /*
+         * Legacy firmware renders from this attached Mono thread only after
+         * the controller has applied and verified the one-byte thread guard.
+         * Newer firmware continues to render from Application.Update.
+         */
+        if (g_background_render_mode)
+            apply_latest_state_on_render();
     }
 }
 
