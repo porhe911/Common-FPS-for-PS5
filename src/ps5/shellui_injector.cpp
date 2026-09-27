@@ -62,7 +62,7 @@ constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
 #elif defined(COMMON_FPS_UNIVERSAL_STAGE8)
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_5.log";
+    "/data/CommonFPS_universal_stage8_6.log";
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -680,9 +680,13 @@ bool ensure_shellui_renderer() {
                 "restored=%d detached=%d auth_restored=%d",
                 pid,
                 hook_report.sdk_version,
-                hook_report.eta_chain ? "eta-chain" : "native",
+                hook_report.main_thread_guard
+                    ? "thread-guard"
+                    : (hook_report.eta_chain ? "eta-chain" : "native"),
                 hook_report.backend,
-                hook_report.probe ? "probe" : "patch",
+                hook_report.probe
+                    ? "probe"
+                    : (hook_report.main_thread_guard ? "guard" : "patch"),
                 static_cast<unsigned long long>(
                     hook_report.method_address),
                 hook_report.displaced_size,
