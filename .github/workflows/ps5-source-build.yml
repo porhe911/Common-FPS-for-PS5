@@ -49,12 +49,12 @@ jobs:
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-Universal-Stage8.5-Game-Gated
+          name: Common-FPS-Universal-Stage8.6-Legacy-Safe
           path: |
-            dist/Common_FPS_PS5_UNIVERSAL_STAGE8_5_GAME_GATED.elf
-            dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_5_GAME_GATED.plugin
-            dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_5_GAME_GATED.elf
+            dist/Common_FPS_PS5_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf
+            dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_6_LEGACY_SAFE.plugin
+            dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf
             dist/SHA256SUMS.txt
-            docs/UNIVERSAL_STAGE8_5_CONTROLLER_PROBE_RU.md
+            docs/UNIVERSAL_STAGE8_6_LEGACY_SAFE_RENDER_RU.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
