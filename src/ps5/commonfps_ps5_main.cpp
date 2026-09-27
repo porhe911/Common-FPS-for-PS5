@@ -25,7 +25,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_5.log";
+    "/data/CommonFPS_universal_stage8_6.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,7 +186,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n"
+        "Common FPS Universal Stage 8.6 legacy-safe renderer + indirect scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -299,7 +299,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Do not inject the ShellUI renderer on the home screen.  Stage 8.5
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.6
          * proved that resolving and patching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
