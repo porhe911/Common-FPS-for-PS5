@@ -9,6 +9,7 @@
 #include "common_fps/layout.hpp"
 #include "common_fps/wire.hpp"
 #include "ps5_platform.hpp"
+#include "dce_fps_sampler.hpp"
 #include "shellui_injector.hpp"
 #include "state_sender.hpp"
 
@@ -25,7 +26,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_6.log";
+    "/data/CommonFPS_universal_stage8_7.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,14 +187,15 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.6 legacy-safe renderer + indirect scan\n"
+        "Common FPS Universal Stage 8.7 hybrid DCE + high-FW renderer\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
         "renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s read=mdbg "
+        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s+dce_fallback "
+        "read=mdbg+dce_ioctl highfw_guard=ptrace_io_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"
@@ -226,7 +228,8 @@ void write_worker_ready_record(
 void append_first_fps_record(
     pid_t game_pid,
     std::uintptr_t counter_address,
-    int fps) noexcept {
+    int fps,
+    const char* backend) noexcept {
 
     const int fd = open(
         kControllerLog,
@@ -239,9 +242,10 @@ void append_first_fps_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Sampler online pid=%d counter=0x%llx first_fps=%d "
-        "event_log=once_per_game_pid log_fd=closing\n",
+        "Sampler online pid=%d backend=%s counter=0x%llx first_fps=%d "
+        "event_log=once_per_backend_per_game_pid log_fd=closing\n",
         game_pid,
+        backend ? backend : "unknown",
         static_cast<unsigned long long>(counter_address),
         fps);
 
@@ -263,8 +267,10 @@ void append_first_fps_record(
 
     common_fps::ps5::Ps5Platform platform;
     common_fps::FpsSampler sampler(platform);
+    common_fps::ps5::DceFpsSampler dce_sampler(platform);
     common_fps::ps5::StateSender sender;
     pid_t reported_pid = -1;
+    pid_t dce_reported_pid = -1;
     pid_t stable_shellui_pid = -1;
     unsigned stable_shellui_observations = 0;
     pid_t stable_game_pid = -1;
@@ -299,7 +305,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Do not inject the ShellUI renderer on the home screen.  Stage 8.6
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.7
          * proved that resolving and patching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
@@ -323,23 +329,49 @@ void append_first_fps_record(
         const bool game_process_ready =
             stable_game_pid > 0 && stable_game_observations >= 3;
 
+        std::optional<int> process_fps;
         if (!sampler.attached()) {
-            have_fps = false;
             if (observed_game_pid)
                 (void)sampler.attach(*observed_game_pid);
         } else {
-            const auto fps = sampler.sample();
-            if (fps) {
-                have_fps = true;
-                latest_fps = *fps;
-                if (sampler.pid() != reported_pid) {
-                    reported_pid = sampler.pid();
-                    append_first_fps_record(
-                        reported_pid,
-                        sampler.counter_address(),
-                        *fps);
-                }
+            process_fps = sampler.sample();
+        }
+
+        /*
+         * Stage 8.7 keeps the per-game VideoOut counter as the preferred
+         * source, but also samples the display-controller flip counter.
+         * DCE requires no game-process memory layout and therefore provides a
+         * firmware-neutral fallback when dynamic VideoOut discovery cannot
+         * resolve a counter on old or new system software.
+         */
+        const auto dce_fps = game_process_ready
+            ? dce_sampler.sample()
+            : std::optional<int>{};
+
+        if (process_fps) {
+            have_fps = true;
+            latest_fps = *process_fps;
+            if (sampler.pid() != reported_pid) {
+                reported_pid = sampler.pid();
+                append_first_fps_record(
+                    reported_pid,
+                    sampler.counter_address(),
+                    *process_fps,
+                    "videoout-process");
             }
+        } else if (dce_fps && observed_game_pid) {
+            have_fps = true;
+            latest_fps = *dce_fps;
+            if (*observed_game_pid != dce_reported_pid) {
+                dce_reported_pid = *observed_game_pid;
+                append_first_fps_record(
+                    dce_reported_pid,
+                    0,
+                    *dce_fps,
+                    "dce-fallback");
+            }
+        } else {
+            have_fps = false;
         }
 
         if (!renderer_online && game_process_ready &&
