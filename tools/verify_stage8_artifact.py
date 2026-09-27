@@ -73,7 +73,7 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.9 hybrid DCE + high-FW renderer"
+            b"Common FPS Universal Stage 8.9 DCE standby + high-FW renderer"
             in elf,
             "Stage 8.9 runtime marker missing",
         ),
