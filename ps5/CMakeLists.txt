@@ -29,7 +29,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_7_DCE_HIGHFW"
+    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -83,7 +83,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -107,11 +107,11 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
+    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # Stage 8.7 hybrid DCE sampler, stopped guard/hook transactions and high-FW fallback.
+    # Stage 8.8 authenticated adaptive DCE sampler and high-FW fallback.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
@@ -182,11 +182,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_7_DCE_HIGHFW.plugin"
-            --title-id CFPS00055
-            --version 1.56
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.plugin"
+            --title-id CFPS00056
+            --version 1.57
 )
