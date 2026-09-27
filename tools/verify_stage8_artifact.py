@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.5 universal diagnostic ELF/plugin boundary."""
+"""Verify the Stage 8.5 game-gated universal diagnostic boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00053\0" + b"1.53\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00053\0" + b"1.54\0"
 
 
 def digest(data: bytes) -> str:
@@ -51,7 +51,7 @@ def main() -> int:
     if len(sys.argv) != 4:
         print(
             "usage: verify_stage8_artifact.py "
-            "stage8_5.elf stage8_5.plugin stage8_5_renderer.elf",
+            "game_gated.elf game_gated.plugin game_gated_renderer.elf",
             file=sys.stderr,
         )
         return 2
@@ -83,6 +83,11 @@ def main() -> int:
             "stopped MDBG hook marker missing",
         ),
         (b"stability_gate=10" in elf, "startup stability gate missing"),
+        (b"game_gate=process_present" in elf, "game-process injection gate missing"),
+        (
+            b"renderer_injection=deferred_until_game" in elf,
+            "deferred renderer injection marker missing",
+        ),
         (
             b"sampler=videoout_indirect_dynamic_1s" in elf,
             "indirect sampler marker missing",

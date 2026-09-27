@@ -189,6 +189,7 @@ void write_worker_ready_record(
         "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
+        "game_gate=process_present renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
         "mono_gc=pinned sampler=videoout_indirect_dynamic_1s read=mdbg "
@@ -294,17 +295,24 @@ void append_first_fps_record(
             renderer_online = false;
         }
 
-        if (!renderer_online && stable_shellui_observations >= 10) {
-            renderer_online =
-                common_fps::ps5::ensure_shellui_renderer();
-        }
-
+        /*
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.5
+         * proved that resolving and patching Application.Update before a
+         * game owns the "Game" container can make ShellUI restart.  The
+         * controller remains loaded, but the renderer is started only after
+         * the process sampler has observed a real game process.  This also
+         * keeps autoload completely inert between games and across reboot.
+         */
+        bool game_active = false;
         if (!sampler.attached()) {
             have_fps = false;
             const auto game_pid = platform.find_game_process();
-            if (game_pid)
+            if (game_pid) {
+                game_active = true;
                 (void)sampler.attach(*game_pid);
+            }
         } else {
+            game_active = true;
             const auto fps = sampler.sample();
             if (fps) {
                 have_fps = true;
@@ -317,6 +325,14 @@ void append_first_fps_record(
                         *fps);
                 }
             }
+            /* sample() resets the sampler when the game closes. */
+            game_active = sampler.attached();
+        }
+
+        if (!renderer_online && game_active &&
+            stable_shellui_observations >= 10) {
+            renderer_online =
+                common_fps::ps5::ensure_shellui_renderer();
         }
 
         if (renderer_online) {

@@ -36,7 +36,7 @@ void write_online_marker() {
     /*
      * Returning an injected ShellUI ELF thread can destabilize the console.
      * A compatibility or socket failure therefore remains inert and resident
-     * instead of returning through the loader. Stage 8.5 preserves that proven
+     * instead of returning through the loader. Stage 8.5 game-gated mode preserves that proven
      * lifecycle and patches a native hook only while ShellUI is stopped.
      */
     for (;;)
