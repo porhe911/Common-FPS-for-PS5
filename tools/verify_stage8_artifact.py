@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.7 hybrid DCE/high-firmware renderer boundary."""
+"""Verify the Stage 8.8 authenticated adaptive DCE renderer boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00055\0" + b"1.56\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00056\0" + b"1.57\0"
 
 
 def digest(data: bytes) -> str:
@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.7 hybrid DCE + high-FW renderer"
+            b"Common FPS Universal Stage 8.8 hybrid DCE + high-FW renderer"
             in elf,
-            "Stage 8.7 runtime marker missing",
+            "Stage 8.8 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -92,12 +92,24 @@ def main() -> int:
             "deferred renderer injection marker missing",
         ),
         (
-            b"sampler=videoout_indirect_dynamic_1s+dce_fallback" in elf,
-            "hybrid sampler marker missing",
+            b"sampler=videoout_indirect_dynamic_1s+hen_shared+dce_auth_adaptive" in elf,
+            "authenticated adaptive sampler marker missing",
         ),
         (
-            b"DCE sampler online" in elf,
-            "DCE fallback sampler missing",
+            b"Fallback sampler online" in elf,
+            "fallback sampler code missing",
+        ),
+        (
+            b"privileged-window" in elf,
+            "DCE auth-window open path missing",
+        ),
+        (
+            b"DCE adaptive counter selected" in elf,
+            "adaptive DCE counter discovery missing",
+        ),
+        (
+            b"/system_tmp/fps_sample" in elf,
+            "shared HEN FPS fallback missing",
         ),
         (
             b"/dev/dce" in elf,
@@ -109,11 +121,11 @@ def main() -> int:
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8_7.log" in elf,
+            b"/data/CommonFPS_universal_stage8_8.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_7_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_8_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -148,7 +160,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_stage8_7_hook_request.bin" in renderer,
+            b"commonfps_stage8_8_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (
