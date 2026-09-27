@@ -55,6 +55,6 @@ jobs:
             dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_4_STOPPED_CHAIN_HOOK.plugin
             dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_4_STOPPED_CHAIN_HOOK.elf
             dist/SHA256SUMS.txt
-            docs/UNIVERSAL_STAGE8_4_STOPPED_CHAIN_HOOK_RU.md
+            docs/UNIVERSAL_STAGE8_4_SAFE_SELF_READ_RU.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
