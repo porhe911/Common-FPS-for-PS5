@@ -1315,10 +1315,9 @@ bool initialize_runtime() {
 
     /*
      * Stage 8.7 first asks the controller for a one-byte, stopped-process
-     * legacy UI-thread guard.  Firmware 3.00-8.20 uses that path and never
-     * compiles or replaces Application.Update.  On newer firmware the guard
-     * request is rejected and the established Application.Update renderer is
-     * retained.
+     * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families
+     * use ptrace I/O. FW 9.60 intentionally rejects the guard so the existing
+     * hardware-proven Application.Update chain renderer is retained.
      */
     g_hook_attempted = true;
     const MainThreadGuardResult guard = install_main_thread_guard();
