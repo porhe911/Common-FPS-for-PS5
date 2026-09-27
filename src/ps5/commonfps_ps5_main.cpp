@@ -27,7 +27,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_7.log";
+    "/data/CommonFPS_universal_stage8_8.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -188,14 +188,14 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.7 hybrid DCE + high-FW renderer\n"
+        "Common FPS Universal Stage 8.8 hybrid DCE + high-FW renderer\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
         "renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s+dce_fallback "
+        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s+hen_shared+dce_auth_adaptive "
         "read=mdbg+dce_ioctl highfw_guard=ptrace_io_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
@@ -306,7 +306,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Do not inject the ShellUI renderer on the home screen.  Stage 8.7
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.8
          * proved that resolving and patching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
@@ -343,7 +343,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Stage 8.7 keeps the per-game VideoOut counter as the preferred
+         * Stage 8.8 keeps the per-game VideoOut counter as the preferred
          * source, but also samples the display-controller flip counter.
          * DCE requires no game-process memory layout and therefore provides a
          * firmware-neutral fallback when dynamic VideoOut discovery cannot
@@ -373,7 +373,7 @@ void append_first_fps_record(
                     dce_reported_pid,
                     0,
                     *dce_fps,
-                    "dce-fallback");
+                    dce_sampler.backend_name());
             }
         } else {
             have_fps = false;
