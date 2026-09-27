@@ -408,7 +408,7 @@ static void test_shellui_hook_protocol_checksum() {
     request.nonce = 0x12345678ULL;
     request.method_address = 0x100000ULL;
     request.hook_address = 0x200000ULL;
-    request.trampoline_address = 0x300000ULL;
+    request.original_call_address = 0x300000ULL;
     request.displaced_size = 16;
     request.expected[0] = 0x55;
     request.desired[0] = 0xff;
@@ -417,6 +417,62 @@ static void test_shellui_hook_protocol_checksum() {
     assert(request.checksum == shellui_hook_request_checksum(request));
     request.expected[1] ^= 1U;
     assert(request.checksum != shellui_hook_request_checksum(request));
+}
+
+static void test_hook_request_validates_exact_destination_and_tail() {
+    ShellUiHookRequest request{};
+    request.pid = 55;
+    request.nonce = 1;
+    request.method_address = 0x100000;
+    request.hook_address = 0x200000;
+    request.original_call_address = 0x300000;
+    request.displaced_size = 14;
+    std::memcpy(request.expected, kShellUiAbsoluteJumpPrefix, 6);
+    std::memcpy(request.expected + 6, &request.original_call_address, 8);
+    request.expected[14] = 0x75;
+    request.expected[15] = 0x31;
+    std::memcpy(request.desired, request.expected, 16);
+    std::memcpy(request.desired + 6, &request.hook_address, 8);
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(shellui_hook_is_eta_chain(request));
+    assert(shellui_hook_request_is_valid(request, 55));
+    assert(!shellui_hook_request_is_valid(request, 56));
+
+    const auto valid = request;
+    request.desired[6] ^= 1;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_hook_request_is_valid(request, 55));
+
+    request = valid;
+    request.desired[15] ^= 1;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_hook_request_is_valid(request, 55));
+
+    request = valid;
+    request.original_call_address = 0x400000;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_hook_request_is_valid(request, 55));
+
+    request = valid;
+    request.expected[0] = 0x55; // Native prologue request, 16 displaced bytes.
+    request.displaced_size = 16;
+    request.desired[14] = request.desired[15] = 0x90;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_hook_is_eta_chain(request));
+    assert(shellui_hook_request_is_valid(request, 55));
+    request.desired[14] = 0xc3; // No extra executable instruction is permitted.
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_hook_request_is_valid(request, 55));
+}
+
+static void test_stopped_hook_backend_is_firmware_guarded() {
+    using Backend = ShellUiHookBackend;
+    assert(shellui_hook_backend(0x04510001U, true) == Backend::Mdbg);
+    assert(shellui_hook_backend(0x07600007U, false) == Backend::Mdbg);
+    assert(shellui_hook_backend(0x09600000U, true) == Backend::PtraceIo);
+    assert(shellui_hook_backend(0x09600000U, false) == Backend::Unsupported);
+    assert(shellui_hook_backend(0U, true) == Backend::Unsupported);
+    assert(shellui_hook_backend(0x10010000U, true) == Backend::Unsupported);
 }
 
 int main() {
@@ -428,6 +484,8 @@ int main() {
     test_dynamic_scan_prioritizes_indirect_chain();
     test_fixed_table_is_only_used_on_proven_firmware();
     test_shellui_hook_protocol_checksum();
+    test_hook_request_validates_exact_destination_and_tail();
+    test_stopped_hook_backend_is_firmware_guarded();
 
     std::cout << "Common FPS alpha2 core tests: PASS\n";
     return 0;

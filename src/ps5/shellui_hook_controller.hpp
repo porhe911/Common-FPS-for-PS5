@@ -24,6 +24,8 @@ struct ShellUiHookPatchReport {
     std::uint32_t sdk_version = 0;
     std::uint64_t method_address = 0;
     std::uint32_t displaced_size = 0;
+    bool eta_chain = false;
+    const char* backend = "none";
     int read_rc = -1;
     int write_rc = -1;
     bool expected_matched = false;
@@ -33,11 +35,11 @@ struct ShellUiHookPatchReport {
     bool auth_restored = false;
 };
 
-/* Remove stale Stage 8.2 request/ack files before a new renderer starts. */
+/* Remove stale Stage 8.3 request/ack files before a new renderer starts. */
 void clear_shellui_hook_protocol_files() noexcept;
 
 /*
- * Apply one native Application.Update patch while SceShellUI is stopped.
+ * Apply one Application.Update patch while SceShellUI is stopped.
  * No game process is written and unsupported firmware fails closed.
  */
 [[nodiscard]] ShellUiHookPollResult poll_and_apply_shellui_hook(

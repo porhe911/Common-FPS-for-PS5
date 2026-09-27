@@ -24,8 +24,6 @@ namespace common_fps::ps5 {
 namespace {
 
 constexpr std::uint64_t kPtraceAuthId = 0x4800000000010003ULL;
-constexpr std::uint32_t kMinimumMdbgWriteSdk = 0x03000000U;
-constexpr std::uint32_t kMaximumMdbgWriteSdk = 0x08200000U;
 
 template <typename T>
 bool read_exact_file(const char* path, T& value) noexcept {
@@ -63,23 +61,6 @@ bool write_exact_file_atomic(
         return false;
     }
     return true;
-}
-
-bool request_is_valid(
-    const ShellUiHookRequest& request,
-    pid_t shellui_pid) noexcept {
-
-    return request.magic == kShellUiHookRequestMagic &&
-        request.version == kShellUiHookProtocolVersion &&
-        request.pid == shellui_pid &&
-        request.nonce != 0 &&
-        request.method_address >= 0x10000ULL &&
-        request.hook_address >= 0x10000ULL &&
-        request.trampoline_address >= 0x10000ULL &&
-        request.patch_size == kShellUiHookPatchSize &&
-        request.displaced_size >= 14 &&
-        request.displaced_size <= kShellUiHookPatchSize &&
-        request.checksum == shellui_hook_request_checksum(request);
 }
 
 void write_ack(
@@ -121,27 +102,47 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
     if (!read_exact_file(kShellUiHookRequestPath, request))
         return ShellUiHookPollResult::NoRequest;
 
-    /* Consume exactly one atomically-published request. */
+    /* Consume one complete request; short files are retried on the next poll. */
     (void)unlink(kShellUiHookRequestPath);
 
     report.sdk_version = stable_sampler::firmware_sdk_version();
     report.method_address = request.method_address;
     report.displaced_size = request.displaced_size;
 
-    if (!request_is_valid(request, shellui_pid)) {
+    if (!shellui_hook_request_is_valid(request, shellui_pid)) {
         report.status = ShellUiHookStatus::InvalidRequest;
         write_ack(request, report);
         return ShellUiHookPollResult::Failed;
     }
 
-    const std::uint32_t sdk_family =
-        report.sdk_version & 0xffff0000U;
-    if (sdk_family < kMinimumMdbgWriteSdk ||
-        sdk_family > kMaximumMdbgWriteSdk) {
+    report.eta_chain = shellui_hook_is_eta_chain(request);
+    const ShellUiHookBackend backend =
+        shellui_hook_backend(report.sdk_version, report.eta_chain);
+    if (backend == ShellUiHookBackend::Unsupported) {
         report.status = ShellUiHookStatus::UnsupportedFirmware;
         write_ack(request, report);
         return ShellUiHookPollResult::Failed;
     }
+
+    report.backend = backend == ShellUiHookBackend::Mdbg
+        ? "mdbg" : "ptrace-io";
+    const auto read_target = [&](void* destination, std::size_t size) {
+        if (backend == ShellUiHookBackend::Mdbg)
+            return mdbg_copyout(shellui_pid,
+                static_cast<intptr_t>(request.method_address), destination, size);
+        return pt_copyout(shellui_pid,
+            static_cast<intptr_t>(request.method_address), destination, size);
+    };
+    const auto write_target = [&](const std::uint8_t* bytes) {
+        /* An existing absolute jump only needs its destination replaced. */
+        const std::size_t offset = report.eta_chain ? 6U : 0U;
+        const std::size_t size = report.eta_chain ? 8U : kShellUiHookPatchSize;
+        const intptr_t address =
+            static_cast<intptr_t>(request.method_address + offset);
+        if (backend == ShellUiHookBackend::Mdbg)
+            return mdbg_copyin(shellui_pid, bytes + offset, address, size);
+        return pt_copyin(shellui_pid, bytes + offset, address, size);
+    };
 
     const pid_t self = getpid();
     const std::uint64_t original_auth = kernel_get_ucred_authid(self);
@@ -161,11 +162,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         report.status = ShellUiHookStatus::AttachFailure;
     } else {
         attached = true;
-        report.read_rc = mdbg_copyout(
-            shellui_pid,
-            static_cast<intptr_t>(request.method_address),
-            observed.data(),
-            observed.size());
+        report.read_rc = read_target(observed.data(), observed.size());
 
         if (report.read_rc != 0 ||
             std::memcmp(
@@ -175,17 +172,9 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
             report.status = ShellUiHookStatus::ExpectedBytesMismatch;
         } else {
             report.expected_matched = true;
-            report.write_rc = mdbg_copyin(
-                shellui_pid,
-                request.desired,
-                static_cast<intptr_t>(request.method_address),
-                kShellUiHookPatchSize);
+            report.write_rc = write_target(request.desired);
 
-            const int verify_rc = mdbg_copyout(
-                shellui_pid,
-                static_cast<intptr_t>(request.method_address),
-                verified.data(),
-                verified.size());
+            const int verify_rc = read_target(verified.data(), verified.size());
             report.verified = verify_rc == 0 &&
                 std::memcmp(
                     verified.data(),
@@ -207,19 +196,11 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
                 if (still_original) {
                     report.restored = true;
                 } else {
-                    const int restore_rc = mdbg_copyin(
-                        shellui_pid,
-                        request.expected,
-                        static_cast<intptr_t>(request.method_address),
-                        kShellUiHookPatchSize);
+                    const int restore_rc = write_target(request.expected);
                     std::array<std::uint8_t, kShellUiHookPatchSize>
                         restore_check{};
                     report.restored = restore_rc == 0 &&
-                        mdbg_copyout(
-                            shellui_pid,
-                            static_cast<intptr_t>(request.method_address),
-                            restore_check.data(),
-                            restore_check.size()) == 0 &&
+                        read_target(restore_check.data(), restore_check.size()) == 0 &&
                         std::memcmp(
                             restore_check.data(),
                             request.expected,

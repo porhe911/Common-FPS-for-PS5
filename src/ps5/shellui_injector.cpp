@@ -62,7 +62,7 @@ constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
 #elif defined(COMMON_FPS_UNIVERSAL_STAGE8)
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_2.log";
+    "/data/CommonFPS_universal_stage8_3.log";
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -673,12 +673,14 @@ bool ensure_shellui_renderer() {
             poll_and_apply_shellui_hook(pid, hook_report);
         if (hook_result != ShellUiHookPollResult::NoRequest) {
             log_line(
-                "ShellUI native hook request pid=%d sdk=0x%08x "
+                "ShellUI hook request pid=%d sdk=0x%08x mode=%s backend=%s "
                 "method=0x%llx displaced=%u status=%d "
                 "read_rc=%d write_rc=%d expected=%d verified=%d "
                 "restored=%d detached=%d auth_restored=%d",
                 pid,
                 hook_report.sdk_version,
+                hook_report.eta_chain ? "eta-chain" : "native",
+                hook_report.backend,
                 static_cast<unsigned long long>(
                     hook_report.method_address),
                 hook_report.displaced_size,
