@@ -485,6 +485,41 @@ static void test_shellui_hook_probe_request() {
     assert(!shellui_hook_probe_request_is_valid(request, 55));
 }
 
+static void test_legacy_main_thread_guard_request() {
+    ShellUiHookRequest request{};
+    request.pid = 76;
+    request.nonce = 0x87654321ULL;
+    request.method_address = 0x410000ULL;
+    request.hook_address = request.method_address;
+    request.original_call_address = 0;
+    request.displaced_size = 1;
+    request.expected[0] = 0x55;
+    std::memcpy(request.desired, request.expected, kShellUiHookPatchSize);
+    request.desired[0] = 0xc3;
+    request.checksum = shellui_hook_request_checksum(request);
+
+    assert(shellui_hook_request_is_main_thread_guard(request));
+    assert(shellui_main_thread_guard_request_is_valid(request, 76));
+    assert(!shellui_main_thread_guard_request_is_valid(request, 77));
+    assert(shellui_main_thread_guard_backend(0x04510001U) ==
+        ShellUiHookBackend::Mdbg);
+    assert(shellui_main_thread_guard_backend(0x07600007U) ==
+        ShellUiHookBackend::Mdbg);
+    assert(shellui_main_thread_guard_backend(0x09600000U) ==
+        ShellUiHookBackend::Unsupported);
+
+    const auto valid = request;
+    request.desired[1] ^= 1U;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_main_thread_guard_request_is_valid(request, 76));
+
+    request = valid;
+    request.expected[0] = 0xc3;
+    request.desired[0] = 0xc3;
+    request.checksum = shellui_hook_request_checksum(request);
+    assert(!shellui_main_thread_guard_request_is_valid(request, 76));
+}
+
 static void test_stopped_hook_backend_is_firmware_guarded() {
     using Backend = ShellUiHookBackend;
     assert(shellui_hook_backend(0x04510001U, true) == Backend::Mdbg);
@@ -506,6 +541,7 @@ int main() {
     test_shellui_hook_protocol_checksum();
     test_hook_request_validates_exact_destination_and_tail();
     test_shellui_hook_probe_request();
+    test_legacy_main_thread_guard_request();
     test_stopped_hook_backend_is_firmware_guarded();
 
     std::cout << "Common FPS alpha2 core tests: PASS\n";
