@@ -6,7 +6,6 @@
 
 #include "dce_fps_sampler.hpp"
 
-#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -147,7 +146,7 @@ std::optional<int> DceFpsSampler::sample() noexcept {
     if (fps < 1.0 || fps > 245.0)
         return std::nullopt;
 
-    const int rounded = static_cast<int>(std::lround(fps));
+    const int rounded = static_cast<int>(fps + 0.5);
     if (rounded < 1 || rounded > 245)
         return std::nullopt;
 
