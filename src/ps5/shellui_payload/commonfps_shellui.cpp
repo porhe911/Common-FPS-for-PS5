@@ -1064,12 +1064,15 @@ bool initialize_runtime() {
     if (g_runtime_ready.load())
         return true;
 
+    record_stage("mono_root_call");
     g_domain = mono_get_root_domain_();
     if (!g_domain) {
         log_line("root domain failed");
         return false;
     }
     mono_thread_attach_(g_domain);
+
+    record_stage("mono_attached");
 
     g_pui_image = open_image(kPuiDll);
     MonoImage* app_system = open_image(kAppSystemDll);
@@ -1079,6 +1082,8 @@ bool initialize_runtime() {
                  static_cast<void*>(app_system));
         return false;
     }
+
+    record_stage("managed_images_ready");
 
     MonoClass* layer_manager = mono_class_from_name_(
         app_system,
@@ -1110,10 +1115,13 @@ bool initialize_runtime() {
         return false;
     }
 
+    record_stage("scene_ready");
+
     MonoClass* application_class = mono_class_from_name_(
         g_pui_image,
         "Sce.PlayStation.PUI",
         "Application");
+    record_stage("hook_setup");
     if (!application_class || !install_update_hook(application_class)) {
         log_line("Application.Update universal hook unavailable");
         return false;

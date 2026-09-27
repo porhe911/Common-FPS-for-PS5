@@ -5,6 +5,7 @@
  */
 
 #include "commonfps_shellui.hpp"
+#include "common_fps/shellui_stage.hpp"
 
 #include <cstdio>
 #include <unistd.h>
@@ -44,6 +45,17 @@ void write_online_marker() {
 
 } // namespace
 
+namespace common_fps::ps5::shellui {
+
+void record_stage(const char* stage) noexcept {
+    if (FILE* fp = std::fopen(kShellUiStagePath, "w")) {
+        std::fprintf(fp, "%d %.47s\n", getpid(), stage);
+        std::fclose(fp);
+    }
+}
+
+} // namespace common_fps::ps5::shellui
+
 #if defined(COMMON_FPS_TEST23_PARK_BEFORE_RUNTIME)
 extern "C" {
 /*
@@ -65,6 +77,8 @@ void* elf_main(void* payload_args) {
 
     /* A shared renderer does not start the PS5 payload CRT in SceShellUI. */
     (void)payload_args;
+
+    record_stage("entry");
 
     if (FILE* fp = std::fopen(kLog, "w")) {
         std::fputs(
@@ -98,8 +112,12 @@ void* elf_main(void* payload_args) {
     if (!runtime_ready)
         park_renderer_failure("runtime");
 
+    record_stage("runtime_ready");
+
     if (!initialize_receiver())
         park_renderer_failure("receiver");
+
+    record_stage("receiver_ready");
 
     write_online_marker();
     run_receiver_loop();
