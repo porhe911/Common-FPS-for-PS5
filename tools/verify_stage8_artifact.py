@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Stage 8.8 authenticated adaptive DCE renderer boundary."""
+"""Verify the Stage 8.9 DCE standby renderer boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00056\0" + b"1.57\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00057\0" + b"1.58\0"
 
 
 def digest(data: bytes) -> str:
@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS Universal Stage 8.8 hybrid DCE + high-FW renderer"
+            b"Common FPS Universal Stage 8.9 hybrid DCE + high-FW renderer"
             in elf,
-            "Stage 8.8 runtime marker missing",
+            "Stage 8.9 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -92,8 +92,16 @@ def main() -> int:
             "deferred renderer injection marker missing",
         ),
         (
-            b"sampler=videoout_indirect_dynamic_1s+hen_shared+dce_auth_adaptive" in elf,
-            "authenticated adaptive sampler marker missing",
+            b"sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe" in elf,
+            "DCE standby sampler marker missing",
+        ),
+        (
+            b"Sampler policy pid=%d state=%s backend=%s" in elf,
+            "sampler standby policy logging missing",
+        ),
+        (
+            b"dce-miss-wake" in elf,
+            "DCE fallback wake path missing",
         ),
         (
             b"Fallback sampler online" in elf,
@@ -121,11 +129,11 @@ def main() -> int:
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_universal_stage8_8.log" in elf,
+            b"/data/CommonFPS_universal_stage8_9.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_universal_stage8_8_shellui.log" in renderer,
+            b"/data/CommonFPS_universal_stage8_9_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -160,7 +168,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_stage8_8_hook_request.bin" in renderer,
+            b"commonfps_stage8_9_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (
