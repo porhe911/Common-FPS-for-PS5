@@ -35,10 +35,11 @@ struct ShellUiHookPatchReport {
     bool detached = false;
     bool auth_restored = false;
     bool probe = false;
+    bool main_thread_guard = false;
     std::array<std::uint8_t, kShellUiHookPatchSize> observed{};
 };
 
-/* Remove stale Stage 8.5 request/ack files before a new renderer starts. */
+/* Remove stale Stage 8.6 request/ack files before a new renderer starts. */
 void clear_shellui_hook_protocol_files() noexcept;
 
 /*
