@@ -8,6 +8,7 @@
 
 #include "common_fps/shellui_hook_protocol.hpp"
 
+#include <array>
 #include <cstdint>
 #include <sys/types.h>
 
@@ -33,9 +34,11 @@ struct ShellUiHookPatchReport {
     bool restored = false;
     bool detached = false;
     bool auth_restored = false;
+    bool probe = false;
+    std::array<std::uint8_t, kShellUiHookPatchSize> observed{};
 };
 
-/* Remove stale Stage 8.4 request/ack files before a new renderer starts. */
+/* Remove stale Stage 8.5 request/ack files before a new renderer starts. */
 void clear_shellui_hook_protocol_files() noexcept;
 
 /*

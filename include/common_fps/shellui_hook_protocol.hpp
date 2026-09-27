@@ -14,25 +14,30 @@
 namespace common_fps {
 
 inline constexpr const char* kShellUiHookRequestPath =
-    "/system_tmp/commonfps_stage8_4_hook_request.bin";
+    "/system_tmp/commonfps_stage8_5_hook_request.bin";
 inline constexpr const char* kShellUiHookRequestTempPath =
-    "/system_tmp/commonfps_stage8_4_hook_request.tmp";
+    "/system_tmp/commonfps_stage8_5_hook_request.tmp";
 inline constexpr const char* kShellUiHookAckPath =
-    "/system_tmp/commonfps_stage8_4_hook_ack.bin";
+    "/system_tmp/commonfps_stage8_5_hook_ack.bin";
 inline constexpr const char* kShellUiHookAckTempPath =
-    "/system_tmp/commonfps_stage8_4_hook_ack.tmp";
+    "/system_tmp/commonfps_stage8_5_hook_ack.tmp";
 
 inline constexpr std::uint64_t kShellUiHookRequestMagic =
-    0x345145524b484643ULL; /* "CFHKREQ4" */
+    0x355145524b484643ULL; /* "CFHKREQ5" */
 inline constexpr std::uint64_t kShellUiHookAckMagic =
-    0x344b43414b484643ULL; /* "CFHKACK4" */
-inline constexpr std::uint32_t kShellUiHookProtocolVersion = 4;
+    0x354b43414b484643ULL; /* "CFHKACK5" */
+inline constexpr std::uint32_t kShellUiHookProtocolVersion = 5;
 inline constexpr std::size_t kShellUiHookPatchSize = 16;
 inline constexpr std::uint8_t kShellUiAbsoluteJumpPrefix[6] = {
     0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
 };
 
 enum class ShellUiHookBackend { Unsupported, Mdbg, PtraceIo };
+
+enum class ShellUiHookAckPhase : std::uint8_t {
+    Patch = 0,
+    Probe = 1,
+};
 
 inline ShellUiHookBackend shellui_hook_backend(
     std::uint32_t sdk, bool eta_chain) noexcept {
@@ -87,12 +92,15 @@ struct ShellUiHookAck {
     std::uint8_t restored = 0;
     std::uint8_t detached = 0;
     std::uint8_t auth_restored = 0;
+    std::uint8_t phase =
+        static_cast<std::uint8_t>(ShellUiHookAckPhase::Patch);
+    std::uint8_t observed[kShellUiHookPatchSize]{};
     std::uint32_t checksum = 0;
 };
 #pragma pack(pop)
 
 static_assert(sizeof(ShellUiHookRequest) == 92);
-static_assert(sizeof(ShellUiHookAck) == 44);
+static_assert(sizeof(ShellUiHookAck) == 61);
 
 inline std::uint32_t shellui_hook_checksum(
     const void* data,
@@ -129,23 +137,53 @@ inline bool shellui_hook_is_eta_chain(
                        sizeof(kShellUiAbsoluteJumpPrefix)) == 0;
 }
 
-inline bool shellui_hook_request_is_valid(
+inline bool shellui_user_address(std::uint64_t address) noexcept {
+    return address >= 0x10000ULL && address < 0x0000800000000000ULL;
+}
+
+inline bool shellui_hook_request_common_is_valid(
     const ShellUiHookRequest& request, std::int32_t pid) noexcept {
-    const auto user_address = [](std::uint64_t address) {
-        return address >= 0x10000ULL && address < 0x0000800000000000ULL;
-    };
     if (request.magic != kShellUiHookRequestMagic ||
         request.version != kShellUiHookProtocolVersion ||
         request.pid != pid || pid <= 0 || request.nonce == 0 ||
-        !user_address(request.method_address) ||
-        !user_address(request.method_address + kShellUiHookPatchSize - 1) ||
-        !user_address(request.hook_address) ||
-        !user_address(request.original_call_address) ||
+        !shellui_user_address(request.method_address) ||
+        !shellui_user_address(request.method_address + kShellUiHookPatchSize - 1) ||
+        !shellui_user_address(request.hook_address) ||
+        request.patch_size != kShellUiHookPatchSize ||
+        request.checksum != shellui_hook_request_checksum(request))
+        return false;
+
+    return true;
+}
+
+inline bool shellui_hook_request_is_probe(
+    const ShellUiHookRequest& request) noexcept {
+    return request.displaced_size == 0;
+}
+
+inline bool shellui_hook_probe_request_is_valid(
+    const ShellUiHookRequest& request, std::int32_t pid) noexcept {
+
+    if (!shellui_hook_request_common_is_valid(request, pid) ||
+        request.original_call_address != 0 ||
+        !shellui_hook_request_is_probe(request))
+        return false;
+
+    for (std::size_t i = 0; i < kShellUiHookPatchSize; ++i)
+        if (request.expected[i] != 0 || request.desired[i] != 0)
+            return false;
+    return true;
+}
+
+inline bool shellui_hook_request_is_valid(
+    const ShellUiHookRequest& request, std::int32_t pid) noexcept {
+
+    if (!shellui_hook_request_common_is_valid(request, pid) ||
+        !shellui_user_address(request.original_call_address) ||
         request.original_call_address == request.hook_address ||
         request.original_call_address == request.method_address ||
-        request.patch_size != kShellUiHookPatchSize ||
         request.displaced_size < 14 || request.displaced_size > 16 ||
-        request.checksum != shellui_hook_request_checksum(request) ||
+        shellui_hook_request_is_probe(request) ||
         std::memcmp(request.desired, kShellUiAbsoluteJumpPrefix, 6) != 0)
         return false;
 
@@ -170,6 +208,16 @@ inline bool shellui_hook_request_is_valid(
         if (request.desired[i] != request.expected[i])
             return false;
     return true;
+}
+
+inline ShellUiHookBackend shellui_hook_probe_backend(
+    std::uint32_t sdk) noexcept {
+    const std::uint32_t family = sdk & 0xffff0000U;
+    if (family >= 0x03000000U && family <= 0x08200000U)
+        return ShellUiHookBackend::Mdbg;
+    if (family == 0x09600000U)
+        return ShellUiHookBackend::PtraceIo;
+    return ShellUiHookBackend::Unsupported;
 }
 
 } // namespace common_fps

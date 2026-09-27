@@ -21,7 +21,7 @@ namespace {
 #if defined(PS5)
 void sampler_log(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_4.log",
+        "/data/CommonFPS_universal_stage8_5.log",
         "a");
     if (!fp)
         return;
@@ -172,7 +172,7 @@ bool FpsSampler::resolve_counter_address() {
      * FW 7.60 proved that the 9.60 table offset may contain only zeroes.
      * Stage 8.1 proved that mixing thousands of direct-pointer false matches
      * into one bounded array can evict every real indirect VideoOut chain.
-     * Stage 8.4 therefore scans the same read-only window, but records only
+     * Stage 8.5 therefore scans the same read-only window, but records only
      * the one-indirection shape used by the hardware-proven implementation.
      * Every candidate is still rejected unless its uint32 counter advances
      * at a display-like rate in two independent 250 ms windows.

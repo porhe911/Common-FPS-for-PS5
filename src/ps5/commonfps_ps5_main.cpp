@@ -25,7 +25,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_4.log";
+    "/data/CommonFPS_universal_stage8_5.log";
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -186,7 +186,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.4 stopped chain hook + indirect scan\n"
+        "Common FPS Universal Stage 8.5 stopped chain hook + indirect scan\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "

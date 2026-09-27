@@ -77,6 +77,13 @@ void write_ack(
     ack.restored = report.restored ? 1U : 0U;
     ack.detached = report.detached ? 1U : 0U;
     ack.auth_restored = report.auth_restored ? 1U : 0U;
+    ack.phase = static_cast<std::uint8_t>(report.probe
+        ? ShellUiHookAckPhase::Probe
+        : ShellUiHookAckPhase::Patch);
+    std::memcpy(
+        ack.observed,
+        report.observed.data(),
+        report.observed.size());
     ack.checksum = shellui_hook_ack_checksum(ack);
     (void)write_exact_file_atomic(
         kShellUiHookAckTempPath,
@@ -109,15 +116,20 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
     report.method_address = request.method_address;
     report.displaced_size = request.displaced_size;
 
-    if (!shellui_hook_request_is_valid(request, shellui_pid)) {
+    report.probe = shellui_hook_request_is_probe(request);
+    const bool valid = report.probe
+        ? shellui_hook_probe_request_is_valid(request, shellui_pid)
+        : shellui_hook_request_is_valid(request, shellui_pid);
+    if (!valid) {
         report.status = ShellUiHookStatus::InvalidRequest;
         write_ack(request, report);
         return ShellUiHookPollResult::Failed;
     }
 
-    report.eta_chain = shellui_hook_is_eta_chain(request);
-    const ShellUiHookBackend backend =
-        shellui_hook_backend(report.sdk_version, report.eta_chain);
+    report.eta_chain = !report.probe && shellui_hook_is_eta_chain(request);
+    const ShellUiHookBackend backend = report.probe
+        ? shellui_hook_probe_backend(report.sdk_version)
+        : shellui_hook_backend(report.sdk_version, report.eta_chain);
     if (backend == ShellUiHookBackend::Unsupported) {
         report.status = ShellUiHookStatus::UnsupportedFirmware;
         write_ack(request, report);
@@ -164,7 +176,21 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         attached = true;
         report.read_rc = read_target(observed.data(), observed.size());
 
-        if (report.read_rc != 0 ||
+        if (report.probe) {
+            if (report.read_rc == 0) {
+                report.observed = observed;
+                report.eta_chain =
+                    std::memcmp(
+                        observed.data(),
+                        kShellUiAbsoluteJumpPrefix,
+                        sizeof(kShellUiAbsoluteJumpPrefix)) == 0;
+                report.expected_matched = true;
+                report.verified = true;
+                report.status = ShellUiHookStatus::Success;
+            } else {
+                report.status = ShellUiHookStatus::ExpectedBytesMismatch;
+            }
+        } else if (report.read_rc != 0 ||
             std::memcmp(
                 observed.data(),
                 request.expected,

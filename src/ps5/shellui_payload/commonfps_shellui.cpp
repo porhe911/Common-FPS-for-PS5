@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.4 never writes Sony method memory from the renderer. Both native
+ * Stage 8.5 never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
@@ -28,10 +28,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
-
-extern "C" {
-#include <ps5/mdbg.h>
-}
 
 namespace common_fps::ps5::shellui {
 
@@ -372,32 +368,6 @@ std::size_t native_patch_length(
     return length <= kAtomicPatchSize ? length : 0;
 }
 
-/*
- * A compiled Mono method can be in a page whose direct user-mode read is not
- * safe at the instant the method is published.  The old memcpy() path turned
- * that race into a ShellUI crash before the stopped controller could inspect
- * the method.  MDBG returns an error for an unreadable range instead of
- * delivering SIGSEGV, so a bad method is rejected and the renderer parks.
- */
-bool copy_from_self(
-    const void* source,
-    void* destination,
-    std::size_t size,
-    int& rc) noexcept {
-
-    if (!source || !destination || size == 0) {
-        rc = -1;
-        return false;
-    }
-
-    rc = mdbg_copyout(
-        getpid(),
-        reinterpret_cast<intptr_t>(source),
-        destination,
-        size);
-    return rc == 0;
-}
-
 template <typename T>
 bool write_exact_file(
     const char* path,
@@ -462,6 +432,63 @@ bool publish_hook_request(
 bool wait_for_native_hook_ack(
     pid_t pid,
     std::uint64_t nonce,
+    ShellUiHookAck& ack) noexcept;
+
+void log_line(const char* fmt, ...);
+
+bool probe_hook_bytes(
+    std::uint8_t* method,
+    std::array<std::uint8_t, kAtomicPatchSize>& expected) noexcept {
+
+    const std::array<std::uint8_t, kAtomicPatchSize> empty{};
+    std::uint64_t nonce = 0;
+    record_stage("hook_probe_request");
+    if (!publish_hook_request(
+            method,
+            empty,
+            empty,
+            0,
+            nullptr,
+            nonce)) {
+        log_line(
+            "Application.Update probe publish failed method=%p",
+            static_cast<void*>(method));
+        return false;
+    }
+
+    ShellUiHookAck ack{};
+    record_stage("hook_probe_ack_wait");
+    if (!wait_for_native_hook_ack(getpid(), nonce, ack)) {
+        log_line(
+            "Application.Update probe timeout method=%p nonce=0x%llx",
+            static_cast<void*>(method),
+            static_cast<unsigned long long>(nonce));
+        return false;
+    }
+
+    if (ack.phase != static_cast<std::uint8_t>(ShellUiHookAckPhase::Probe) ||
+        ack.status != static_cast<std::int32_t>(ShellUiHookStatus::Success) ||
+        ack.verified == 0 || ack.detached == 0 || ack.auth_restored == 0) {
+        log_line(
+            "Application.Update probe failed method=%p status=%d "
+            "read_rc=%d verified=%u detached=%u auth_restored=%u phase=%u",
+            static_cast<void*>(method),
+            ack.status,
+            ack.read_rc,
+            static_cast<unsigned>(ack.verified),
+            static_cast<unsigned>(ack.detached),
+            static_cast<unsigned>(ack.auth_restored),
+            static_cast<unsigned>(ack.phase));
+        return false;
+    }
+
+    std::memcpy(expected.data(), ack.observed, expected.size());
+    return true;
+}
+
+bool wait_for_native_hook_ack(
+    pid_t pid,
+    std::uint64_t nonce,
     ShellUiHookAck& ack) noexcept {
 
     for (int attempt = 0; attempt < 1000; ++attempt) {
@@ -482,7 +509,7 @@ bool wait_for_native_hook_ack(
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_4_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_5_shellui.log", "a");
     if (!fp)
         return;
 
@@ -891,12 +918,7 @@ bool install_update_hook(MonoClass* application_class) {
 
     record_stage("hook_read_start");
     std::array<std::uint8_t, kAtomicPatchSize> expected{};
-    int read_rc = 0;
-    if (!copy_from_self(address, expected.data(), expected.size(), read_rc)) {
-        log_line(
-            "Application.Update safe read failed method=%p rc=%d",
-            static_cast<void*>(address),
-            read_rc);
+    if (!probe_hook_bytes(address, expected)) {
         return false;
     }
     record_stage("hook_read_ok");
@@ -1039,6 +1061,7 @@ bool install_update_hook(MonoClass* application_class) {
 
     if (ack.status != static_cast<std::int32_t>(
             ShellUiHookStatus::Success) ||
+        ack.phase != static_cast<std::uint8_t>(ShellUiHookAckPhase::Patch) ||
         ack.verified == 0 || ack.detached == 0 ||
         ack.auth_restored == 0) {
         log_line(
@@ -1055,25 +1078,6 @@ bool install_update_hook(MonoClass* application_class) {
             static_cast<unsigned>(ack.auth_restored));
         return false;
     }
-
-    record_stage("hook_readback");
-    std::array<std::uint8_t, kAtomicPatchSize> readback{};
-    int readback_rc = 0;
-    if (!copy_from_self(
-            address,
-            readback.data(),
-            readback.size(),
-            readback_rc) ||
-        std::memcmp(readback.data(), desired.data(), desired.size()) != 0) {
-        log_line(
-            "Application.Update safe readback failed method=%p rc=%d",
-            static_cast<void*>(address),
-            readback_rc);
-        return false;
-    }
-    __builtin___clear_cache(
-        reinterpret_cast<char*>(address),
-        reinterpret_cast<char*>(address + desired.size()));
 
     log_line(
         "Application.Update hook online method=%p "
