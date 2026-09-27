@@ -29,7 +29,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_6_LEGACY_SAFE"
+    OUTPUT_NAME "Common_FPS_ShellUI_UNIVERSAL_STAGE8_7_DCE_HIGHFW"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -83,7 +83,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -107,16 +107,17 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
+    OUTPUT_NAME "Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # Stage 8.6 legacy-safe renderer, stopped guard/hook transactions and indirect scan.
+    # Stage 8.7 hybrid DCE sampler, stopped guard/hook transactions and high-FW fallback.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp"
     "${ROOT}/src/ps5/ps5_platform.cpp"
+    "${ROOT}/src/ps5/dce_fps_sampler.cpp"
     "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/shellui_injector.cpp"
     "${ROOT}/src/ps5/shellui_hook_controller.cpp"
@@ -181,11 +182,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_6_LEGACY_SAFE.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_6_LEGACY_SAFE.plugin"
-            --title-id CFPS00054
-            --version 1.55
+            "${ROOT}/dist/Common_FPS_PS5_UNIVERSAL_STAGE8_7_DCE_HIGHFW.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_7_DCE_HIGHFW.plugin"
+            --title-id CFPS00055
+            --version 1.56
 )
