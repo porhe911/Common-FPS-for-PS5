@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\\0CFPS00054\\0" + b"1.55\\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00054\0" + b"1.55\0"
 
 
 def digest(data: bytes) -> str:
