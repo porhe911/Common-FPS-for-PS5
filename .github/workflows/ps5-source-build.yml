@@ -49,12 +49,12 @@ jobs:
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-Universal-Stage8.8-DCE-Auth-Adaptive
+          name: Common-FPS-Universal-Stage8.9-DCE-Standby
           path: |
-            dist/Common_FPS_PS5_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf
-            dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.plugin
-            dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE.elf
+            dist/Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf
+            dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin
+            dist/Common_FPS_ShellUI_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf
             dist/SHA256SUMS.txt
-            docs/UNIVERSAL_STAGE8_8_DCE_AUTH_ADAPTIVE_RU.md
+            docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
