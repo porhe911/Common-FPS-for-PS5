@@ -458,10 +458,10 @@ void append_first_fps_record(
 
                 dce_standby_active = true;
                 dce_standby_pid = *observed_game_pid;
-                next_videoout_probe_us =
-                    now_us + kDceVideoOutStandbyUs;
 
                 if (entering_standby) {
+                    next_videoout_probe_us =
+                        now_us + kDceVideoOutStandbyUs;
                     append_sampler_policy_record(
                         *observed_game_pid,
                         "dce-standby",
