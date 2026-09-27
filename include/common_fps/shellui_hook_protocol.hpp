@@ -14,19 +14,19 @@
 namespace common_fps {
 
 inline constexpr const char* kShellUiHookRequestPath =
-    "/system_tmp/commonfps_stage8_5_hook_request.bin";
+    "/system_tmp/commonfps_stage8_6_hook_request.bin";
 inline constexpr const char* kShellUiHookRequestTempPath =
-    "/system_tmp/commonfps_stage8_5_hook_request.tmp";
+    "/system_tmp/commonfps_stage8_6_hook_request.tmp";
 inline constexpr const char* kShellUiHookAckPath =
-    "/system_tmp/commonfps_stage8_5_hook_ack.bin";
+    "/system_tmp/commonfps_stage8_6_hook_ack.bin";
 inline constexpr const char* kShellUiHookAckTempPath =
-    "/system_tmp/commonfps_stage8_5_hook_ack.tmp";
+    "/system_tmp/commonfps_stage8_6_hook_ack.tmp";
 
 inline constexpr std::uint64_t kShellUiHookRequestMagic =
-    0x355145524b484643ULL; /* "CFHKREQ5" */
+    0x365145524b484643ULL; /* "CFHKREQ6" */
 inline constexpr std::uint64_t kShellUiHookAckMagic =
-    0x354b43414b484643ULL; /* "CFHKACK5" */
-inline constexpr std::uint32_t kShellUiHookProtocolVersion = 5;
+    0x364b43414b484643ULL; /* "CFHKACK6" */
+inline constexpr std::uint32_t kShellUiHookProtocolVersion = 6;
 inline constexpr std::size_t kShellUiHookPatchSize = 16;
 inline constexpr std::uint8_t kShellUiAbsoluteJumpPrefix[6] = {
     0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
@@ -37,6 +37,7 @@ enum class ShellUiHookBackend { Unsupported, Mdbg, PtraceIo };
 enum class ShellUiHookAckPhase : std::uint8_t {
     Patch = 0,
     Probe = 1,
+    MainThreadGuard = 2,
 };
 
 inline ShellUiHookBackend shellui_hook_backend(
@@ -44,9 +45,23 @@ inline ShellUiHookBackend shellui_hook_backend(
     const std::uint32_t family = sdk & 0xffff0000U;
     if (family >= 0x03000000U && family <= 0x08200000U)
         return ShellUiHookBackend::Mdbg;
-    /* New stopped-chain path: requires a separate 9.60 hardware regression. */
     if (family == 0x09600000U && eta_chain)
         return ShellUiHookBackend::PtraceIo;
+    return ShellUiHookBackend::Unsupported;
+}
+
+/*
+ * Legacy 3.00-8.20 fallback does not replace Application.Update.  It only
+ * changes the first byte of Diagnostics.CheckRunningOnMainThread to RET while
+ * ShellUI is ptrace-stopped.  MDBG is the already-established write backend
+ * for this firmware range.  Newer firmware deliberately fails closed and
+ * keeps the existing Application.Update path.
+ */
+inline ShellUiHookBackend shellui_main_thread_guard_backend(
+    std::uint32_t sdk) noexcept {
+    const std::uint32_t family = sdk & 0xffff0000U;
+    if (family >= 0x03000000U && family <= 0x08200000U)
+        return ShellUiHookBackend::Mdbg;
     return ShellUiHookBackend::Unsupported;
 }
 
@@ -161,6 +176,13 @@ inline bool shellui_hook_request_is_probe(
     return request.displaced_size == 0;
 }
 
+inline bool shellui_hook_request_is_main_thread_guard(
+    const ShellUiHookRequest& request) noexcept {
+    return request.displaced_size == 1 &&
+        request.original_call_address == 0 &&
+        request.hook_address == request.method_address;
+}
+
 inline bool shellui_hook_probe_request_is_valid(
     const ShellUiHookRequest& request, std::int32_t pid) noexcept {
 
@@ -175,6 +197,22 @@ inline bool shellui_hook_probe_request_is_valid(
     return true;
 }
 
+inline bool shellui_main_thread_guard_request_is_valid(
+    const ShellUiHookRequest& request, std::int32_t pid) noexcept {
+
+    if (!shellui_hook_request_common_is_valid(request, pid) ||
+        !shellui_hook_request_is_main_thread_guard(request) ||
+        request.expected[0] == 0xc3 ||
+        request.desired[0] != 0xc3)
+        return false;
+
+    for (std::size_t i = 1; i < kShellUiHookPatchSize; ++i)
+        if (request.desired[i] != request.expected[i])
+            return false;
+
+    return true;
+}
+
 inline bool shellui_hook_request_is_valid(
     const ShellUiHookRequest& request, std::int32_t pid) noexcept {
 
@@ -184,6 +222,7 @@ inline bool shellui_hook_request_is_valid(
         request.original_call_address == request.method_address ||
         request.displaced_size < 14 || request.displaced_size > 16 ||
         shellui_hook_request_is_probe(request) ||
+        shellui_hook_request_is_main_thread_guard(request) ||
         std::memcmp(request.desired, kShellUiAbsoluteJumpPrefix, 6) != 0)
         return false;
 
@@ -204,7 +243,9 @@ inline bool shellui_hook_request_is_valid(
                 return false;
     }
 
-    for (std::size_t i = request.displaced_size; i < kShellUiHookPatchSize; ++i)
+    for (std::size_t i = request.displaced_size;
+         i < kShellUiHookPatchSize;
+         ++i)
         if (request.desired[i] != request.expected[i])
             return false;
     return true;
