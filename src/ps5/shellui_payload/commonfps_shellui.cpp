@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.6 legacy-safe mode never writes Sony method memory from the renderer. Both native
+ * Stage 8.7 legacy-safe mode never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
@@ -640,7 +640,7 @@ MainThreadGuardResult install_main_thread_guard() {
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_6_shellui.log", "a");
+        "/data/CommonFPS_universal_stage8_7_shellui.log", "a");
     if (!fp)
         return;
 
@@ -1314,7 +1314,7 @@ bool initialize_runtime() {
     record_stage("scene_ready");
 
     /*
-     * Stage 8.6 first asks the controller for a one-byte, stopped-process
+     * Stage 8.7 first asks the controller for a one-byte, stopped-process
      * legacy UI-thread guard.  Firmware 3.00-8.20 uses that path and never
      * compiles or replaces Application.Update.  On newer firmware the guard
      * request is rejected and the established Application.Update renderer is
