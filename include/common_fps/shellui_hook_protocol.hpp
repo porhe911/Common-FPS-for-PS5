@@ -14,19 +14,19 @@
 namespace common_fps {
 
 inline constexpr const char* kShellUiHookRequestPath =
-    "/system_tmp/commonfps_stage8_7_hook_request.bin";
+    "/system_tmp/commonfps_stage8_8_hook_request.bin";
 inline constexpr const char* kShellUiHookRequestTempPath =
-    "/system_tmp/commonfps_stage8_7_hook_request.tmp";
+    "/system_tmp/commonfps_stage8_8_hook_request.tmp";
 inline constexpr const char* kShellUiHookAckPath =
-    "/system_tmp/commonfps_stage8_7_hook_ack.bin";
+    "/system_tmp/commonfps_stage8_8_hook_ack.bin";
 inline constexpr const char* kShellUiHookAckTempPath =
-    "/system_tmp/commonfps_stage8_7_hook_ack.tmp";
+    "/system_tmp/commonfps_stage8_8_hook_ack.tmp";
 
 inline constexpr std::uint64_t kShellUiHookRequestMagic =
-    0x375145524b484643ULL; /* "CFHKREQ7" */
+    0x385145524b484643ULL; /* "CFHKREQ8" */
 inline constexpr std::uint64_t kShellUiHookAckMagic =
-    0x374b43414b484643ULL; /* "CFHKACK7" */
-inline constexpr std::uint32_t kShellUiHookProtocolVersion = 7;
+    0x384b43414b484643ULL; /* "CFHKACK8" */
+inline constexpr std::uint32_t kShellUiHookProtocolVersion = 8;
 inline constexpr std::size_t kShellUiHookPatchSize = 16;
 inline constexpr std::uint8_t kShellUiAbsoluteJumpPrefix[6] = {
     0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
