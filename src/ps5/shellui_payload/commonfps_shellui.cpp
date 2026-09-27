@@ -439,6 +439,7 @@ bool wait_for_native_hook_ack(
     ShellUiHookAck& ack) noexcept;
 
 void log_line(const char* fmt, ...);
+MonoImage* open_image(const char* path);
 
 bool probe_hook_bytes(
     std::uint8_t* method,
