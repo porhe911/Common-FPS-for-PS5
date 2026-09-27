@@ -27,7 +27,10 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_8.log";
+    "/data/CommonFPS_universal_stage8_9.log";
+
+constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
+constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
 
 /*
  * These FW 9.60 kinfo_proc offsets were established by the hardware-proven
@@ -188,14 +191,14 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.8 hybrid DCE + high-FW renderer\n"
+        "Common FPS Universal Stage 8.9 DCE standby + high-FW renderer\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
         "renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_indirect_dynamic_1s+hen_shared+dce_auth_adaptive "
+        "mono_gc=pinned sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe "
         "read=mdbg+dce_ioctl highfw_guard=ptrace_io_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
@@ -213,6 +216,44 @@ void write_worker_ready_record(
         first.bytes,
         first.records,
         first.malformed_records);
+
+    if (record_size > 0) {
+        const std::size_t safe_size =
+            static_cast<std::size_t>(record_size) < sizeof(record)
+                ? static_cast<std::size_t>(record_size)
+                : sizeof(record) - 1;
+        write_all(fd, record, safe_size);
+    }
+
+    (void)fsync(fd);
+    (void)close(fd);
+}
+
+void append_sampler_policy_record(
+    pid_t game_pid,
+    const char* state,
+    const char* backend,
+    std::uint64_t retry_after_us) noexcept {
+
+    const int fd = open(
+        kControllerLog,
+        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
+        0644);
+    if (fd < 0)
+        return;
+
+    char record[320]{};
+    const unsigned long long retry_ms =
+        static_cast<unsigned long long>(retry_after_us / 1000ULL);
+    const int record_size = std::snprintf(
+        record,
+        sizeof(record),
+        "Sampler policy pid=%d state=%s backend=%s "
+        "videoout_retry_after_ms=%llu\n",
+        game_pid,
+        state ? state : "unknown",
+        backend ? backend : "unknown",
+        retry_ms);
 
     if (record_size > 0) {
         const std::size_t safe_size =
@@ -276,6 +317,10 @@ void append_first_fps_record(
     unsigned stable_shellui_observations = 0;
     pid_t stable_game_pid = -1;
     unsigned stable_game_observations = 0;
+    bool dce_standby_active = false;
+    pid_t dce_standby_pid = -1;
+    unsigned dce_miss_streak = 0;
+    std::uint64_t next_videoout_probe_us = 0;
     bool renderer_online = false;
     bool have_fps = false;
     int latest_fps = 0;
@@ -306,7 +351,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Do not inject the ShellUI renderer on the home screen.  Stage 8.8
+         * Do not inject the ShellUI renderer on the home screen.  Stage 8.9
          * proved that resolving and patching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
@@ -322,32 +367,56 @@ void append_first_fps_record(
             } else {
                 stable_game_pid = *observed_game_pid;
                 stable_game_observations = 1;
+
+                sampler.reset();
+                reported_pid = -1;
                 dce_sampler.reset();
                 dce_reported_pid = -1;
+
+                dce_standby_active = false;
+                dce_standby_pid = -1;
+                dce_miss_streak = 0;
+                next_videoout_probe_us = 0;
             }
         } else {
             stable_game_pid = -1;
             stable_game_observations = 0;
+
+            sampler.reset();
+            reported_pid = -1;
             dce_sampler.reset();
             dce_reported_pid = -1;
+
+            dce_standby_active = false;
+            dce_standby_pid = -1;
+            dce_miss_streak = 0;
+            next_videoout_probe_us = 0;
         }
         const bool game_process_ready =
             stable_game_pid > 0 && stable_game_observations >= 3;
 
+        const std::uint64_t now_us = platform.monotonic_us();
+        const bool videoout_probe_due =
+            !dce_standby_active ||
+            now_us >= next_videoout_probe_us;
+
         std::optional<int> process_fps;
-        if (!sampler.attached()) {
-            if (observed_game_pid)
-                (void)sampler.attach(*observed_game_pid);
-        } else {
+        if (sampler.attached()) {
             process_fps = sampler.sample();
+        } else if (observed_game_pid && videoout_probe_due) {
+            const bool attached = sampler.attach(*observed_game_pid);
+            if (!attached && dce_standby_active) {
+                next_videoout_probe_us =
+                    now_us + kDceVideoOutStandbyUs;
+            }
         }
 
         /*
-         * Stage 8.8 keeps the per-game VideoOut counter as the preferred
-         * source, but also samples the display-controller flip counter.
-         * DCE requires no game-process memory layout and therefore provides a
-         * firmware-neutral fallback when dynamic VideoOut discovery cannot
-         * resolve a counter on old or new system software.
+         * Stage 8.9 keeps VideoOut as the preferred source, but once the DCE
+         * fallback has produced a valid FPS sample it suppresses expensive
+         * read-only VideoOut discovery for 60 seconds.  A lightweight
+         * periodic re-probe preserves the preferred path without rescanning
+         * thousands of candidates every 10 seconds.
          */
         const auto dce_fps = game_process_ready
             ? dce_sampler.sample()
@@ -356,6 +425,19 @@ void append_first_fps_record(
         if (process_fps) {
             have_fps = true;
             latest_fps = *process_fps;
+
+            if (dce_standby_active) {
+                append_sampler_policy_record(
+                    sampler.pid(),
+                    "videoout-resumed",
+                    "videoout-process",
+                    0);
+            }
+            dce_standby_active = false;
+            dce_standby_pid = -1;
+            dce_miss_streak = 0;
+            next_videoout_probe_us = 0;
+
             if (sampler.pid() != reported_pid) {
                 reported_pid = sampler.pid();
                 append_first_fps_record(
@@ -367,6 +449,27 @@ void append_first_fps_record(
         } else if (dce_fps && observed_game_pid) {
             have_fps = true;
             latest_fps = *dce_fps;
+            dce_miss_streak = 0;
+
+            if (!sampler.attached()) {
+                const bool entering_standby =
+                    !dce_standby_active ||
+                    dce_standby_pid != *observed_game_pid;
+
+                dce_standby_active = true;
+                dce_standby_pid = *observed_game_pid;
+                next_videoout_probe_us =
+                    now_us + kDceVideoOutStandbyUs;
+
+                if (entering_standby) {
+                    append_sampler_policy_record(
+                        *observed_game_pid,
+                        "dce-standby",
+                        dce_sampler.backend_name(),
+                        kDceVideoOutStandbyUs);
+                }
+            }
+
             if (*observed_game_pid != dce_reported_pid) {
                 dce_reported_pid = *observed_game_pid;
                 append_first_fps_record(
@@ -377,6 +480,22 @@ void append_first_fps_record(
             }
         } else {
             have_fps = false;
+
+            if (dce_standby_active && observed_game_pid) {
+                ++dce_miss_streak;
+                if (dce_miss_streak >=
+                    kDceMissesBeforeVideoOutWake) {
+                    append_sampler_policy_record(
+                        *observed_game_pid,
+                        "dce-miss-wake",
+                        dce_sampler.backend_name(),
+                        0);
+                    dce_standby_active = false;
+                    dce_standby_pid = -1;
+                    dce_miss_streak = 0;
+                    next_videoout_probe_us = 0;
+                }
+            }
         }
 
         if (!renderer_online && game_process_ready &&
