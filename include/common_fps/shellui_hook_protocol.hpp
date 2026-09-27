@@ -60,8 +60,20 @@ inline ShellUiHookBackend shellui_hook_backend(
 inline ShellUiHookBackend shellui_main_thread_guard_backend(
     std::uint32_t sdk) noexcept {
     const std::uint32_t family = sdk & 0xffff0000U;
-    if (family >= 0x03000000U && family <= 0x08200000U)
+
+    /*
+     * Low/mid firmware uses the controller MDBG backend.  Higher firmware
+     * keeps the same one-byte, expected-byte-verified guard transaction but
+     * uses ptrace I/O, which is already required by the ShellUI loader.
+     *
+     * FW 9.60 deliberately stays on the hardware-proven Application.Update
+     * chain path; returning Unsupported here selects that existing backend.
+     */
+    if (family >= 0x01000000U && family <= 0x08200000U)
         return ShellUiHookBackend::Mdbg;
+    if ((family >= 0x08300000U && family < 0x09600000U) ||
+        (family > 0x09600000U && family <= 0x10ff0000U))
+        return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }
 
@@ -254,9 +266,9 @@ inline bool shellui_hook_request_is_valid(
 inline ShellUiHookBackend shellui_hook_probe_backend(
     std::uint32_t sdk) noexcept {
     const std::uint32_t family = sdk & 0xffff0000U;
-    if (family >= 0x03000000U && family <= 0x08200000U)
+    if (family >= 0x01000000U && family <= 0x08200000U)
         return ShellUiHookBackend::Mdbg;
-    if (family == 0x09600000U)
+    if (family >= 0x08300000U && family <= 0x10ff0000U)
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }
