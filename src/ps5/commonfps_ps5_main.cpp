@@ -322,10 +322,14 @@ void append_first_fps_record(
             } else {
                 stable_game_pid = *observed_game_pid;
                 stable_game_observations = 1;
+                dce_sampler.reset();
+                dce_reported_pid = -1;
             }
         } else {
             stable_game_pid = -1;
             stable_game_observations = 0;
+            dce_sampler.reset();
+            dce_reported_pid = -1;
         }
         const bool game_process_ready =
             stable_game_pid > 0 && stable_game_observations >= 3;
