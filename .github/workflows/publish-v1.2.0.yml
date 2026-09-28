@@ -50,6 +50,13 @@ jobs:
             "docs/evidence/FW451_V1_2_0_HARDWARE_20260928.md" \
             "release/RELEASE_NOTES_v1.2.0.md"
 
+      - name: Point v1.2.0 tag at current release commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f v1.2.0 "${GITHUB_SHA}"
+          git push origin refs/tags/v1.2.0 --force
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -73,6 +80,7 @@ jobs:
             done
 
             gh release edit v1.2.0 \
+              --target "${GITHUB_SHA}" \
               --title "Common FPS for PS5 v1.2.0" \
               --notes-file "release/RELEASE_NOTES_v1.2.0.md" \
               --latest
