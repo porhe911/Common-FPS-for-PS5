@@ -5,6 +5,7 @@
  */
 
 #include "shellui_injector.hpp"
+#include "common_fps/shellui_stage.hpp"
 #if defined(COMMON_FPS_TEST29_NO_AUTH_ONLY)
 #elif defined(COMMON_FPS_TEST28_AUTH_DIRECT_ONLY)
 #include "shellui_auth_direct_probe.hpp"
@@ -14,6 +15,7 @@
 #include "shellui_attach_probe.hpp"
 #else
 #include "shellui_blob.hpp"
+#include "shellui_hook_controller.hpp"
 #include "stable_shellui_injector.hpp"
 #endif
 
@@ -58,6 +60,9 @@ constexpr const char* kLog =
 #elif defined(COMMON_FPS_TEST25_LOAD_ONLY)
 constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
+#elif defined(COMMON_FPS_UNIVERSAL_STAGE8)
+constexpr const char* kLog =
+    "/data/CommonFPS_universal_stage8_9.log";
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -271,6 +276,22 @@ bool marker_matches(pid_t pid) {
     std::fclose(fp);
     return rc == 1 && marked_pid == pid;
 }
+
+const char* last_stage_for(pid_t pid, char (&stage)[48]) {
+    std::memcpy(stage, "unavailable", sizeof("unavailable"));
+    FILE* fp = std::fopen(kShellUiStagePath, "r");
+    if (!fp)
+        return stage;
+
+    int recorded_pid = -1;
+    char recorded_stage[48]{};
+    const int count = std::fscanf(
+        fp, "%d %47s", &recorded_pid, recorded_stage);
+    std::fclose(fp);
+    if (count == 2 && recorded_pid == pid)
+        std::memcpy(stage, recorded_stage, sizeof(recorded_stage));
+    return stage;
+}
 #endif
 
 } // namespace
@@ -281,6 +302,15 @@ bool ensure_shellui_renderer() {
     static bool retry_allowed = true;
     static unsigned retry_delay_ticks = 0;
     static unsigned discovery_failures = 0;
+#if !defined(COMMON_FPS_TEST25_LOAD_ONLY) && \
+    !defined(COMMON_FPS_TEST26_ATTACH_DETACH_ONLY) && \
+    !defined(COMMON_FPS_TEST27_AUTH_ONLY) && \
+    !defined(COMMON_FPS_TEST28_AUTH_DIRECT_ONLY) && \
+    !defined(COMMON_FPS_TEST29_NO_AUTH_ONLY)
+    static bool renderer_quarantined = false;
+    if (renderer_quarantined)
+        return false;
+#endif
 
     const ShellUiLookupResult lookup = find_shellui_pid();
     if (lookup.pid <= 0) {
@@ -485,6 +515,8 @@ bool ensure_shellui_renderer() {
         static_cast<unsigned long long>(now_ms() - probe_started_ms));
     return true;
 #else
+    clear_shellui_hook_protocol_files();
+    (void)unlink(kShellUiStagePath);
     log_line(
         "ShellUI inject start pid=%d payload_size=%zu",
         pid,
@@ -618,10 +650,64 @@ bool ensure_shellui_renderer() {
                     now_ms() - inject_started_ms));
             return true;
         }
+
+        /* A restarted ShellUI must not receive the same failing image. */
+        if (i != 0 && i % 50 == 0) {
+            const pid_t observed_pid = find_shellui_pid().pid;
+            if (observed_pid > 0 && observed_pid != pid) {
+                char stage[48]{};
+                log_line(
+                    "ShellUI changed before marker old_pid=%d new_pid=%d "
+                    "last_stage=%s quarantine=1",
+                    pid,
+                    observed_pid,
+                    last_stage_for(pid, stage));
+                renderer_quarantined = true;
+                retry_allowed = false;
+                return false;
+            }
+        }
+
+        ShellUiHookPatchReport hook_report{};
+        const ShellUiHookPollResult hook_result =
+            poll_and_apply_shellui_hook(pid, hook_report);
+        if (hook_result != ShellUiHookPollResult::NoRequest) {
+            log_line(
+                "ShellUI hook request pid=%d sdk=0x%08x mode=%s backend=%s "
+                "phase=%s "
+                "method=0x%llx displaced=%u status=%d "
+                "read_rc=%d write_rc=%d expected=%d verified=%d "
+                "restored=%d detached=%d auth_restored=%d",
+                pid,
+                hook_report.sdk_version,
+                hook_report.main_thread_guard
+                    ? "thread-guard"
+                    : (hook_report.eta_chain ? "eta-chain" : "native"),
+                hook_report.backend,
+                hook_report.probe
+                    ? "probe"
+                    : (hook_report.main_thread_guard ? "guard" : "patch"),
+                static_cast<unsigned long long>(
+                    hook_report.method_address),
+                hook_report.displaced_size,
+                static_cast<int>(hook_report.status),
+                hook_report.read_rc,
+                hook_report.write_rc,
+                hook_report.expected_matched ? 1 : 0,
+                hook_report.verified ? 1 : 0,
+                hook_report.restored ? 1 : 0,
+                hook_report.detached ? 1 : 0,
+                hook_report.auth_restored ? 1 : 0);
+        }
         usleep(20000);
     }
 
-    log_line("ShellUI marker timeout pid=%d", pid);
+    char stage[48]{};
+    log_line(
+        "ShellUI marker timeout pid=%d last_stage=%s quarantine=1",
+        pid,
+        last_stage_for(pid, stage));
+    renderer_quarantined = true;
     retry_allowed = false;
     return false;
 #endif
