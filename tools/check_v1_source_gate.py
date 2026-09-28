@@ -9,9 +9,9 @@ checks = [
      "include/common_fps/types.hpp",
      "int fps = 0"),
 
-    ("font 26",
+    ("font 24",
      "include/common_fps/constants.hpp",
-     "kDefaultFontSize = 26"),
+     "kDefaultFontSize = 24"),
 
     ("payload args",
      "integration/loader/v1_loader_contract.cpp",
@@ -57,4 +57,4 @@ for label, rel, needle in checks:
 if failed:
     sys.exit(1)
 
-print("v1.0.0 + safe-autoload source gate: PASS")
+print("v1.2.0 source gate: PASS")
