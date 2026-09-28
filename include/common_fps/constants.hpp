@@ -33,7 +33,7 @@ inline constexpr std::uintptr_t kVideoOutCounterOffset = 0x768;
 inline constexpr float kLogicalWidth = 1920.0f;
 inline constexpr float kLogicalHeight = 1080.0f;
 
-inline constexpr int kDefaultFontSize = 26;
+inline constexpr int kDefaultFontSize = 24;
 inline constexpr int kMinFontSize = 18;
 inline constexpr int kMaxFontSize = 36;
 
