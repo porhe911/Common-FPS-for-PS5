@@ -352,7 +352,7 @@ void append_first_fps_record(
 
         /*
          * Do not inject the ShellUI renderer on the home screen.  Earlier
-         * universal-stage hardware tests proved that touching Application.Update before a
+         * hardware tests proved that touching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
          * the process sampler has observed the same real game process for
