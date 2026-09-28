@@ -1,0 +1,77 @@
+name: Publish Common FPS v1.2.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "release/PUBLISH_v1.2.0"
+      - ".github/workflows/publish-v1.2.0.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git wget unzip zip cmake meson pkg-config \
+            python3 python3-pyelftools \
+            clang-18 lld-18 xxd
+
+      - name: Prepare pinned PS5 dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build and verify PS5 artifacts
+        run: bash ./scripts/ps5_source_build.sh
+
+      - name: Create release bundle
+        run: |
+          zip -9 "dist/Common-FPS-v1.2.0-Universal.zip" \
+            "dist/Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf" \
+            "dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin" \
+            "dist/SHA256SUMS.txt" \
+            "docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md" \
+            "docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md" \
+            "docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md" \
+            "release/RELEASE_NOTES_v1.2.0.md"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSETS=(
+            "dist/Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf"
+            "dist/Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin"
+            "dist/SHA256SUMS.txt"
+            "dist/Common-FPS-v1.2.0-Universal.zip"
+            "docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md"
+          )
+
+          if gh release view v1.2.0 >/dev/null 2>&1; then
+            gh release edit v1.2.0 \
+              --title "Common FPS for PS5 v1.2.0 — Universal Stage 8.9" \
+              --notes-file "release/RELEASE_NOTES_v1.2.0.md" \
+              --latest
+            gh release upload v1.2.0 "${ASSETS[@]}" --clobber
+          else
+            gh release create v1.2.0 "${ASSETS[@]}" \
+              --target "${GITHUB_SHA}" \
+              --title "Common FPS for PS5 v1.2.0 — Universal Stage 8.9" \
+              --notes-file "release/RELEASE_NOTES_v1.2.0.md" \
+              --latest
+          fi
