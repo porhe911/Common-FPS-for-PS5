@@ -47,7 +47,7 @@ jobs:
             "dist/SHA256SUMS.txt" \
             "docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md" \
             "docs/V1_2_0_ARCHITECTURE_RU.md" \
-            "docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md" \
+            "docs/evidence/FW451_V1_2_0_HARDWARE_20260928.md" \
             "release/RELEASE_NOTES_v1.2.0.md"
 
       - name: Publish GitHub Release
