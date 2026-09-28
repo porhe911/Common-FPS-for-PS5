@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git wget unzip zip cmake meson pkg-config \
+            git wget unzip cmake meson pkg-config \
             python3 python3-pyelftools \
             clang-18 lld-18 xxd
 
@@ -39,17 +39,6 @@ jobs:
       - name: Build and verify PS5 artifacts
         run: bash ./scripts/ps5_source_build.sh
 
-      - name: Create release bundle
-        run: |
-          zip -9 "dist/Common-FPS-v1.2.0.zip" \
-            "dist/Common_FPS_PS5_v1.2.0.elf" \
-            "dist/Common_FPS_PS5_etaHEN_v1.2.0.plugin" \
-            "dist/SHA256SUMS.txt" \
-            "docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md" \
-            "docs/V1_2_0_ARCHITECTURE_RU.md" \
-            "docs/evidence/FW451_V1_2_0_HARDWARE_20260928.md" \
-            "release/RELEASE_NOTES_v1.2.0.md"
-
       - name: Point v1.2.0 tag at current release commit
         run: |
           git config user.name "github-actions[bot]"
@@ -64,16 +53,16 @@ jobs:
           ASSETS=(
             "dist/Common_FPS_PS5_v1.2.0.elf"
             "dist/Common_FPS_PS5_etaHEN_v1.2.0.plugin"
-            "dist/SHA256SUMS.txt"
-            "dist/Common-FPS-v1.2.0.zip"
-            "docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md"
           )
 
           if gh release view v1.2.0 >/dev/null 2>&1; then
-            # Remove the old development-branded asset names from the same
-            # public v1.2.0 release before uploading the final names.
+            # Keep the public Assets section minimal: only the standalone
+            # ELF and etaHEN plugin belong in the release.
             for old_asset in \
+              "Common-FPS-v1.2.0.zip" \
               "Common-FPS-v1.2.0-Universal.zip" \
+              "COMMON_FPS_FULL_DOCUMENTATION_RU.md" \
+              "SHA256SUMS.txt" \
               "Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf" \
               "Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin"; do
               gh release delete-asset v1.2.0 "${old_asset}" -y || true
