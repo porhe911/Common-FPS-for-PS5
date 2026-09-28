@@ -1314,7 +1314,7 @@ bool initialize_runtime() {
     record_stage("scene_ready");
 
     /*
-     * Stage 8.9 first asks the controller for a one-byte, stopped-process
+     * The current renderer first asks the controller for a one-byte, stopped-process
      * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families
      * use ptrace I/O. FW 9.60 intentionally rejects the guard so the existing
      * hardware-proven Application.Update chain renderer is retained.
