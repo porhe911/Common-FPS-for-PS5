@@ -41,12 +41,6 @@ etaHEN plugin:
 
 **ELF и plugin одновременно не запускать.**
 
-## Документация
-
-- `docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md`
-- `docs/V1_2_0_ARCHITECTURE_RU.md`
-- `BUILDING.md`
-
 ## Лицензия
 
 GPL-3.0-or-later.
