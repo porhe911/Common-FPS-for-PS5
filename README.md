@@ -164,7 +164,7 @@ Local build details are in [BUILDING.md](BUILDING.md).
 
 - [Full Russian documentation](docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md)
 - [v1.2.0 architecture and lifecycle](docs/V1_2_0_ARCHITECTURE_RU.md)
-- [FW 4.51 hardware evidence](docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md)
+- [FW 4.51 hardware evidence](docs/evidence/FW451_V1_2_0_HARDWARE_20260928.md)
 - [v1.2.0 release notes](release/RELEASE_NOTES_v1.2.0.md)
 
 ## License
