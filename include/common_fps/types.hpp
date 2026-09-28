@@ -27,7 +27,7 @@ struct Vec2 {
 
 struct OverlayConfig {
     Corner corner = Corner::BottomLeft;
-    int font_size = 26;
+    int font_size = 24;
     float margin_x = 10.0f;
     float margin_y = 10.0f;
 };

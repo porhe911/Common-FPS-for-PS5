@@ -27,7 +27,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_universal_stage8_9.log";
+    "/data/CommonFPS_v1_2_0.log";
 
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
@@ -191,7 +191,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS Universal Stage 8.9 DCE standby + high-FW renderer\n"
+        "Common FPS for PS5 v1.2.0\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -352,7 +352,7 @@ void append_first_fps_record(
 
         /*
          * Do not inject the ShellUI renderer on the home screen.  Earlier
-         * universal-stage hardware tests proved that touching Application.Update before a
+         * hardware tests proved that touching Application.Update before a
          * game owns the "Game" container can make ShellUI restart.  The
          * controller remains loaded, but the renderer is started only after
          * the process sampler has observed the same real game process for
@@ -412,7 +412,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Stage 8.9 keeps VideoOut as the preferred source, but once the DCE
+         * v1.2.0 keeps VideoOut as the preferred source, but once the DCE
          * fallback has produced a valid FPS sample it suppresses expensive
          * read-only VideoOut discovery for 60 seconds.  A lightweight
          * periodic re-probe preserves the preferred path without rescanning

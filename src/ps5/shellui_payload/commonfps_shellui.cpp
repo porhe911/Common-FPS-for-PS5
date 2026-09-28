@@ -8,7 +8,7 @@
 /*
  * Source-only ShellUI renderer.
  *
- * Stage 8.9 legacy-safe mode never writes Sony method memory from the renderer. Both native
+ * The v1.2.0 renderer never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
@@ -640,7 +640,7 @@ MainThreadGuardResult install_main_thread_guard() {
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_universal_stage8_9_shellui.log", "a");
+        "/data/CommonFPS_v1_2_0_shellui.log", "a");
     if (!fp)
         return;
 
@@ -1314,7 +1314,7 @@ bool initialize_runtime() {
     record_stage("scene_ready");
 
     /*
-     * Stage 8.9 first asks the controller for a one-byte, stopped-process
+     * The current renderer first asks the controller for a one-byte, stopped-process
      * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families
      * use ptrace I/O. FW 9.60 intentionally rejects the guard so the existing
      * hardware-proven Application.Update chain renderer is retained.
@@ -1333,7 +1333,7 @@ bool initialize_runtime() {
             "Application");
         record_stage("hook_setup");
         if (!application_class || !install_update_hook(application_class)) {
-            log_line("Application.Update universal hook unavailable");
+            log_line("Application.Update hook unavailable");
             return false;
         }
         g_background_render_mode = false;

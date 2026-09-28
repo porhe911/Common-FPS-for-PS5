@@ -18,9 +18,9 @@ using namespace common_fps;
 int main() {
     const auto cfg = default_config();
 
-    // Stable v1.0.0 UI defaults.
+    // Current public UI defaults.
     assert(cfg.corner == Corner::BottomLeft);
-    assert(cfg.font_size == 26);
+    assert(cfg.font_size == 24);
 
     // Integer-only public transport.
     OverlayFrame frame;
@@ -35,6 +35,6 @@ int main() {
     assert(display == "FPS: 59");
     assert(display.find('.') == std::string::npos);
 
-    std::cout << "v1.0.0 parity defaults: PASS\n";
+    std::cout << "v1.2.0 public defaults: PASS\n";
     return 0;
 }

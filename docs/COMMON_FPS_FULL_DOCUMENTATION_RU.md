@@ -1,507 +1,320 @@
 # Common FPS for PS5 — полная документация
 
-**Публичная версия:** v1.2.0 Universal  
-**Техническая ветка:** Universal Stage 8.9 DCE Standby  
+**Версия:** 1.2.0  
 **Автор проекта:** porhe911  
 **Репозиторий:** porhe911/Common-FPS-for-PS5  
 **Лицензия:** GPL-3.0-or-later  
-**Дата аппаратной приёмки Stage 8.9:** 28.09.2026
+**Актуализация:** 28.09.2026
 
 ---
 
-## 1. Назначение
+## 1. Что такое Common FPS
 
-Common FPS for PS5 — открытый homebrew-счётчик реальной частоты кадров для
-модифицированных PlayStation 5. Он отображает целочисленный FPS поверх
+Common FPS for PS5 — homebrew-счётчик реальной частоты кадров для
+модифицированной PlayStation 5. Он показывает целочисленный FPS поверх
 запущенной PS4- или PS5-игры.
 
-Текущий публичный универсальный путь построен вокруг двух независимых способов
-получения FPS:
+Версия 1.2.0 включает:
 
-1. per-game VideoOut counter — предпочтительный источник;
-2. DCE adaptive fallback — аппаратный fallback через `/dev/dce`, который не
-   требует hardcoded offsets конкретной игры.
-
-ShellUI renderer отделён от sampler/controller и запускается только после
-обнаружения стабильного игрового процесса.
-
----
-
-## 2. Что подтверждено на реальном железе
-
-### FW 4.51 — подтверждено
-
-На FW 4.51 Stage 8.9 прошёл аппаратную приёмку:
-
-- PS5-игры показывают реальный FPS;
-- PS4-игры показывают реальный FPS;
-- подтверждены значения 30 FPS и 60 FPS;
-- переход в Rest Mode и последующее пробуждение не ломают счётчик;
-- после пробуждения FPS восстанавливается;
-- штатная перезагрузка консоли проходит нормально;
-- после смены ShellUI PID renderer повторно поднимается;
-- переключение игровых процессов обрабатывается;
-- adaptive DCE fallback работает;
-- старый опасный ранний ShellUI/Application.Update путь на 4.51 не используется.
-
-### FW 9.60 — подтверждённая baseline-платформа
-
-FW 9.60 остаётся аппаратно подтверждённой baseline-платформой предыдущих
-стабильных Common FPS сборок:
-
-- реальный FPS;
-- запуск PS4/PS5 игр;
-- переключение игр;
-- etaHEN plugin/autoload;
-- восстановление после Rest Mode;
-- нормальный системный lifecycle.
-
-Для 9.60 универсальная архитектура сохраняет отдельный hardware-proven
-Application.Update chain path вместо принудительного перевода на
-экспериментальный high-FW guard.
-
-### FW 7.60
-
-Требуется новый regression test именно текущего Stage 8.9. Старые тестовые
-ветки на 7.60 имели ошибки, поэтому 7.60 нельзя считать подтверждённой
-только по наличию backend в коде.
-
-### FW 10.xx
-
-В Stage 8.9 присутствует экспериментальный high-firmware backend на базе
-stopped ptrace-I/O one-byte guard и adaptive DCE. До аппаратного теста
-конкретной версии 10.xx это следует считать экспериментальной поддержкой,
-а не подтверждённой совместимостью.
-
-### Другие версии ПО
-
-Наличие firmware backend в исходниках не означает аппаратную сертификацию
-каждой промежуточной версии. В документации всегда разделяются:
-
-- **hardware confirmed** — проверено на реальной консоли;
-- **implemented / experimental** — путь реализован в коде, но требует
-  отдельного теста.
+- standalone ELF;
+- etaHEN plugin;
+- автоматическое определение активной игры;
+- восстановление после смены game PID;
+- восстановление ShellUI-компонента после смены ShellUI PID;
+- VideoOut sampler;
+- adaptive DCE fallback через `/dev/dce`;
+- 60-секундный backoff тяжёлого VideoOut discovery, когда DCE уже работает;
+- поддержку Rest Mode recovery на протестированных системах;
+- автоматическую сборку и проверку бинарников через GitHub Actions.
 
 ---
 
-## 3. Отображение
+## 2. Внешний вид
 
-По умолчанию overlay имеет следующие параметры:
+По умолчанию:
 
-- позиция: левый нижний угол;
-- размер шрифта: 26;
-- отступы: 10 × 10 logical pixels;
-- текст `FPS:`: фиолетовый;
-- числовое значение: белое;
-- только целые числа;
-- во время ожидания источника FPS отображается `FPS: Loading`.
+- положение: левый нижний угол;
+- размер шрифта: **24**;
+- `FPS:` — фиолетовый;
+- число FPS — белое;
+- отображается только целое значение;
+- пока источник FPS готовится, выводится `FPS: Loading`.
 
-Текущий Stage 8.9 использует compile-time/default `OverlayConfig`.
-Парсер конфигурации присутствует в исходниках, но runtime-загрузка пользовательского
-INI в публичной Stage 8.9 ветке не подключена. Поэтому изменение позиции,
-шрифта и отступов пользователем без пересборки пока не заявляется как
-поддерживаемая функция.
+Размер 24 в версии 1.2.0 немного компактнее предыдущего размера 26 и меньше
+закрывает элементы интерфейса игры.
 
 ---
 
-## 4. Публичные файлы
+## 3. Статус системного ПО
 
-Основные артефакты Stage 8.9:
+| Версия ПО | Статус | Что подтверждено |
+|---|---|---|
+| **4.51** | **Подтверждено** | PS4/PS5 игры, 30/60 FPS, смена игр, Rest Mode, штатная перезагрузка |
+| **9.60** | **Подтверждённая база** | реальный FPS и проверенный lifecycle предыдущих стабильных сборок |
+| **7.60** | Требуется тест | для версии 1.2.0 нужен новый аппаратный regression test |
+| **10.xx** | Экспериментально | кодовый путь реализован, но требуется аппаратная проверка |
+
+Наличие поддержки в исходниках не означает, что каждая промежуточная версия
+системного ПО уже проверена на реальной консоли.
+
+---
+
+## 4. Файлы релиза
+
+Для пользователя предназначены два варианта запуска:
 
 ```text
-Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf
-Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin
-Common_FPS_ShellUI_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf
-SHA256SUMS.txt
+Common_FPS_PS5_v1.2.0.elf
+Common_FPS_PS5_etaHEN_v1.2.0.plugin
 ```
 
-Пользователю нужны только один из двух вариантов:
-
-- `.elf` — ручной/standalone запуск через совместимый payload launcher;
-- `.plugin` — постоянный запуск через etaHEN Plugin system.
-
-`Common_FPS_ShellUI_....elf` — внутренний renderer, уже встроенный в
-controller. Его **не нужно и нельзя запускать как отдельный пользовательский
-payload**.
-
-### Важно
-
-**Не запускайте ELF и plugin одновременно.**
-
-Это два способа запуска одного и того же controller. Одновременный запуск
-создаёт ненужную конкуренцию за один renderer/lifecycle.
-
----
-
-## 5. Установка и запуск
-
-### Вариант A — standalone ELF
-
-1. Запустите jailbreak/эксплойт и etaHEN обычным для вашей системы способом.
-2. Передайте
-   `Common_FPS_PS5_UNIVERSAL_STAGE8_9_DCE_STANDBY.elf`
-   через Payload Manager, Netcat или другой поддерживаемый вашей средой
-   ELF launcher.
-3. Оставьте controller запущенным.
-4. Запустите PS4- или PS5-игру.
-5. После game/ShellUI stability gate overlay появится автоматически.
-6. Если источник FPS ещё определяется, временно будет `FPS: Loading`.
-
-### Вариант B — etaHEN plugin
-
-1. Используйте
-   `Common_FPS_PS5_etaHEN_UNIVERSAL_STAGE8_9_DCE_STANDBY.plugin`.
-2. Установите его через plugin-механизм etaHEN.
-3. Если ваша сборка etaHEN использует стандартный каталог плагинов, обычно
-   применяется `/data/etaHEN/plugins/`; фактический путь зависит от вашей
-   версии/сборки etaHEN.
-4. Включите plugin/autoload в интерфейсе etaHEN.
-5. После следующего запуска etaHEN controller должен стартовать автоматически.
-6. Overlay инъектируется не на домашнем экране, а только когда обнаружена
-   стабильная игра.
-
----
-
-## 6. Архитектура
-
-### 6.1 Controller
-
-Controller работает в tracked process, созданном loader/etaHEN, и не создаёт
-внутренний второй `fork()`.
-
-Основной цикл:
+Внутренний файл:
 
 ```text
-observe ShellUI
-      ↓
-observe game process
-      ↓
-3 стабильных наблюдения game PID
-      ↓
-FPS sampling
-      ↓
-10 стабильных наблюдений ShellUI PID
-      ↓
-ShellUI renderer injection
-      ↓
-UDP loopback state packets
-      ↓
-PUI overlay
+Common_FPS_ShellUI_v1.2.0.elf
 ```
 
-### 6.2 Game gate
+используется сборкой автоматически и отдельно запускаться не должен.
 
-Renderer не внедряется на домашнем экране. Перед первым renderer injection
-controller требует один и тот же игровой PID в течение трёх последовательных
-опросов.
-
-Это уменьшает риск раннего вмешательства в ShellUI до того, как контейнер
-`Game` действительно существует.
-
-### 6.3 ShellUI gate
-
-Перед renderer injection требуется десять стабильных наблюдений одного
-`SceShellUI` PID.
-
-Если ShellUI PID меняется, например после системного lifecycle/Rest Mode,
-старый renderer больше не считается online, gate начинается заново и renderer
-поднимается в новом ShellUI.
+**ELF и plugin одновременно не запускать.**
 
 ---
 
-## 7. Получение FPS
+## 5. Установка standalone ELF
 
-Stage 8.9 использует несколько источников с приоритетом.
+1. Запустить jailbreak/etaHEN.
+2. Передать `Common_FPS_PS5_v1.2.0.elf` через совместимый Payload Manager,
+   Netcat или другой ELF launcher.
+3. Запустить PS4- или PS5-игру.
+4. После стабилизации game PID и ShellUI overlay появится автоматически.
+5. Если sampler ещё готовится, временно будет показано `FPS: Loading`.
 
-### 7.1 VideoOut process sampler
+---
 
-Предпочтительный источник.
+## 6. Установка etaHEN plugin
 
-На hardware-proven FW 9.60 доступен fast path через известную VideoOut chain.
-На других версиях может применяться read-only indirect discovery внутри
+1. Использовать `Common_FPS_PS5_etaHEN_v1.2.0.plugin`.
+2. Установить его через plugin-механизм etaHEN.
+3. Включить plugin/autoload.
+4. После запуска игры Common FPS автоматически дождётся стабильного процесса
+   и поднимет overlay.
+
+Plugin удобнее для постоянного использования, поскольку controller
+автоматически присутствует после старта etaHEN и может восстановить overlay
+после поддерживаемых lifecycle-событий.
+
+---
+
+## 7. Как определяется FPS
+
+### 7.1 VideoOut
+
+Сначала Common FPS пытается получить подтверждённый счётчик VideoOut активной
+игры.
+
+На FW 9.60 используется ранее аппаратно проверенный быстрый путь. На других
+версиях может выполняться read-only discovery внутри
 `libSceVideoOut.sprx`.
 
-Кандидат принимается только если counter изменяется с правдоподобной
-display-like частотой в нескольких независимых временных окнах.
+Память игры во время поиска FPS не изменяется.
 
-Память игры этим discovery-путём **не изменяется**.
+### 7.2 Adaptive DCE
 
-### 7.2 HEN shared sample
+Если VideoOut counter не удаётся безопасно подтвердить, используется
+`/dev/dce`.
 
-Если HEN публикует совместимый `/system_tmp/fps_sample`, Stage 8.9 может
-использовать его как fallback.
+DCE-механизм:
 
-### 7.3 DCE adaptive fallback
+- выполняет display query;
+- получает набор 64-битных значений;
+- проверяет известное поле;
+- при необходимости автоматически ищет стабильный monotonic counter;
+- вычисляет частоту по изменению counter за время;
+- выдаёт целочисленный FPS.
 
-Если VideoOut counter не подтверждён, controller использует `/dev/dce`.
+На FW 4.51 именно этот механизм подтвердил 30 FPS и 60 FPS в разных играх.
 
-Порядок:
+### 7.3 Backoff VideoOut
 
-```text
-open /dev/dce
-      ↓
-ioctl display query
-      ↓
-извлечение 0x60-byte response
-      ↓
-проверка fixed field
-      ↓
-adaptive scan 64-bit monotonic fields
-      ↓
-выбор стабильного counter
-      ↓
-целочисленный FPS
-```
+После того как DCE стабильно выдаёт FPS, тяжёлый VideoOut discovery
+откладывается на 60 секунд.
 
-На FW 4.51 именно adaptive DCE стал рабочим универсальным источником и
-подтвердил 30/60 FPS в PS4 и PS5 играх.
-
-DCE fallback не читает и не пишет память игрового процесса.
+Если DCE несколько раз подряд перестаёт выдавать валидные samples, Common FPS
+снимает задержку и разрешает VideoOut recovery сразу.
 
 ---
 
-## 8. DCE Standby — оптимизация Stage 8.9
+## 8. Game lifecycle
 
-Stage 8.8 уже давал правильный FPS, но после успешного DCE продолжал
-периодически выполнять тяжёлый VideoOut indirect scan.
+Common FPS отслеживает процесс `eboot.bin`.
 
-Stage 8.9 добавляет backoff:
+При смене игры:
 
-- после первого валидного DCE FPS для текущего game PID VideoOut discovery
-  переходит в standby;
-- тяжёлый discovery разрешается не чаще одного раза в 60 секунд;
-- DCE продолжает выдавать FPS каждую рабочую итерацию;
-- после трёх подряд DCE misses standby немедленно снимается;
-- при смене game PID все sampler baseline/standby states сбрасываются;
-- если VideoOut позже успешно находится, он снова становится приоритетным.
-
-В логе это отображается строками:
-
-```text
-Sampler policy ... state=dce-standby ... videoout_retry_after_ms=60000
-Sampler policy ... state=dce-miss-wake ...
-Sampler policy ... state=videoout-resumed ...
-```
+1. старый sampler attachment сбрасывается;
+2. новый PID должен стабилизироваться;
+3. sampler запускается заново;
+4. DCE baseline и backoff сбрасываются;
+5. overlay начинает показывать FPS новой игры.
 
 ---
 
-## 9. ShellUI renderer
+## 9. ShellUI lifecycle
 
-Renderer создаёт два PUI label:
+Common FPS также отслеживает `SceShellUI`.
 
-- статический `FPS:`;
-- динамическое значение `Loading` или целый FPS.
+Renderer загружается только после появления стабильной игры и стабильного
+ShellUI PID.
 
-Controller отправляет renderer только валидированное состояние через loopback
-IPC. Renderer не занимается поиском игрового FPS самостоятельно.
+Если ShellUI перезапускается:
 
-### FW 4.51 / low-mid firmware path
+1. старый PID перестаёт считаться рабочим;
+2. controller ждёт новый стабильный PID;
+3. повторно выполняет bootstrap;
+4. восстанавливает overlay.
 
-Используется stopped MDBG transaction:
-
-1. controller определяет `Diagnostics.CheckRunningOnMainThread`;
-2. ShellUI останавливается;
-3. читаются expected bytes;
-4. изменяется только один проверенный байт на `RET`;
-5. выполняется readback/verification;
-6. восстанавливается auth;
-7. процесс возобновляется;
-8. renderer работает через background PUI path.
-
-### FW 9.60
-
-Сохраняется hardware-proven Application.Update chain backend.
-
-### High-FW experimental path
-
-Для выбранных более новых firmware семей Stage 8.9 содержит stopped ptrace-I/O
-one-byte guard. При несовпадении expected bytes, ошибке attach/write/readback
-или неподдержанной firmware renderer должен завершить попытку fail-closed,
-а не выполнять слепую запись.
+Это необходимо для корректной работы после системных lifecycle-событий.
 
 ---
 
-## 10. Rest Mode и lifecycle
+## 10. Rest Mode
 
-Controller не предполагает, что ShellUI PID вечен.
+На FW 4.51 подтверждено:
 
-При изменении/перезапуске ShellUI:
-
-1. старый PID перестаёт считаться активным renderer target;
-2. controller заново ждёт стабильный ShellUI;
-3. выполняет новый bootstrap;
-4. повторно поднимает renderer;
-5. FPS sampling продолжает работать.
-
-Аппаратная приёмка FW 4.51 от 28.09.2026 подтвердила:
-
-- Rest Mode → пробуждение → FPS работает;
-- последующая системная перезагрузка проходит штатно;
-- после нового ShellUI PID renderer снова становится online;
-- adaptive DCE снова выдаёт реальный FPS.
+- консоль уходит в Rest Mode штатно;
+- после пробуждения система продолжает работать;
+- FPS восстанавливается;
+- последующая обычная перезагрузка проходит без ошибки improper shutdown.
 
 ---
 
 ## 11. Логи
 
-### Controller
+Controller:
 
 ```text
-/data/CommonFPS_universal_stage8_9.log
+/data/CommonFPS_v1_2_0.log
 ```
 
-### ShellUI renderer
+ShellUI:
 
 ```text
-/data/CommonFPS_universal_stage8_9_shellui.log
+/data/CommonFPS_v1_2_0_shellui.log
 ```
 
-### Важные успешные строки
+Основные успешные события:
 
 ```text
-ShellUI bootstrap ... rc=0 ...
-ShellUI hook request ... status=0 ... verified=1 ...
-ShellUI renderer online ...
+ShellUI bootstrap ... rc=0
+ShellUI hook request ... status=0 ... verified=1
+ShellUI renderer online
 DCE adaptive counter selected ...
-Fallback sampler online backend=dce-adaptive ...
-Sampler policy ... state=dce-standby ...
+Fallback sampler online ...
 Sampler online ... first_fps=...
 ```
 
-### Если FPS остаётся Loading
+---
 
-Проверить в controller log:
+## 12. Если остаётся FPS: Loading
 
-1. найден ли `eboot.bin`;
+Проверить controller log:
+
+1. найден ли game PID;
 2. найден ли `libSceVideoOut.sprx`;
-3. прошёл ли VideoOut validation;
+3. прошла ли проверка VideoOut counter;
 4. открылся ли `/dev/dce`;
 5. прошёл ли DCE ioctl;
-6. выбран ли adaptive counter;
+6. найден ли adaptive counter;
 7. появился ли `Fallback sampler online`;
-8. поднялся ли `ShellUI renderer online`.
+8. поднялся ли ShellUI-компонент.
+
+Если overlay виден, но показывает `Loading`, это обычно означает, что
+визуальная часть уже работает, а sampler ещё не получил валидный FPS.
 
 ---
 
-## 12. Типовые состояния и диагностика
+## 13. Смена игр
 
-### FPS: Loading, но игра не падает
+Версия 1.2.0 рассчитана на смену игровых процессов без перезапуска самого
+счётчика.
 
-Renderer уже жив. Проблема находится на стороне sampler/source FPS.
-Нужен controller log.
-
-### Overlay отсутствует полностью
-
-Проверить:
-
-- действительно ли controller/plugin запущен;
-- определён ли game PID;
-- стабилен ли ShellUI PID;
-- дошёл ли лог до `ShellUI renderer online`.
-
-### После Rest Mode overlay исчез
-
-Подождать завершения нового ShellUI stability gate. Если overlay не
-восстанавливается, снять оба Stage 8.9 лога после пробуждения.
-
-### DCE ioctl failed
-
-Одиночная ошибка при закрытии/смене игры сама по себе не означает аварии.
-Stage 8.9 имеет fallback wake/recovery и сбрасывает состояние при game PID
-transition.
+После закрытия одной игры и запуска другой старое состояние сбрасывается и
+FPS определяется заново.
 
 ---
 
-## 13. Проверка после установки
+## 14. Штатная перезагрузка
 
-Минимальный acceptance test:
+В аппаратном тесте FW 4.51 после работы FPS, сна и пробуждения консоль
+перезагрузилась штатно. Это является обязательной частью текущей приёмки,
+поскольку ранние экспериментальные сборки могли затрагивать ShellUI слишком
+рано.
+
+---
+
+## 15. Сборка из исходников
+
+В репозитории используются GitHub Actions:
+
+- `Host Source Tests`;
+- `PS5 Source Build`.
+
+Сборка создаёт:
+
+```text
+Common_FPS_PS5_v1.2.0.elf
+Common_FPS_PS5_etaHEN_v1.2.0.plugin
+Common_FPS_ShellUI_v1.2.0.elf
+SHA256SUMS.txt
+```
+
+Подробности локальной сборки находятся в `BUILDING.md`.
+
+---
+
+## 16. Проверка после установки
+
+Рекомендуемый тест:
 
 1. запустить Common FPS;
-2. запустить PS5 игру с известным 30/60 FPS режимом;
-3. убедиться, что число реагирует на режим;
-4. закрыть игру;
-5. запустить PS4 игру;
-6. проверить FPS;
-7. оставить игру более 60 секунд;
-8. убедиться, что overlay не пропадает после VideoOut periodic reprobe;
-9. перевести PS5 в Rest Mode;
-10. разбудить консоль и запустить/вернуться в игру;
-11. убедиться, что FPS восстановился;
-12. выполнить обычную перезагрузку;
-13. убедиться в отсутствии improper shutdown/system software error.
+2. открыть PS5-игру;
+3. проверить появление реального FPS;
+4. закрыть её и открыть PS4-игру;
+5. проверить FPS;
+6. оставить игру более минуты;
+7. убедиться, что FPS продолжает отображаться;
+8. перевести консоль в Rest Mode;
+9. разбудить консоль;
+10. проверить восстановление FPS;
+11. выполнить штатную перезагрузку.
 
 ---
 
-## 14. Сборка из исходников
+## 17. Ограничения
 
-Рекомендуемый путь — GitHub Actions `PS5 Source Build`.
-
-Проект фиксирует исходные зависимости и собирает:
-
-- controller ELF;
-- etaHEN plugin wrapper;
-- внутренний ShellUI renderer;
-- SHA256SUMS.
-
-Для локальной сборки см. `BUILDING.md`.
-
-Ключевой принцип проекта: публичные бинарники должны быть воспроизводимыми
-из открытых исходников, а hardware validation рассматривается отдельно от
-успешной компиляции.
+- FW 7.60 требует нового теста текущей версии.
+- 10.xx пока не объявляется аппаратно подтверждённой.
+- Runtime-настройка размера/позиции через пользовательский INI пока не
+  является публично подключённой функцией.
+- FPS отображается целым числом.
+- Нельзя одновременно запускать ELF и plugin.
 
 ---
 
-## 15. Безопасностные ограничения проекта
+## 18. Безопасностные принципы
 
-В текущем universal path соблюдаются следующие правила:
-
-- game memory discovery — read-only;
-- DCE fallback не изменяет game memory;
-- системный method write выполняется controller-side, а не renderer-side;
-- перед write проверяются expected bytes;
-- после write выполняется verify readback;
-- auth-id восстанавливается после короткого privileged window;
-- неизвестные/неподтверждённые случаи должны fail-closed;
-- renderer не внедряется до появления стабильной игры;
-- controller не использует внутренний fork;
-- shutdown-specific writes/handlers отключены.
+- FPS sampler не пишет в память игры.
+- DCE fallback не зависит от offsets конкретной игры.
+- Перед системным изменением проверяются expected bytes.
+- После изменения выполняется readback.
+- Временный privileged auth восстанавливается.
+- Неизвестные случаи должны завершаться без слепой записи.
+- Overlay не внедряется до обнаружения стабильной игры.
 
 ---
 
-## 16. Известные ограничения
-
-- Не каждая версия системного ПО 1.xx–10.xx аппаратно проверена.
-- 7.60 требует свежего Stage 8.9 regression test.
-- 10.xx требует отдельного аппаратного подтверждения текущей high-FW ветки.
-- Runtime INI/customization для позиции/шрифта в Stage 8.9 не считается
-  публично подключённой функцией.
-- FPS отображается целым числом, без десятых.
-- Один экземпляр controller должен использоваться либо как ELF, либо как
-  etaHEN plugin.
-
----
-
-## 17. Что считать стабильной публикацией
-
-Для v1.2.0 Universal опубликованная база — это Stage 8.9 со следующими
-свойствами:
-
-- исходники находятся в `main`;
-- Host Source Tests проходят;
-- PS5 Source Build проходит;
-- artifact verifier проходит;
-- FW 4.51 подтверждён PS4/PS5 играми;
-- Rest Mode recovery подтверждён;
-- штатная перезагрузка подтверждена;
-- FW 9.60 остаётся hardware-proven baseline;
-- release notes явно отделяют подтверждённые firmware от experimental.
-
----
-
-## 18. Лицензия и ответственность
+## 19. Лицензия
 
 Common FPS for PS5 распространяется по GPL-3.0-or-later.
 
-Это homebrew для модифицированных PlayStation 5. Использование выполняется
-пользователем на собственный риск. Совместимость зависит от версии системного
-ПО, jailbreak/etaHEN окружения и изменений Sony/сторонних loader components.
+Это homebrew для модифицированных PlayStation 5. Пользователь самостоятельно
+несёт ответственность за использование на своей системе.

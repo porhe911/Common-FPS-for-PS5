@@ -8,7 +8,7 @@
 /*
  * PS5 adapter for Common FPS.
  *
- * Universal diagnostic adapter:
+ * Current PS5 diagnostic adapter:
  *   KERN_PROC PID discovery -> short debugger Auth window for module lookup
  *   -> original Auth restore -> read-only MDBG process reads.
  * The direct-map reader is used only as a FW 9.60 compatibility fallback.
@@ -49,7 +49,7 @@ constexpr std::size_t kProbeTableSize =
 #else
 
 constexpr const char* kLog =
-    "/data/CommonFPS_universal_stage8_9.log";
+    "/data/CommonFPS_v1_2_0.log";
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(kLog, "a");
