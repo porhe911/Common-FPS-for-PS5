@@ -1,6 +1,6 @@
-# Common FPS for PS5 — 1.1.0
+# Common FPS for PS5 — v1.2.0 Universal
 
-> Universal development branch: **Stage 8.9 DCE Standby**.
+> Current public universal release: **v1.2.0 / Stage 8.9 DCE Standby**.
 >
 > FW 4.51 is now hardware-confirmed with visible real FPS in both PS4 and PS5
 > games. Stage 8.9 keeps the successful Stage 8.8 DCE adaptive fallback but
@@ -27,6 +27,12 @@ FW 4.51 hardware evidence is documented in
 [docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md](docs/evidence/STAGE8_8_FW451_HARDWARE_20260928.md).
 The Stage 8.9 design and test procedure are in
 [docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md](docs/UNIVERSAL_STAGE8_9_DCE_STANDBY_RU.md).
+
+Full Russian user/developer documentation:
+[docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md](docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md).
+
+Release notes:
+[release/RELEASE_NOTES_v1.2.0.md](release/RELEASE_NOTES_v1.2.0.md).
 
 This hardware-validated source snapshot combines the tracked-process lifecycle
 with the source-built renderer/IPC path that produces the visible counter:
