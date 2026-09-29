@@ -480,6 +480,7 @@ static void test_shellui_hook_probe_request() {
     assert(shellui_hook_probe_backend(0x01000001U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x04510001U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x09000045U) == ShellUiHookBackend::Mdbg);
+    assert(shellui_hook_probe_backend(0x09000045U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x09600000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x10200000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x11000000U) == ShellUiHookBackend::Unsupported);
