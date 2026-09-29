@@ -479,6 +479,7 @@ static void test_shellui_hook_probe_request() {
     assert(shellui_hook_probe_request_is_valid(request, 55));
     assert(shellui_hook_probe_backend(0x01000001U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x04510001U) == ShellUiHookBackend::Mdbg);
+    assert(shellui_hook_probe_backend(0x09000045U) == ShellUiHookBackend::Mdbg);
     assert(shellui_hook_probe_backend(0x09600000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x10200000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x11000000U) == ShellUiHookBackend::Unsupported);
@@ -510,8 +511,8 @@ static void test_legacy_main_thread_guard_request() {
         ShellUiHookBackend::Mdbg);
     assert(shellui_main_thread_guard_backend(0x07600007U) ==
         ShellUiHookBackend::Mdbg);
-    assert(shellui_main_thread_guard_backend(0x09000000U) ==
-        ShellUiHookBackend::PtraceIo);
+    assert(shellui_main_thread_guard_backend(0x09000045U) ==
+        ShellUiHookBackend::Mdbg);
     assert(shellui_main_thread_guard_backend(0x09600000U) ==
         ShellUiHookBackend::Unsupported);
     assert(shellui_main_thread_guard_backend(0x10200000U) ==
