@@ -27,7 +27,7 @@
 namespace {
 
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_v1_2_0.log";
+    "/data/CommonFPS_v1_2_1.log";
 
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
@@ -191,7 +191,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.0\n"
+        "Common FPS for PS5 v1.2.1\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
