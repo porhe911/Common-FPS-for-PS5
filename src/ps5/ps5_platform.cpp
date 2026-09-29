@@ -49,7 +49,7 @@ constexpr std::size_t kProbeTableSize =
 #else
 
 constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_1.log";
+    "/data/CommonFPS_v1_2_2.log";
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(kLog, "a");
