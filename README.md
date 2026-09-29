@@ -1,57 +1,50 @@
-# Common FPS for PS5 v1.2.0
+# Common FPS for PS5 v1.2.1
 
-Real-time FPS overlay for PS4 and PS5 games running on a modified PlayStation 5.
+Real-time FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 
-Common FPS displays the current frame rate directly in the game UI. The project
-is open source, provides both a standalone ELF and an etaHEN plugin, follows
-game/ShellUI lifecycle changes, and restores the overlay after supported
-Rest Mode transitions.
+Common FPS displays the current frame rate directly over the game and is
+available as a standalone ELF or etaHEN plugin.
 
 ## Features
 
 - real-time integer FPS for PS4 and PS5 games;
 - compact bottom-left overlay;
 - purple `FPS:` label and white FPS value;
-- smaller 24px default font in v1.2.0;
-- automatic `FPS: Loading` state while the counter source is being prepared;
-- preferred per-game VideoOut sampling;
-- adaptive `/dev/dce` fallback when a VideoOut counter cannot be validated;
+- 24px default font;
+- `FPS: Loading` while the FPS source is being prepared;
+- VideoOut sampling with adaptive `/dev/dce` fallback;
 - no game-memory writes from the FPS sampler;
 - automatic game PID reattachment;
 - automatic ShellUI PID recovery;
 - Rest Mode recovery on tested firmware;
-- standalone ELF and persistent etaHEN plugin builds;
-- source-built controller, plugin and ShellUI component;
-- automated host tests, PS5 source build and artifact verification.
+- standalone ELF and etaHEN plugin builds;
+- automated source build and artifact verification.
 
 ## Firmware status
 
 | System software | Status | Notes |
 |---|---|---|
-| **4.51** | **Confirmed** | PS4 + PS5 games, 30/60 FPS, game switching, Rest Mode recovery and normal reboot tested |
-| **9.60** | **Confirmed baseline** | Existing hardware-tested Common FPS lifecycle and FPS path |
-| **7.60** | Test pending | Current v1.2.0 build needs a fresh hardware regression test |
-| **10.xx** | Experimental | Code path is implemented, but current v1.2.0 still needs hardware validation |
+| **4.51** | **Confirmed** | PS4 + PS5 games, 30/60 FPS, game switching, Rest Mode recovery, normal reboot |
+| **9.00** | **Confirmed** | Shadow of the Colossus and Spider-Man 2 tested; FPS survives Rest Mode |
+| **9.60** | **Confirmed baseline** | Existing hardware-tested FPS and lifecycle path |
+| **7.60** | Test pending | Current v1.2.1 build needs a fresh hardware regression test |
+| **10.xx** | Experimental | Code path exists, but hardware validation is still required |
 
 A code path being present does not mean every firmware revision has been
-physically tested. Confirmed and experimental status are intentionally kept
-separate.
+physically tested. Confirmed and experimental status are kept separate.
 
 ## Download
 
-Use **one** of these two files:
+Use **one** of these two files from the latest GitHub Release:
 
 ```text
-Common_FPS_PS5_v1.2.0.elf
-Common_FPS_PS5_etaHEN_v1.2.0.plugin
+Common_FPS_PS5_v1.2.1.elf
+Common_FPS_PS5_etaHEN_v1.2.1.plugin
 ```
-
-The internal `Common_FPS_ShellUI_v1.2.0.elf` is embedded into the controller
-and is not meant to be launched manually.
 
 **Do not run the standalone ELF and etaHEN plugin at the same time.**
 
-The latest release is available from the GitHub Releases page:
+Latest release:
 
 https://github.com/porhe911/Common-FPS-for-PS5/releases/latest
 
@@ -60,43 +53,59 @@ https://github.com/porhe911/Common-FPS-for-PS5/releases/latest
 ### Standalone ELF
 
 1. Start your jailbreak/etaHEN environment.
-2. Send `Common_FPS_PS5_v1.2.0.elf` with your preferred payload launcher.
+2. Send `Common_FPS_PS5_v1.2.1.elf` with your preferred payload launcher.
 3. Start a PS4 or PS5 game.
 4. The overlay appears automatically after the game and ShellUI readiness
    checks complete.
 
 ### etaHEN plugin
 
-1. Install `Common_FPS_PS5_etaHEN_v1.2.0.plugin` through etaHEN's plugin
+1. Install `Common_FPS_PS5_etaHEN_v1.2.1.plugin` through etaHEN's plugin
    system.
 2. Enable the plugin/autoload option.
 3. Start a game.
 4. Common FPS waits for a stable game process before creating the overlay.
 
-The plugin is the recommended option when you want the counter to come back
-automatically after normal console lifecycle events.
+The plugin is the recommended option for persistent use.
+
+## What's new in v1.2.1
+
+FW 9.00 required a different ShellUI write path than the one used by earlier
+tested firmware. Reading the target JIT code through MDBG worked, but the
+verified one-byte UI-thread guard could not be written while the page remained
+RX.
+
+v1.2.1 adds a FW 9.00-specific safe transaction:
+
+- ShellUI is stopped;
+- expected bytes are verified;
+- the target 16 KiB JIT page is temporarily changed from RX to RWX;
+- only the required one-byte guard is written;
+- the page is restored to RX immediately;
+- the result is read back and verified;
+- auth state is restored before the transaction completes.
+
+No game-process write path was added.
 
 ## How FPS is measured
 
 Common FPS prefers a validated VideoOut counter associated with the active
-game. If that counter cannot be resolved safely, it can fall back to the PS5
+game. If that counter cannot be resolved safely, it falls back to the PS5
 display controller through `/dev/dce`.
 
 The DCE path:
 
 - does not depend on per-game hardcoded offsets;
 - does not write to game memory;
-- automatically searches the returned DCE data for a stable display-like
-  counter when the fixed field is not suitable;
-- was confirmed on FW 4.51 with both 30 FPS and 60 FPS games.
+- can automatically identify a stable display-like counter;
+- is confirmed on FW 4.51 and FW 9.00.
 
-After DCE becomes the active source, expensive VideoOut discovery is placed in
-a 60-second backoff window. If DCE stops producing valid samples, VideoOut
-recovery is allowed immediately after repeated misses.
+When DCE is healthy, expensive VideoOut discovery uses a 60-second backoff.
+If DCE stops producing valid samples, VideoOut recovery is allowed again.
 
 ## Overlay
 
-Default appearance in v1.2.0:
+Default appearance:
 
 ```text
 Position: bottom-left
@@ -106,35 +115,27 @@ FPS value: white
 Format: integer only
 ```
 
-Example:
+## Rest Mode and recovery
 
-```text
-FPS: 60
-```
+Common FPS tracks both the active game process and `SceShellUI`.
 
-## Rest Mode and process recovery
+When a game or ShellUI PID changes, the old state is discarded and the
+required sampler/renderer components are brought up again.
 
-The controller does not assume that the ShellUI or game PID stays constant.
-
-When the game changes, the sampler resets and attaches to the new game
-process. When ShellUI is recreated, Common FPS waits for the new PID to become
-stable and restores the renderer.
-
-FW 4.51 testing confirmed that FPS returns after Rest Mode and that a normal
-system reboot still works correctly.
+Rest Mode recovery is hardware-confirmed on FW 4.51 and FW 9.00.
 
 ## Logs
 
 Controller:
 
 ```text
-/data/CommonFPS_v1_2_0.log
+/data/CommonFPS_v1_2_1.log
 ```
 
 ShellUI:
 
 ```text
-/data/CommonFPS_v1_2_0_shellui.log
+/data/CommonFPS_v1_2_1_shellui.log
 ```
 
 If the overlay shows `FPS: Loading`, the controller log is the first file to
@@ -142,34 +143,22 @@ check.
 
 ## Build from source
 
-The repository contains a reproducible PS5 build workflow.
-
-GitHub Actions:
+GitHub Actions runs:
 
 - **Host Source Tests**
 - **PS5 Source Build**
 
-The build produces:
+The PS5 build produces:
 
 ```text
-Common_FPS_PS5_v1.2.0.elf
-Common_FPS_PS5_etaHEN_v1.2.0.plugin
-Common_FPS_ShellUI_v1.2.0.elf
+Common_FPS_PS5_v1.2.1.elf
+Common_FPS_PS5_etaHEN_v1.2.1.plugin
+Common_FPS_ShellUI_v1.2.1.elf
 SHA256SUMS.txt
 ```
 
-Local build details are in [BUILDING.md](BUILDING.md).
-
-## Documentation
-
-- [Full Russian documentation](docs/COMMON_FPS_FULL_DOCUMENTATION_RU.md)
-- [v1.2.0 architecture and lifecycle](docs/V1_2_0_ARCHITECTURE_RU.md)
-- [FW 4.51 hardware evidence](docs/evidence/FW451_V1_2_0_HARDWARE_20260928.md)
-- [v1.2.0 release notes](release/RELEASE_NOTES_v1.2.0.md)
-
 ## License
 
-Common FPS-owned source is licensed under **GPL-3.0-or-later**. Third-party
-projects keep their own licenses and notices.
+Common FPS-owned source is licensed under **GPL-3.0-or-later**.
 
 Homebrew software for modified PlayStation 5 systems. Use at your own risk.

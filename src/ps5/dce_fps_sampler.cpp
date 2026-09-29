@@ -36,7 +36,7 @@ struct DceIoctlArg {
 
 void log_line(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_0.log", "a");
+        "/data/CommonFPS_v1_2_1.log", "a");
     if (!fp)
         return;
 

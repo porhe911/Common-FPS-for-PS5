@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Common FPS for PS5 v1.2.0 release boundary."""
+"""Verify the Common FPS for PS5 v1.2.1 release boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00057\0" + b"1.20\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00058\0" + b"1.21\0"
 
 
 def digest(data: bytes) -> str:
@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.0"
+            b"Common FPS for PS5 v1.2.1"
             in elf,
-            "v1.2.0 runtime marker missing",
+            "v1.2.1 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (
@@ -129,11 +129,11 @@ def main() -> int:
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_v1_2_0.log" in elf,
+            b"/data/CommonFPS_v1_2_1.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_v1_2_0_shellui.log" in renderer,
+            b"/data/CommonFPS_v1_2_1_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -168,7 +168,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_v120_hook_request.bin" in renderer,
+            b"commonfps_v121_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (

@@ -60,9 +60,9 @@ constexpr const char* kLog =
 #elif defined(COMMON_FPS_TEST25_LOAD_ONLY)
 constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
-#elif defined(COMMON_FPS_V120)
+#elif defined(COMMON_FPS_V121)
 constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_0.log";
+    "/data/CommonFPS_v1_2_1.log";
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";

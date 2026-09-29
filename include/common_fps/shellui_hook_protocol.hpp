@@ -14,13 +14,13 @@
 namespace common_fps {
 
 inline constexpr const char* kShellUiHookRequestPath =
-    "/system_tmp/commonfps_v120_hook_request.bin";
+    "/system_tmp/commonfps_v121_hook_request.bin";
 inline constexpr const char* kShellUiHookRequestTempPath =
-    "/system_tmp/commonfps_v120_hook_request.tmp";
+    "/system_tmp/commonfps_v121_hook_request.tmp";
 inline constexpr const char* kShellUiHookAckPath =
-    "/system_tmp/commonfps_v120_hook_ack.bin";
+    "/system_tmp/commonfps_v121_hook_ack.bin";
 inline constexpr const char* kShellUiHookAckTempPath =
-    "/system_tmp/commonfps_v120_hook_ack.tmp";
+    "/system_tmp/commonfps_v121_hook_ack.tmp";
 
 inline constexpr std::uint64_t kShellUiHookRequestMagic =
     0x395145524b484643ULL; /* "CFHKREQ9" */
@@ -69,9 +69,11 @@ inline ShellUiHookBackend shellui_main_thread_guard_backend(
      * FW 9.60 deliberately stays on the hardware-proven Application.Update
      * chain path; returning Unsupported here selects that existing backend.
      */
-    if (family >= 0x01000000U && family <= 0x08200000U)
+    if ((family >= 0x01000000U && family <= 0x08200000U) ||
+        family == 0x09000000U)
         return ShellUiHookBackend::Mdbg;
-    if ((family >= 0x08300000U && family < 0x09600000U) ||
+    if ((family >= 0x08300000U && family < 0x09000000U) ||
+        (family > 0x09000000U && family < 0x09600000U) ||
         (family > 0x09600000U && family <= 0x10ff0000U))
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
@@ -266,7 +268,8 @@ inline bool shellui_hook_request_is_valid(
 inline ShellUiHookBackend shellui_hook_probe_backend(
     std::uint32_t sdk) noexcept {
     const std::uint32_t family = sdk & 0xffff0000U;
-    if (family >= 0x01000000U && family <= 0x08200000U)
+    if ((family >= 0x01000000U && family <= 0x08200000U) ||
+        family == 0x09000000U)
         return ShellUiHookBackend::Mdbg;
     if (family >= 0x08300000U && family <= 0x10ff0000U)
         return ShellUiHookBackend::PtraceIo;

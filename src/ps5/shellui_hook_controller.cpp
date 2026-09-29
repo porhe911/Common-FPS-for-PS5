@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
+#include <sys/mman.h>
 
 extern "C" {
 #include <ps5/kernel.h>
@@ -24,6 +25,7 @@ namespace common_fps::ps5 {
 namespace {
 
 constexpr std::uint64_t kPtraceAuthId = 0x4800000000010003ULL;
+constexpr std::uint64_t kPs5CodePageSize = 0x4000ULL;
 
 template <typename T>
 bool read_exact_file(const char* path, T& value) noexcept {
@@ -149,8 +151,17 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         return ShellUiHookPollResult::Failed;
     }
 
-    report.backend = backend == ShellUiHookBackend::Mdbg
-        ? "mdbg" : "ptrace-io";
+    const std::uint32_t firmware_family =
+        report.sdk_version & 0xffff0000U;
+    const bool fw900_guard_write =
+        report.main_thread_guard &&
+        firmware_family == 0x09000000U &&
+        backend == ShellUiHookBackend::Mdbg;
+
+    report.backend = fw900_guard_write
+        ? "mdbg-rwx"
+        : (backend == ShellUiHookBackend::Mdbg ? "mdbg" : "ptrace-io");
+
     const auto read_target = [&](void* destination, std::size_t size) {
         if (backend == ShellUiHookBackend::Mdbg)
             return mdbg_copyout(shellui_pid,
@@ -160,9 +171,11 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
         /*
-         * Legacy UI-thread guard changes one verified byte only.
-         * An existing etaHEN absolute jump changes only its destination.
-         * Native Application.Update keeps the full verified 16-byte write.
+         * The UI-thread guard changes one verified byte only. FW 9.00 can
+         * read JIT code through MDBG but rejects a write while the JIT page
+         * is RX. For that exact firmware family, temporarily make the single
+         * 16 KiB code page RWX while ShellUI is stopped, write the byte, then
+         * restore RX before verification. No game process memory is written.
          */
         const std::size_t offset =
             report.main_thread_guard ? 0U : (report.eta_chain ? 6U : 0U);
@@ -171,6 +184,35 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
             (report.eta_chain ? 8U : kShellUiHookPatchSize);
         const intptr_t address =
             static_cast<intptr_t>(request.method_address + offset);
+
+        if (fw900_guard_write) {
+            const std::uint64_t page =
+                request.method_address & ~(kPs5CodePageSize - 1ULL);
+            if (kernel_mprotect(
+                    shellui_pid,
+                    static_cast<intptr_t>(page),
+                    static_cast<std::size_t>(kPs5CodePageSize),
+                    PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+                return -1000;
+            }
+
+            int rc = mdbg_copyin(
+                shellui_pid, bytes + offset, address, size);
+            if (rc != 0) {
+                rc = pt_copyin(
+                    shellui_pid, bytes + offset, address, size);
+            }
+
+            const int restore_prot_rc = kernel_mprotect(
+                shellui_pid,
+                static_cast<intptr_t>(page),
+                static_cast<std::size_t>(kPs5CodePageSize),
+                PROT_READ | PROT_EXEC);
+            if (restore_prot_rc != 0)
+                return -1001;
+            return rc;
+        }
+
         if (backend == ShellUiHookBackend::Mdbg)
             return mdbg_copyin(shellui_pid, bytes + offset, address, size);
         return pt_copyin(shellui_pid, bytes + offset, address, size);
@@ -226,7 +268,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
                     verified.data(),
                     request.desired,
                     verified.size()) == 0;
-            if (report.verified) {
+            if (report.verified && report.write_rc == 0) {
                 patch_applied = true;
                 report.status = ShellUiHookStatus::Success;
             } else {

@@ -1,0 +1,71 @@
+name: Publish Common FPS v1.2.1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "release/PUBLISH_v1.2.1"
+      - ".github/workflows/publish-v1.2.1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git wget unzip cmake meson pkg-config \
+            python3 python3-pyelftools \
+            clang-18 lld-18 xxd
+
+      - name: Prepare pinned PS5 dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build and verify PS5 artifacts
+        run: bash ./scripts/ps5_source_build.sh
+
+      - name: Point v1.2.1 tag at current release commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f v1.2.1 "${GITHUB_SHA}"
+          git push origin refs/tags/v1.2.1 --force
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSETS=(
+            "dist/Common_FPS_PS5_v1.2.1.elf"
+            "dist/Common_FPS_PS5_etaHEN_v1.2.1.plugin"
+          )
+
+          if gh release view v1.2.1 >/dev/null 2>&1; then
+            gh release edit v1.2.1 \
+              --target "${GITHUB_SHA}" \
+              --title "Common FPS for PS5 v1.2.1" \
+              --notes-file "release/RELEASE_NOTES_v1.2.1.md" \
+              --latest
+            gh release upload v1.2.1 "${ASSETS[@]}" --clobber
+          else
+            gh release create v1.2.1 "${ASSETS[@]}" \
+              --target "${GITHUB_SHA}" \
+              --title "Common FPS for PS5 v1.2.1" \
+              --notes-file "release/RELEASE_NOTES_v1.2.1.md" \
+              --latest
+          fi
