@@ -49,11 +49,11 @@ jobs:
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-v1.2.1
+          name: Common-FPS-v1.2.2
           path: |
-            dist/Common_FPS_PS5_v1.2.1.elf
-            dist/Common_FPS_PS5_etaHEN_v1.2.1.plugin
-            dist/Common_FPS_ShellUI_v1.2.1.elf
+            dist/Common_FPS_PS5_v1.2.2.elf
+            dist/Common_FPS_PS5_etaHEN_v1.2.2.plugin
+            dist/Common_FPS_ShellUI_v1.2.2.elf
             dist/SHA256SUMS.txt
             docs/V1_2_0_ARCHITECTURE_RU.md
             RESOLVED_BUILD_DEPENDENCIES.txt

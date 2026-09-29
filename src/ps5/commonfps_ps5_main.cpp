@@ -22,12 +22,17 @@
 #include <fcntl.h>
 #include <optional>
 #include <sys/types.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+
+extern "C" int sceKernelSetProcessName(const char* name);
 
 namespace {
 
+constexpr const char* kPayloadProcessName = "CommonFPS.elf";
+
 constexpr const char* kControllerLog =
-    "/data/CommonFPS_v1_2_1.log";
+    "/data/CommonFPS_v1_2_2.log";
 
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
@@ -53,6 +58,30 @@ struct ShellUiObservation {
     unsigned records = 0;
     unsigned malformed_records = 0;
 };
+
+struct PayloadIdentityResult {
+    int process_name_rc = -1;
+    int process_name_errno = 0;
+    long thread_name_rc = -1;
+    int thread_name_errno = 0;
+};
+
+PayloadIdentityResult set_payload_identity() noexcept {
+    PayloadIdentityResult result{};
+
+    errno = 0;
+    result.process_name_rc = sceKernelSetProcessName(kPayloadProcessName);
+    result.process_name_errno = result.process_name_rc == 0 ? 0 : errno;
+
+    errno = 0;
+    result.thread_name_rc = syscall(
+        SYS_thr_set_name,
+        -1,
+        kPayloadProcessName);
+    result.thread_name_errno = result.thread_name_rc == 0 ? 0 : errno;
+
+    return result;
+}
 
 void write_all(int fd, const char* data, std::size_t size) noexcept {
     while (size != 0) {
@@ -178,7 +207,8 @@ ShellUiObservation observe_shellui_once() noexcept {
 }
 
 void write_worker_ready_record(
-    const ShellUiObservation& first) noexcept {
+    const ShellUiObservation& first,
+    const PayloadIdentityResult& identity) noexcept {
 
     const int fd = open(
         kControllerLog,
@@ -191,7 +221,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.1\n"
+        "Common FPS for PS5 v1.2.2\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -205,8 +235,9 @@ void write_worker_ready_record(
         "stop_path=disabled\n"
         "Worker ready pid=%d ppid=%d first_shellui_pid=%d "
         "size_rc=%d data_rc=%d errno=%d bytes=%zu records=%u "
-        "malformed=%u log_fd=closing periodic_log=disabled "
-        "platform_log=enabled\n",
+        "malformed=%u process_name=%s process_name_rc=%d "
+        "process_name_errno=%d thread_name_rc=%ld thread_name_errno=%d "
+        "log_fd=closing periodic_log=disabled platform_log=enabled\n",
         getpid(),
         getppid(),
         first.pid,
@@ -215,7 +246,12 @@ void write_worker_ready_record(
         first.saved_errno,
         first.bytes,
         first.records,
-        first.malformed_records);
+        first.malformed_records,
+        kPayloadProcessName,
+        identity.process_name_rc,
+        identity.process_name_errno,
+        identity.thread_name_rc,
+        identity.thread_name_errno);
 
     if (record_size > 0) {
         const std::size_t safe_size =
@@ -304,8 +340,16 @@ void append_first_fps_record(
 }
 
 [[noreturn]] void run_tracked_worker() noexcept {
+    /*
+     * Payload Manager's default Active Processes view recognizes resident
+     * payloads by ki_comm ending in ".elf". Set both the process command name
+     * and the main-thread name before the first diagnostic snapshot so the
+     * controller appears as CommonFPS.elf instead of inheriting its loader
+     * identity.
+     */
+    const PayloadIdentityResult identity = set_payload_identity();
     const ShellUiObservation first = observe_shellui_once();
-    write_worker_ready_record(first);
+    write_worker_ready_record(first, identity);
 
     common_fps::ps5::Ps5Platform platform;
     common_fps::FpsSampler sampler(platform);

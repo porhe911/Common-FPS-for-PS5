@@ -29,7 +29,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.1"
+    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.2"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -83,7 +83,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.1.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.2.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -107,11 +107,11 @@ add_custom_command(
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.2.1.elf"
+    OUTPUT_NAME "Common_FPS_PS5_v1.2.2.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # Current v1.2.1 sampler, lifecycle and ShellUI implementation.
+    # Current v1.2.2 sampler, lifecycle and ShellUI implementation.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
@@ -132,7 +132,7 @@ target_sources(common_fps_controller PRIVATE
 )
 
 target_compile_definitions(common_fps_controller PRIVATE
-    COMMON_FPS_V121=1
+    COMMON_FPS_V122=1
     COMMON_FPS_DIAGNOSTIC_SYSCTL_ONLY=1
 )
 
@@ -182,11 +182,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.1.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.2.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.1.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.1.plugin"
-            --title-id CFPS00058
-            --version 1.21
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.2.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.2.plugin"
+            --title-id CFPS00059
+            --version 1.22
 )
