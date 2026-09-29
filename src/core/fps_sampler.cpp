@@ -21,7 +21,7 @@ namespace {
 #if defined(PS5)
 void sampler_log(const char* fmt, ...) {
     FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_0.log",
+        "/data/CommonFPS_v1_2_1.log",
         "a");
     if (!fp)
         return;
