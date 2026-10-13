@@ -9,6 +9,7 @@ add_library(common_fps_core STATIC
     src/core/scene_guard.cpp
     src/core/app.cpp
     src/core/config.cpp
+    src/core/dce_counter_sampler.cpp
     src/core/fps_sampler.cpp
     src/core/layout.cpp
     src/core/lifecycle.cpp
@@ -47,6 +48,16 @@ if(COMMON_FPS_BUILD_TESTS)
     )
     target_link_libraries(common_fps_autoload_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_autoload_tests COMMAND common_fps_autoload_tests)
+    add_executable(common_fps_sampling_tests tests/test_sampling.cpp)
+    target_link_libraries(common_fps_sampling_tests PRIVATE common_fps_core)
+    add_test(NAME common_fps_sampling_tests COMMAND common_fps_sampling_tests)
+
+    if(UNIX)
+        add_executable(common_fps_logging_tests tests/test_session_log.cpp)
+        target_link_libraries(common_fps_logging_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_logging_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_logging_tests COMMAND common_fps_logging_tests)
+    endif()
 endif()
 
 if(COMMON_FPS_BUILD_TESTS)
@@ -55,6 +66,7 @@ if(COMMON_FPS_BUILD_TESTS)
     foreach(common_fps_test_target IN ITEMS
             common_fps_tests
             common_fps_v1_parity_tests
+            common_fps_sampling_tests
             common_fps_autoload_tests)
         if(MSVC)
             target_compile_options(${common_fps_test_target} PRIVATE /UNDEBUG)

@@ -39,8 +39,9 @@ WirePacket make_wire_packet(
 
     WirePacket packet;
     packet.sequence = sequence;
-    packet.fps = frame.fps;
-    packet.loading = frame.loading ? 1 : 0;
+    const bool valid_rate = frame.fps >= 0 && frame.fps <= kMaxDisplayFps;
+    packet.fps = valid_rate ? frame.fps : 0;
+    packet.loading = frame.loading || !valid_rate ? 1 : 0;
     packet.corner = encode_corner(frame.config.corner);
     packet.font_size = static_cast<std::uint16_t>(
         std::clamp(frame.config.font_size, kMinFontSize, kMaxFontSize));
@@ -73,8 +74,9 @@ decode_wire_packet(const WirePacket& packet) {
 
     OverlayFrame frame;
     frame.visible = true;
-    frame.loading = packet.loading != 0;
-    frame.fps = packet.fps;
+    const bool valid_rate = packet.fps >= 0 && packet.fps <= kMaxDisplayFps;
+    frame.loading = packet.loading != 0 || !valid_rate;
+    frame.fps = valid_rate ? packet.fps : 0;
     frame.config.corner = decode_corner(packet.corner);
     frame.config.font_size = std::clamp(
         static_cast<int>(packet.font_size),

@@ -1,4 +1,4 @@
-# Building Common FPS for PS5 v1.2.0
+# Building Common FPS for PS5 v1.2.3 RC1
 
 ## GitHub Actions
 
@@ -16,9 +16,9 @@ The workflow:
 The downloadable artifact contains:
 
 ```text
-Common_FPS_PS5_v1.2.0.elf
-Common_FPS_PS5_etaHEN_v1.2.0.plugin
-Common_FPS_ShellUI_v1.2.0.elf
+Common_FPS_PS5_v1.2.3.elf
+Common_FPS_PS5_etaHEN_v1.2.3.plugin
+Common_FPS_ShellUI_v1.2.3.elf
 SHA256SUMS.txt
 RESOLVED_BUILD_DEPENDENCIES.txt
 ```
@@ -46,8 +46,11 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.0 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC1 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
+
+FW 11.60 requires hardware validation. See
+[test-build notes](release/RELEASE_NOTES_v1.2.3_RC1.md).

@@ -8,6 +8,8 @@
 #include "common_fps/fps_sampler.hpp"
 #include "common_fps/layout.hpp"
 #include "common_fps/wire.hpp"
+#include "common_fps/session_log.hpp"
+#include "stable_sampler/proc_rw_v960.hpp"
 #include "ps5_platform.hpp"
 #include "dce_fps_sampler.hpp"
 #include "shellui_injector.hpp"
@@ -19,7 +21,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <fcntl.h>
 #include <optional>
 #include <sys/types.h>
 #include <sys/syscall.h>
@@ -30,9 +31,6 @@ extern "C" int sceKernelSetProcessName(const char* name);
 namespace {
 
 constexpr const char* kPayloadProcessName = "CommonFPS.elf";
-
-constexpr const char* kControllerLog =
-    "/data/CommonFPS_v1_2_2.log";
 
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
@@ -81,20 +79,6 @@ PayloadIdentityResult set_payload_identity() noexcept {
     result.thread_name_errno = result.thread_name_rc == 0 ? 0 : errno;
 
     return result;
-}
-
-void write_all(int fd, const char* data, std::size_t size) noexcept {
-    while (size != 0) {
-        const ssize_t written = write(fd, data, size);
-        if (written > 0) {
-            data += written;
-            size -= static_cast<std::size_t>(written);
-            continue;
-        }
-        if (written < 0 && errno == EINTR)
-            continue;
-        break;
-    }
 }
 
 bool record_is_shellui(
@@ -210,18 +194,13 @@ void write_worker_ready_record(
     const ShellUiObservation& first,
     const PayloadIdentityResult& identity) noexcept {
 
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_TRUNC | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
-
-    char record[1024]{};
+    char record[2048]{};
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.2\n"
+        "Common FPS for PS5 v1.2.3 RC1\n"
+        "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
+        "fw1160_guard=ptrace_io_1byte\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -238,6 +217,7 @@ void write_worker_ready_record(
         "malformed=%u process_name=%s process_name_rc=%d "
         "process_name_errno=%d thread_name_rc=%ld thread_name_errno=%d "
         "log_fd=closing periodic_log=disabled platform_log=enabled\n",
+        common_fps::ps5::stable_sampler::firmware_sdk_version(),
         getpid(),
         getppid(),
         first.pid,
@@ -258,11 +238,9 @@ void write_worker_ready_record(
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 void append_sampler_policy_record(
@@ -270,13 +248,6 @@ void append_sampler_policy_record(
     const char* state,
     const char* backend,
     std::uint64_t retry_after_us) noexcept {
-
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
 
     char record[320]{};
     const unsigned long long retry_ms =
@@ -296,11 +267,9 @@ void append_sampler_policy_record(
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 void append_first_fps_record(
@@ -308,13 +277,6 @@ void append_first_fps_record(
     std::uintptr_t counter_address,
     int fps,
     const char* backend) noexcept {
-
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
 
     char record[256]{};
     const int record_size = std::snprintf(
@@ -332,14 +294,14 @@ void append_first_fps_record(
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 [[noreturn]] void run_tracked_worker() noexcept {
+    common_fps::reset_session_log(common_fps::kControllerLogPath);
+    common_fps::reset_session_log(common_fps::kRendererLogPath);
     /*
      * Payload Manager's default Active Processes view recognizes resident
      * payloads by ki_comm ending in ".elf". Set both the process command name

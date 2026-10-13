@@ -6,6 +6,7 @@
 
 #include "shellui_injector.hpp"
 #include "common_fps/shellui_stage.hpp"
+#include "common_fps/session_log.hpp"
 #if defined(COMMON_FPS_TEST29_NO_AUTH_ONLY)
 #elif defined(COMMON_FPS_TEST28_AUTH_DIRECT_ONLY)
 #include "shellui_auth_direct_probe.hpp"
@@ -60,9 +61,9 @@ constexpr const char* kLog =
 #elif defined(COMMON_FPS_TEST25_LOAD_ONLY)
 constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
-#elif defined(COMMON_FPS_V122)
+#elif defined(COMMON_FPS_V123)
 constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_2.log";
+    kControllerLogPath;
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -249,16 +250,10 @@ ShellUiLookupResult find_shellui_pid() noexcept {
 }
 
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(kLog, "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kLog, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 
 #if !defined(COMMON_FPS_TEST25_LOAD_ONLY) && \

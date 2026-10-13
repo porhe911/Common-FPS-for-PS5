@@ -111,6 +111,10 @@ bool read_page_entry(std::uintptr_t address, std::uint64_t& entry) noexcept {
 } // namespace
 
 std::uint32_t firmware_sdk_version() noexcept {
+    /* HEN can spoof kern.sdk_version. Use the SDK's physical-FW resolver. */
+    const std::uint32_t physical_sdk = kernel_get_fw_version();
+    if (physical_sdk != 0)
+        return physical_sdk;
     std::uint32_t sdk = 0;
     std::size_t sdk_len = sizeof(sdk);
     if (sysctlbyname("kern.sdk_version", &sdk, &sdk_len, nullptr, 0) != 0 ||

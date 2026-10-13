@@ -6,6 +6,7 @@
 #pragma once
 
 #include "common_fps/platform.hpp"
+#include "common_fps/dce_counter_sampler.hpp"
 
 #include <array>
 #include <cstddef>
@@ -40,21 +41,10 @@ private:
     bool ensure_open() noexcept;
     std::optional<int> sample_shared_hen() noexcept;
     bool query_dce(std::array<std::uint64_t, 12>& words) noexcept;
-    std::optional<int> derive_fps(
-        const std::array<std::uint64_t, 12>& words,
-        std::uint64_t now_us) noexcept;
-
     Platform& platform_;
     int fd_ = -1;
 
-    bool have_dce_baseline_ = false;
-    std::array<std::uint64_t, 12> previous_words_{};
-    std::uint64_t previous_time_us_ = 0;
-
-    std::array<unsigned, 12> candidate_streak_{};
-    std::array<int, 12> candidate_last_fps_{};
-    int selected_word_ = -1;
-    unsigned selected_invalid_ = 0;
+    DceCounterSampler counter_sampler_;
 
     unsigned consecutive_failures_ = 0;
     bool backend_logged_ = false;

@@ -21,9 +21,9 @@ cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
 mkdir -p "${ROOT}/dist"
 
-ELF="${ROOT}/dist/Common_FPS_PS5_v1.2.2.elf"
-PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.2.plugin"
-RENDERER="${ROOT}/dist/Common_FPS_ShellUI_v1.2.2.elf"
+ELF="${ROOT}/dist/Common_FPS_PS5_v1.2.3.elf"
+PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.3.plugin"
+RENDERER="${ROOT}/dist/Common_FPS_ShellUI_v1.2.3.elf"
 
 test -f "${ELF}"
 test -f "${PLUGIN}"

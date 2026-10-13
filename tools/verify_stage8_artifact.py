@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Common FPS for PS5 v1.2.2 release boundary."""
+"""Verify the Common FPS for PS5 v1.2.3 release boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00059\0" + b"1.22\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.23\0"
 
 
 def digest(data: bytes) -> str:
@@ -73,11 +73,14 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.2"
+            b"Common FPS for PS5 v1.2.3"
             in elf,
-            "v1.2.2 runtime marker missing",
+            "v1.2.3 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
+        (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
+        (b"log_limit=65536 log_reset=activation" in elf, "bounded session log missing"),
+        (b"fw1160_guard=ptrace_io_1byte" in elf, "FW 11.60 guard marker missing"),
         (b"CommonFPS.elf" in elf, "Payload Manager process name marker missing"),
         (b"sceKernelSetProcessName" in elf, "process-name API import missing"),
         (
@@ -131,11 +134,11 @@ def main() -> int:
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_v1_2_2.log" in elf,
+            b"/data/CommonFPS.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_v1_2_2_shellui.log" in renderer,
+            b"/data/CommonFPS_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -170,7 +173,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_v122_hook_request.bin" in renderer,
+            b"commonfps_v123_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (

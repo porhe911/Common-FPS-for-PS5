@@ -37,8 +37,11 @@ inline constexpr int kDefaultFontSize = 24;
 inline constexpr int kMinFontSize = 18;
 inline constexpr int kMaxFontSize = 36;
 
-/* Hardware-proven v11 filter: PS5 output is at most 120 Hz. */
+/* PS5 output is at most 120 Hz; allow only a small measurement tolerance. */
+inline constexpr int kMaxDisplayFps = 120;
 inline constexpr std::uint32_t kMaxTenthsFps = 1300;
+inline constexpr std::uint64_t kMinFpsWindowUs = 200'000ULL;
+inline constexpr std::uint64_t kMaxFpsWindowUs = 3'000'000ULL;
 
 /* Baseline read + one discarded delta suppresses the startup spike. */
 inline constexpr unsigned kWarmupDeltasToDiscard = 1;

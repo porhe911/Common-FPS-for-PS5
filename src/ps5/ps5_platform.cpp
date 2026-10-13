@@ -20,6 +20,7 @@
 #include "ps5_platform.hpp"
 
 #include "common_fps/constants.hpp"
+#include "common_fps/session_log.hpp"
 #include "stable_sampler/process_sysctl.hpp"
 #include "stable_sampler/proc_rw_v960.hpp"
 #include "stable_sampler/videoout_module.hpp"
@@ -31,7 +32,7 @@ extern "C" {
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
-#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 namespace common_fps::ps5 {
@@ -48,20 +49,11 @@ constexpr std::size_t kProbeTableSize =
 
 #else
 
-constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_2.log";
-
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(kLog, "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kControllerLogPath, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 
 unsigned long long hex_address(std::uintptr_t value) noexcept {
@@ -318,12 +310,11 @@ std::uint32_t Ps5Platform::firmware_sdk_version() noexcept {
 }
 
 std::uint64_t Ps5Platform::monotonic_us() {
-    timeval tv{};
-    gettimeofday(&tv, nullptr);
-
-    return
-        static_cast<std::uint64_t>(tv.tv_sec) * 1'000'000ULL +
-        static_cast<std::uint64_t>(tv.tv_usec);
+    timespec now{};
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return 0;
+    return static_cast<std::uint64_t>(now.tv_sec) * 1'000'000ULL +
+        static_cast<std::uint64_t>(now.tv_nsec) / 1000ULL;
 }
 
 void Ps5Platform::sleep_ms(unsigned milliseconds) {

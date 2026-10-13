@@ -8,13 +8,14 @@
 /*
  * Source-only ShellUI renderer.
  *
- * The v1.2.2 renderer never writes Sony method memory from the renderer. Both native
+ * The v1.2.3 renderer never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
 
 #include "commonfps_shellui.hpp"
 #include "common_fps/shellui_hook_protocol.hpp"
+#include "common_fps/session_log.hpp"
 
 #include <arpa/inet.h>
 #include <array>
@@ -639,17 +640,10 @@ MainThreadGuardResult install_main_thread_guard() {
 }
 
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_2_shellui.log", "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kRendererLogPath, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 
 MonoImage* open_image(const char* path) {
@@ -1315,7 +1309,7 @@ bool initialize_runtime() {
 
     /*
      * The current renderer first asks the controller for a one-byte, stopped-process
-     * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families
+     * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families and FW 11.60
      * use ptrace I/O. FW 9.60 intentionally rejects the guard so the existing
      * hardware-proven Application.Update chain renderer is retained.
      */
