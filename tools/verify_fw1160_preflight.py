@@ -20,8 +20,12 @@ main = subprocess.check_output(["objdump", "-d", "--disassemble=main", sys.argv[
 assert "<fork>" not in main
 for name in ["mdbg_copyout", "mdbg_copyin", "DceFpsSampler", "FpsSampler",
              "inject_shellui_stable", "pt_attach", "pt_detach", "ioctl",
-             "kernel_set_ucred_authid", "kernel_mprotect"]:
+             "kernel_set_ucred_authid"]:
     assert name not in symbols, name
+# The unmodified SDK CRT maps/protects its own ELF before main. That helper
+# is legitimate startup code; the diagnostic application must not call it.
+assert "<kernel_mprotect>" not in main
+assert "<kernel_set_vmem_protection>" not in main
 assert b"/dev/dce" not in elf
 assert b"id_commonfps_value" not in elf
 print("FW 11.60 observation-only boundary: PASS")
