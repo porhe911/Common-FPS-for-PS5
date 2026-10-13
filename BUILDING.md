@@ -52,9 +52,10 @@ recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
 
-FW 11.60 application sampling/rendering is held after hardware KP reports.
-Keep all controller and Preflight v0.1 builds disabled on that firmware:
-the reduced diagnostic also reproduced a reported freeze/shutdown, and
-the application hold does not bypass the shared SDK CRT startup. See
+FW 11.60 application sampling/rendering remains held pending validation.
+The user now reports the same shutdown without the FPS counter, so the
+system failure is not specific to Common FPS. Stabilize the base environment
+before re-enabling hardware counter tests. The application hold does not
+bypass the shared SDK CRT startup. See
 [RC2 notes](release/RELEASE_NOTES_v1.2.3_RC2.md) and the distinct
 [FW 11.60 preflight](release/FW1160_PREFLIGHT_v0.1_RU.md).
