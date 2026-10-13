@@ -65,8 +65,11 @@ void snapshot(unsigned tick) noexcept {
                 ++games;
             if (view.shellui_name_offset >= 0)
                 ++shells;
-            if (view.game_name_offset >= 0 || view.shellui_name_offset >= 0 ||
-                view.pid == getpid()) {
+            // Keep the 1 Hz before/after checkpoints for the whole run;
+            // repeated process details need only one record every ten ticks.
+            if (tick % 10 == 0 &&
+                (view.game_name_offset >= 0 || view.shellui_name_offset >= 0 ||
+                 view.pid == getpid())) {
                 log_durable_message(kLog,
                     "tick=%u pid=%d ppid=%d record_size=%zu name447=%.32s "
                     "eboot_name_at=%d shellui_name_at=%d",
