@@ -9,6 +9,7 @@
 #include "common_fps/layout.hpp"
 #include "common_fps/wire.hpp"
 #include "common_fps/session_log.hpp"
+#include "common_fps/firmware_runtime_policy.hpp"
 #include "stable_sampler/proc_rw_v960.hpp"
 #include "ps5_platform.hpp"
 #include "dce_fps_sampler.hpp"
@@ -198,7 +199,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC1\n"
+        "Common FPS for PS5 v1.2.3 RC2\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_io_1byte\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
@@ -312,6 +313,15 @@ void append_first_fps_record(
     const PayloadIdentityResult identity = set_payload_identity();
     const ShellUiObservation first = observe_shellui_once();
     write_worker_ready_record(first, identity);
+
+    if (common_fps::firmware_requires_preflight(
+            common_fps::ps5::stable_sampler::firmware_sdk_version())) {
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "fw1160_runtime=blocked_pending_preflight game_memory=disabled "
+            "dce=disabled renderer=disabled; use FW1160 Preflight v0.1");
+        for (;;)
+            usleep(5000000);
+    }
 
     common_fps::ps5::Ps5Platform platform;
     common_fps::FpsSampler sampler(platform);

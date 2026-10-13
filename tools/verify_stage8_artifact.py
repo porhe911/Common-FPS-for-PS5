@@ -79,6 +79,7 @@ def main() -> int:
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
+        (b"fw1160_runtime=blocked_pending_preflight" in elf, "FW 11.60 KP hold missing"),
         (b"log_limit=65536 log_reset=activation" in elf, "bounded session log missing"),
         (b"fw1160_guard=ptrace_io_1byte" in elf, "FW 11.60 guard marker missing"),
         (b"CommonFPS.elf" in elf, "Payload Manager process name marker missing"),

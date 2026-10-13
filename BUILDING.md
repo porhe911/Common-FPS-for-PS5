@@ -1,4 +1,4 @@
-# Building Common FPS for PS5 v1.2.3 RC1
+# Building Common FPS for PS5 v1.2.3 RC2
 
 ## GitHub Actions
 
@@ -46,11 +46,12 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC1 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC2 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
 
-FW 11.60 requires hardware validation. See
-[test-build notes](release/RELEASE_NOTES_v1.2.3_RC1.md).
+FW 11.60 is held at passive startup after a hardware KP report. See
+[RC2 notes](release/RELEASE_NOTES_v1.2.3_RC2.md) and the distinct
+[FW 11.60 preflight](release/FW1160_PREFLIGHT_v0.1_RU.md).

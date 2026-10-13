@@ -20,8 +20,9 @@ inline constexpr std::size_t kSessionLogLimit = 64U * 1024U;
 /* Close every descriptor immediately; preserve startup evidence when full. */
 inline void write_session_log(
     const char* path, const char* data, std::size_t size,
-    bool reset = false) noexcept {
-    const int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    bool reset = false, bool durable = false) noexcept {
+    const int fd = open(path,
+        O_WRONLY | O_CREAT | O_APPEND | (durable ? O_SYNC : 0), 0644);
     if (fd < 0)
         return;
     int lock_rc;
@@ -52,6 +53,8 @@ inline void write_session_log(
             }
         }
     }
+    if (ready && durable)
+        (void)fsync(fd);
     flock(fd, LOCK_UN);
     close(fd);
 }
@@ -61,7 +64,8 @@ inline void reset_session_log(const char* path) noexcept {
 }
 
 inline void log_message_v(
-    const char* path, const char* format, va_list args) noexcept {
+    const char* path, const char* format, va_list args,
+    bool durable = false) noexcept {
     char line[2048]{};
     const int count = std::vsnprintf(line, sizeof(line) - 1, format, args);
     if (count < 0)
@@ -69,13 +73,22 @@ inline void log_message_v(
     const std::size_t size = std::min(
         static_cast<std::size_t>(count), sizeof(line) - 2);
     line[size] = '\n';
-    write_session_log(path, line, size + 1);
+    write_session_log(path, line, size + 1, false, durable);
 }
 
 inline void log_message(const char* path, const char* format, ...) noexcept {
     va_list args;
     va_start(args, format);
     log_message_v(path, format, args);
+    va_end(args);
+}
+
+/* Persist a checkpoint before entering the operation it identifies. */
+inline void log_durable_message(
+    const char* path, const char* format, ...) noexcept {
+    va_list args;
+    va_start(args, format);
+    log_message_v(path, format, args, true);
     va_end(args);
 }
 

@@ -51,6 +51,9 @@ if(COMMON_FPS_BUILD_TESTS)
     add_executable(common_fps_sampling_tests tests/test_sampling.cpp)
     target_link_libraries(common_fps_sampling_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_sampling_tests COMMAND common_fps_sampling_tests)
+    add_executable(common_fps_preflight_tests tests/test_preflight_process_view.cpp)
+    target_link_libraries(common_fps_preflight_tests PRIVATE common_fps_core)
+    add_test(NAME common_fps_preflight_tests COMMAND common_fps_preflight_tests)
 
     if(UNIX)
         add_executable(common_fps_logging_tests tests/test_session_log.cpp)
@@ -67,6 +70,7 @@ if(COMMON_FPS_BUILD_TESTS)
             common_fps_tests
             common_fps_v1_parity_tests
             common_fps_sampling_tests
+            common_fps_preflight_tests
             common_fps_autoload_tests)
         if(MSVC)
             target_compile_options(${common_fps_test_target} PRIVATE /UNDEBUG)

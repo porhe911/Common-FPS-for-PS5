@@ -56,6 +56,6 @@ jobs:
             dist/Common_FPS_PS5_etaHEN_v1.2.3.plugin
             dist/Common_FPS_ShellUI_v1.2.3.elf
             dist/SHA256SUMS.txt
-            release/RELEASE_NOTES_v1.2.3_RC1.md
+            release/RELEASE_NOTES_v1.2.3_RC2.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error

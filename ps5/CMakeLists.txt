@@ -191,3 +191,29 @@ add_custom_command(
             --title-id CFPS00060
             --version 1.23
 )
+
+# ------------------------------------------------------------------
+# Isolated FW 11.60 preflight after the v1.2.1 hardware KP report.
+# No renderer, ptrace, MDBG, DCE or game-memory adapter is linked here.
+# ------------------------------------------------------------------
+add_executable(common_fps_fw1160_preflight
+    "${ROOT}/src/ps5/fw1160_preflight_main.cpp")
+set_target_properties(common_fps_fw1160_preflight PROPERTIES
+    OUTPUT_NAME "Common_FPS_PS5_FW1160_Preflight_v0.1.elf")
+target_include_directories(common_fps_fw1160_preflight PRIVATE
+    "${ROOT}/include" "${SDK}" "${SDK}/include")
+target_compile_options(common_fps_fw1160_preflight PRIVATE
+    --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE
+    -ffunction-sections -fdata-sections -march=znver2 -O2 -Wall -Wextra)
+target_link_options(common_fps_fw1160_preflight PRIVATE -Wl,--gc-sections)
+target_link_libraries(common_fps_fw1160_preflight PRIVATE
+    kernel_sys SceLibcInternal SceNet)
+add_custom_command(TARGET common_fps_fw1160_preflight POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE:common_fps_fw1160_preflight>"
+        "${ROOT}/dist/Common_FPS_PS5_FW1160_Preflight_v0.1.elf"
+    COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
+        "${ROOT}/dist/Common_FPS_PS5_FW1160_Preflight_v0.1.elf"
+        "${ROOT}/dist/Common_FPS_PS5_etaHEN_FW1160_Preflight_v0.1.plugin"
+        --title-id CFPS00061 --version 0.10)

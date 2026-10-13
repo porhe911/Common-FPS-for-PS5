@@ -36,8 +36,8 @@ int main() {
     first.close();
 
     // The next activation destroys old contents and begins a fresh small log.
-    reset_session_log(path.c_str());
-    log_message(path.c_str(), "activation=%d", 2);
+    write_session_log(path.c_str(), "", 0, true, true);
+    log_durable_message(path.c_str(), "activation=%d", 2);
     assert(stat(path.c_str(), &status) == 0 && status.st_size == 13);
     std::ifstream second(path);
     assert(std::getline(second, line) && line == "activation=2");
