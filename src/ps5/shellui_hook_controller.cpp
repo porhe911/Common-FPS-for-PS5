@@ -5,7 +5,8 @@
  */
 
 #include "shellui_hook_controller.hpp"
-#include "shellui_mdbg_read.hpp"
+#include "shellui_mdbg_io.hpp"
+#include "shellui_guard_write.hpp"
 #include "common_fps/shellui_code_read.hpp"
 
 #include "stable_sampler/proc_rw_v960.hpp"
@@ -159,6 +160,11 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         report.main_thread_guard &&
         firmware_family == 0x09000000U &&
         backend == ShellUiHookBackend::Mdbg;
+    const bool fw1160_guard_write = report.main_thread_guard &&
+        firmware_is_fw1160(report.sdk_version) &&
+        backend == ShellUiHookBackend::PtraceIo;
+    ShellUiGuardWriteState guard_write_state{};
+    bool guard_write_attempted = false;
 
     report.backend = fw900_guard_write
         ? "mdbg-rwx"
@@ -183,17 +189,30 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
             report.read_primary_rc = result.primary_rc;
             report.read_fallback_rc = result.fallback_rc;
         }
-        if (result.fallback_attempted)
+        if (result.fallback_attempted && !guard_write_attempted)
             report.backend = "ptrace-io+mdbg-read";
         return result.rc;
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
+        if (fw1160_guard_write) {
+            guard_write_attempted = true;
+            report.backend = "checked-mdbg+vm-protection";
+            const int rc = shellui_write_guard_byte(shellui_pid,
+                request.method_address, bytes[0], guard_write_state);
+            report.original_protection = guard_write_state.original_protection;
+            report.protect_rc = guard_write_state.protect_rc;
+            report.mdbg_write_rc = guard_write_state.mdbg_write_rc;
+            report.restore_protection_rc = guard_write_state.restore_protection_rc;
+            report.protection_restored = guard_write_state.protection_restored;
+            return rc;
+        }
         /*
          * The UI-thread guard changes one verified byte only. FW 9.00 can
          * read JIT code through MDBG but rejects a write while the JIT page
-         * is RX. For that exact firmware family, temporarily make the single
-         * 16 KiB code page RWX while ShellUI is stopped, write the byte, then
-         * restore RX before verification. No game process memory is written.
+         * is RX. That existing firmware-specific branch requests RWX for a
+         * 16 KiB range while ShellUI is stopped, writes the byte, and restores
+         * RX before verification. The SDK applies this to containing VM
+         * entries; it does not split a hardware page. No game memory is written.
          */
         const std::size_t offset =
             report.main_thread_guard ? 0U : (report.eta_chain ? 6U : 0U);
@@ -299,7 +318,8 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
                         verified.data(),
                         request.expected,
                         verified.size()) == 0;
-                if (still_original) {
+                if (still_original &&
+                    (!fw1160_guard_write || guard_write_state.protection_restored)) {
                     report.restored = true;
                 } else {
                     const int restore_rc = write_target(request.expected);

@@ -46,20 +46,22 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC4 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC5 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
 
-RC4 addresses the FW 11.60 RC3 log: sampling reached about 61 FPS, but the
-ShellUI code probe failed with PT_IO EFAULT. Only that read error on that
-firmware permits a bounded MDBG read fallback. The fallback requires a
-successful syscall, a successful reply and all requested bytes, and restores
-and verifies the controller's credentials. Patch writes retain their existing
-byte checks, verification and rollback. Firmware 11.60 overlay operation
-remains experimental and is not hardware-confirmed. See
-[RC4 notes](release/RELEASE_NOTES_v1.2.3_RC4.md) and
-[hardware evidence](docs/evidence/FW1160_RC3_HOOK_READ_20261014.md).
+RC4's FW 11.60 log confirms checked MDBG code reads succeed after PT_IO
+EFAULT, but the one-byte guard write still fails through PT_IO. RC5 writes
+only that verified guard byte using checked MDBG. It snapshots the original
+VM protection flags, enables writing temporarily, restores and verifies the
+exact flags before detach, and retains that snapshot through rollback errors.
+The SDK changes the containing VM entry, not an isolated hardware page.
+Expected-byte checks, full code verification and credential restoration stay
+mandatory. Previous firmware paths remain unchanged. Firmware 11.60 overlay
+operation remains experimental and is not hardware-confirmed. See
+[RC5 notes](release/RELEASE_NOTES_v1.2.3_RC5.md) and
+[hardware evidence](docs/evidence/FW1160_RC4_GUARD_WRITE_20261014.md).
 The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
 contains no FPS renderer and is not the full counter.

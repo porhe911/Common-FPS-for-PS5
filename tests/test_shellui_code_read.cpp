@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "common_fps/shellui_code_read.hpp"
-#include "shellui_mdbg_read.hpp"
+#include "shellui_mdbg_io.hpp"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -21,6 +21,7 @@ struct State {
     std::uint64_t auth = kAuth;
     std::array<unsigned char, 16> caps{};
     Mode mode = Mode::Complete;
+    std::array<unsigned char, 16> memory = kCode;
     unsigned calls = 0, auth_restores = 0, caps_restores = 0;
 } state;
 void reset(Mode mode) { state = {}; state.caps.fill(0x5a); state.mode = mode; }
@@ -60,9 +61,12 @@ extern "C" long syscall(long number, ...) noexcept {
     const auto* args = va_arg(ap, const Args*);
     auto* reply = va_arg(ap, Reply*);
     va_end(ap);
-    assert(command->type == 1 && command->op == 0x12); // no write operation
-    assert(args->pid == 58 && args->source >= kMethod);
-    const auto offset = args->source - kMethod;
+    assert(command->type == 1 && (command->op == 0x12 || command->op == 0x13));
+    const bool read = command->op == 0x12;
+    const auto address = read ? args->source : args->destination;
+    assert(args->pid == 58 && address >= kMethod);
+    if (!read) assert(args->length == 1); // only the guard byte may be written
+    const auto offset = address - kMethod;
     assert(offset < kCode.size() && args->length <= kCode.size() - offset);
     if (state.mode == Mode::SyscallError) { errno = EFAULT; return -1; }
     reply->status = state.mode == Mode::StatusError ? EFAULT : 0;
@@ -70,7 +74,10 @@ extern "C" long syscall(long number, ...) noexcept {
         (state.mode == Mode::Oversize ? args->length + 1 :
          (state.mode == Mode::Chunked ? std::min(4UL, args->length) : args->length));
     const auto count = std::min(reply->length, args->length);
-    std::memcpy(reinterpret_cast<void*>(args->destination), kCode.data() + offset, count);
+    if (read)
+        std::memcpy(reinterpret_cast<void*>(args->destination), state.memory.data() + offset, count);
+    else
+        std::memcpy(state.memory.data() + offset, reinterpret_cast<const void*>(args->source), count);
     return 0;
 }
 
@@ -111,6 +118,22 @@ static void test_fw1160_actual_efault_fallback() {
     assert(failed.rc == EFAULT && failed.fallback_attempted && zero(out));
 }
 
+static void test_checked_one_byte_writer() {
+    for (Mode mode : {Mode::Complete, Mode::Chunked, Mode::StatusError,
+                      Mode::NoProgress, Mode::Oversize, Mode::SyscallError,
+                      Mode::SetupFailure, Mode::RestoreFailure}) {
+        reset(mode);
+        const int rc = common_fps::ps5::shellui_mdbg_write_byte(58, kMethod, 0xc3);
+        const bool success = mode == Mode::Complete || mode == Mode::Chunked;
+        assert((rc == 0) == success);
+        if (success) assert(state.memory[0] == 0xc3);
+        for (std::size_t i = 1; i < kCode.size(); ++i)
+            assert(state.memory[i] == kCode[i]);
+        assert(state.caps[0] == 0x5a && state.caps_restores == 1 && state.auth_restores == 1);
+        if (mode != Mode::RestoreFailure) assert(state.auth == kAuth);
+    }
+}
+
 static void test_no_unrelated_fallback() {
     for (auto sdk : {0x09600005U, 0x10600005U, 0x11000005U, 0x12000005U}) {
         unsigned fallback_calls = 0;
@@ -138,7 +161,8 @@ static void test_no_unrelated_fallback() {
 
 int main() {
     test_checked_live_reader();
+    test_checked_one_byte_writer();
     test_fw1160_actual_efault_fallback();
     test_no_unrelated_fallback();
-    std::cout << "FW1160 EFAULT recovery, exact MDBG replies and credential restoration: PASS\n";
+    std::cout << "FW1160 EFAULT recovery, exact MDBG I/O and credential restoration: PASS\n";
 }

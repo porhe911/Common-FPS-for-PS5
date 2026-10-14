@@ -199,9 +199,9 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC4\n"
+        "Common FPS for PS5 v1.2.3 RC5\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
-        "fw1160_guard=ptrace_io_1byte\n"
+        "fw1160_guard=checked_mdbg_vm_protection_1byte\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -209,7 +209,7 @@ void write_worker_ready_record(
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
         "mono_gc=pinned sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe "
-        "read=mdbg+dce_ioctl highfw_guard=ptrace_io_1byte "
+        "read=mdbg+dce_ioctl highfw_guard=firmware_routed_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"

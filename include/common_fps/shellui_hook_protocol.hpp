@@ -54,7 +54,8 @@ inline ShellUiHookBackend shellui_hook_backend(
  * The background-PUI path never replaces Application.Update. It changes only
  * the first byte of Diagnostics.CheckRunningOnMainThread to RET while ShellUI
  * is ptrace-stopped. FW 1.xx-8.20 uses MDBG; selected higher firmware uses
- * ptrace I/O. FW 9.60 deliberately keeps the hardware-proven update-chain
+ * ptrace I/O for probes. FW 11.60 uses checked MDBG and saved VM protection
+ * for the guard write. FW 9.60 keeps the hardware-proven update-chain
  * backend. Unknown future firmware fails closed.
  */
 inline ShellUiHookBackend shellui_main_thread_guard_backend(

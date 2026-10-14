@@ -673,7 +673,9 @@ bool ensure_shellui_renderer() {
                 "method=0x%llx displaced=%u status=%d "
                 "read_rc=%d read_primary_rc=%d read_fallback_rc=%d "
                 "write_rc=%d expected=%d verified=%d "
-                "restored=%d detached=%d auth_restored=%d",
+                "restored=%d detached=%d auth_restored=%d "
+                "original_protection=%d protect_rc=%d mdbg_write_rc=%d "
+                "restore_protection_rc=%d protection_restored=%d",
                 pid,
                 hook_report.sdk_version,
                 hook_report.main_thread_guard
@@ -695,7 +697,12 @@ bool ensure_shellui_renderer() {
                 hook_report.verified ? 1 : 0,
                 hook_report.restored ? 1 : 0,
                 hook_report.detached ? 1 : 0,
-                hook_report.auth_restored ? 1 : 0);
+                hook_report.auth_restored ? 1 : 0,
+                hook_report.original_protection,
+                hook_report.protect_rc,
+                hook_report.mdbg_write_rc,
+                hook_report.restore_protection_rc,
+                hook_report.protection_restored ? 1 : 0);
         }
         usleep(20000);
     }

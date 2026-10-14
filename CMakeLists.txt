@@ -57,11 +57,17 @@ if(COMMON_FPS_BUILD_TESTS)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_executable(common_fps_shellui_read_tests
-            tests/test_shellui_code_read.cpp src/ps5/shellui_mdbg_read.cpp)
+            tests/test_shellui_code_read.cpp src/ps5/shellui_mdbg_io.cpp)
         target_include_directories(common_fps_shellui_read_tests PRIVATE
             tests/ps5_sdk_mock src/ps5 include)
         target_compile_options(common_fps_shellui_read_tests PRIVATE -UNDEBUG)
         add_test(NAME common_fps_shellui_read_tests COMMAND common_fps_shellui_read_tests)
+        add_executable(common_fps_shellui_write_tests
+            tests/test_shellui_guard_write.cpp src/ps5/shellui_guard_write.cpp)
+        target_include_directories(common_fps_shellui_write_tests PRIVATE
+            tests/ps5_sdk_mock src/ps5 include)
+        target_compile_options(common_fps_shellui_write_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_shellui_write_tests COMMAND common_fps_shellui_write_tests)
     endif()
     if(UNIX)
         add_executable(common_fps_logging_tests tests/test_session_log.cpp)

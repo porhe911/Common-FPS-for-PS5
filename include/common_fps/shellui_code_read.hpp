@@ -16,6 +16,24 @@ struct DebuggerReadChunk {
 };
 
 // A successful syscall alone is insufficient: require status and byte count.
+template <typename TransferChunk>
+int debugger_transfer_exact(std::size_t size,
+                            TransferChunk&& transfer_chunk) noexcept {
+    if (size == 0)
+        return EINVAL;
+    std::size_t offset = 0;
+    while (offset < size) {
+        const auto result = transfer_chunk(offset, size - offset);
+        int error = result.syscall_rc != 0 ? result.syscall_rc : result.status;
+        if (error == 0 && (result.bytes == 0 || result.bytes > size - offset))
+            error = EIO;
+        if (error != 0)
+            return error;
+        offset += result.bytes;
+    }
+    return 0;
+}
+
 template <typename ReadChunk>
 int debugger_read_exact(void* destination, std::size_t size,
                         ReadChunk&& read_chunk) noexcept {
@@ -23,19 +41,13 @@ int debugger_read_exact(void* destination, std::size_t size,
         return EINVAL;
     auto* bytes = static_cast<unsigned char*>(destination);
     std::memset(bytes, 0, size);
-    std::size_t offset = 0;
-    while (offset < size) {
-        const auto result = read_chunk(bytes + offset, offset, size - offset);
-        int error = result.syscall_rc != 0 ? result.syscall_rc : result.status;
-        if (error == 0 && (result.bytes == 0 || result.bytes > size - offset))
-            error = EIO;
-        if (error != 0) {
-            std::memset(bytes, 0, size);
-            return error;
-        }
-        offset += result.bytes;
-    }
-    return 0;
+    const int result = debugger_transfer_exact(size,
+        [&](std::size_t offset, std::size_t remaining) {
+            return read_chunk(bytes + offset, offset, remaining);
+        });
+    if (result != 0)
+        std::memset(bytes, 0, size);
+    return result;
 }
 
 struct ShellUiCodeReadResult {
