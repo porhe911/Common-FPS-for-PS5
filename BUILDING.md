@@ -46,15 +46,20 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC3 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC4 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
 
-RC3 re-enables the full FW 11.60 test path after the user reported the same
-shutdown without the counter and a later Sonic Poopsploit control exceeding
-ten minutes. Firmware 11.60 overlay operation remains experimental and is
-not hardware-confirmed. See [RC3 notes](release/RELEASE_NOTES_v1.2.3_RC3.md).
+RC4 addresses the FW 11.60 RC3 log: sampling reached about 61 FPS, but the
+ShellUI code probe failed with PT_IO EFAULT. Only that read error on that
+firmware permits a bounded MDBG read fallback. The fallback requires a
+successful syscall, a successful reply and all requested bytes, and restores
+and verifies the controller's credentials. Patch writes retain their existing
+byte checks, verification and rollback. Firmware 11.60 overlay operation
+remains experimental and is not hardware-confirmed. See
+[RC4 notes](release/RELEASE_NOTES_v1.2.3_RC4.md) and
+[hardware evidence](docs/evidence/FW1160_RC3_HOOK_READ_20261014.md).
 The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
 contains no FPS renderer and is not the full counter.

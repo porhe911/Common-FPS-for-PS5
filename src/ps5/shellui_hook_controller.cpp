@@ -5,6 +5,8 @@
  */
 
 #include "shellui_hook_controller.hpp"
+#include "shellui_mdbg_read.hpp"
+#include "common_fps/shellui_code_read.hpp"
 
 #include "stable_sampler/proc_rw_v960.hpp"
 
@@ -162,12 +164,28 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         ? "mdbg-rwx"
         : (backend == ShellUiHookBackend::Mdbg ? "mdbg" : "ptrace-io");
 
+    unsigned code_reads = 0;
     const auto read_target = [&](void* destination, std::size_t size) {
-        if (backend == ShellUiHookBackend::Mdbg)
-            return mdbg_copyout(shellui_pid,
-                static_cast<intptr_t>(request.method_address), destination, size);
-        return pt_copyout(shellui_pid,
-            static_cast<intptr_t>(request.method_address), destination, size);
+        const auto result = read_shellui_code(report.sdk_version, backend,
+            destination, size,
+            [&](void* out, std::size_t count) {
+                return pt_copyout(shellui_pid,
+                    static_cast<intptr_t>(request.method_address), out, count);
+            },
+            [&](void* out, std::size_t count) {
+                if (firmware_is_fw1160(report.sdk_version))
+                    return shellui_mdbg_read_exact(shellui_pid,
+                        request.method_address, out, count);
+                return mdbg_copyout(shellui_pid,
+                    static_cast<intptr_t>(request.method_address), out, count);
+            });
+        if (code_reads++ == 0) {
+            report.read_primary_rc = result.primary_rc;
+            report.read_fallback_rc = result.fallback_rc;
+        }
+        if (result.fallback_attempted)
+            report.backend = "ptrace-io+mdbg-read";
+        return result.rc;
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
         /*

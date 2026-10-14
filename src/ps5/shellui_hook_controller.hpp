@@ -28,6 +28,8 @@ struct ShellUiHookPatchReport {
     bool eta_chain = false;
     const char* backend = "none";
     int read_rc = -1;
+    int read_primary_rc = -1;
+    int read_fallback_rc = -1;
     int write_rc = -1;
     bool expected_matched = false;
     bool verified = false;

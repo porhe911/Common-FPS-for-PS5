@@ -122,6 +122,7 @@ target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/shellui_injector.cpp"
     "${ROOT}/src/ps5/shellui_hook_controller.cpp"
+    "${ROOT}/src/ps5/shellui_mdbg_read.cpp"
     "${ROOT}/src/ps5/stable_shellui_injector.cpp"
     "${ROOT}/src/ps5/remote_call.cpp"
     "${ROOT}/src/ps5/stable_elfldr_bridge.c"

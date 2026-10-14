@@ -73,9 +73,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.3 RC3"
+            b"Common FPS for PS5 v1.2.3 RC4"
             in elf,
-            "v1.2.3 RC3 runtime marker missing",
+            "v1.2.3 RC4 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
@@ -83,8 +83,14 @@ def main() -> int:
          "FW 11.60 full-counter test path missing"),
         (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
         (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
-        (b"Common FPS for PS5 v1.2.3 RC3 renderer" in renderer,
-         "RC3 renderer marker missing"),
+        (b"Common FPS for PS5 v1.2.3 RC4 renderer" in renderer,
+         "RC4 renderer marker missing"),
+        (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,
+         "FW 11.60 checked code-read fallback marker missing"),
+        (b"ptrace-io+mdbg-read" in elf,
+         "checked MDBG code-read backend missing"),
+        (b"read_primary_rc=%d read_fallback_rc=%d" in elf,
+         "code-read fallback result logging missing"),
         (b"log_limit=65536 log_reset=activation" in elf, "bounded session log missing"),
         (b"fw1160_guard=ptrace_io_1byte" in elf, "FW 11.60 guard marker missing"),
         (b"CommonFPS.elf" in elf, "Payload Manager process name marker missing"),

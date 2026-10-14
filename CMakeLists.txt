@@ -55,6 +55,14 @@ if(COMMON_FPS_BUILD_TESTS)
     target_link_libraries(common_fps_preflight_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_preflight_tests COMMAND common_fps_preflight_tests)
 
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(common_fps_shellui_read_tests
+            tests/test_shellui_code_read.cpp src/ps5/shellui_mdbg_read.cpp)
+        target_include_directories(common_fps_shellui_read_tests PRIVATE
+            tests/ps5_sdk_mock src/ps5 include)
+        target_compile_options(common_fps_shellui_read_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_shellui_read_tests COMMAND common_fps_shellui_read_tests)
+    endif()
     if(UNIX)
         add_executable(common_fps_logging_tests tests/test_session_log.cpp)
         target_link_libraries(common_fps_logging_tests PRIVATE common_fps_core)
