@@ -29,7 +29,7 @@ available as a standalone ELF or etaHEN plugin.
 | **9.60** | **Confirmed baseline** | Existing hardware-tested FPS and lifecycle path |
 | **7.60** | Test pending | Current v1.2.1 build needs a fresh hardware regression test |
 | **10.xx** | Experimental | Code path exists, but hardware validation is still required |
-| **11.60** | **Validation on hold** | The user reports the same shutdown without Common FPS; stabilize the base environment before FPS/overlay testing |
+| **11.60** | **Experimental in v1.2.3 RC3** | Full counter test path enabled; Preflight has no FPS overlay; game/overlay hardware validation remains pending |
 
 A code path being present does not mean every firmware revision has been
 physically tested. Confirmed and experimental status are kept separate.

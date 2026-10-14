@@ -46,16 +46,15 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC2 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC3 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
 The default overlay font size is 24.
 
-FW 11.60 application sampling/rendering remains held pending validation.
-The user now reports the same shutdown without the FPS counter, so the
-system failure is not specific to Common FPS. Stabilize the base environment
-before re-enabling hardware counter tests. The application hold does not
-bypass the shared SDK CRT startup. See
-[RC2 notes](release/RELEASE_NOTES_v1.2.3_RC2.md) and the distinct
-[FW 11.60 preflight](release/FW1160_PREFLIGHT_v0.1_RU.md).
+RC3 re-enables the full FW 11.60 test path after the user reported the same
+shutdown without the counter and a later Sonic Poopsploit control exceeding
+ten minutes. Firmware 11.60 overlay operation remains experimental and is
+not hardware-confirmed. See [RC3 notes](release/RELEASE_NOTES_v1.2.3_RC3.md).
+The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
+contains no FPS renderer and is not the full counter.

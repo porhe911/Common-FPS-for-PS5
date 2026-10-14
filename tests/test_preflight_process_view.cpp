@@ -9,12 +9,12 @@
 using namespace common_fps;
 
 int main() {
-    assert(firmware_requires_preflight(0x11600000U));
-    assert(firmware_requires_preflight(0x11600045U));
-    assert(!firmware_requires_preflight(0x10600000U));
-    assert(!firmware_requires_preflight(0x09600000U));
-    assert(!firmware_requires_preflight(0x09000000U));
-    assert(!firmware_requires_preflight(0x04510000U));
+    assert(firmware_is_fw1160(0x11600000U));
+    assert(firmware_is_fw1160(0x11600045U));
+    assert(!firmware_is_fw1160(0x10600000U));
+    assert(!firmware_is_fw1160(0x09600000U));
+    assert(!firmware_is_fw1160(0x09000000U));
+    assert(!firmware_is_fw1160(0x04510000U));
     std::array<std::uint8_t, 1096> record{};
     std::int32_t length = record.size(), pid = 123, ppid = 84;
     std::memcpy(record.data(), &length, 4);
