@@ -146,8 +146,8 @@ def main() -> int:
             "DCE device path missing",
         ),
         (
-            b"highfw_guard=ptrace_io_1byte" in elf,
-            "high firmware guard marker missing",
+            b"highfw_guard=firmware_routed_1byte" in elf,
+            "high firmware guard routing marker missing",
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
