@@ -9,6 +9,7 @@ add_library(common_fps_core STATIC
     src/core/scene_guard.cpp
     src/core/app.cpp
     src/core/config.cpp
+    src/core/overlay_config.cpp
     src/core/dce_counter_sampler.cpp
     src/core/fps_sampler.cpp
     src/core/layout.cpp

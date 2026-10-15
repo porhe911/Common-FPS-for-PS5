@@ -971,9 +971,9 @@ bool apply_packet_on_render(const WirePacket& packet) {
         return false;
     }
 
-    const auto layout = compute_layout(frame.config,
-        widget_dimension(root, "Width", kLogicalWidth),
-        widget_dimension(root, "Height", kLogicalHeight), frame.loading);
+    const float scene_width = widget_dimension(root, "Width", kLogicalWidth);
+    const float scene_height = widget_dimension(root, "Height", kLogicalHeight);
+    const auto layout = compute_layout(frame.config, scene_width, scene_height, frame.loading);
     MonoObject* label = managed_target(g_label_handle);
     MonoObject* value = managed_target(g_value_handle);
 
@@ -1081,8 +1081,8 @@ bool apply_packet_on_render(const WirePacket& packet) {
         ok &= set_property_direct(klass, label, "Y", layout.anchor.y);
         ok &= set_property_direct(klass, value, "X", layout.anchor.x + layout.label_advance);
         ok &= set_property_direct(klass, value, "Y", layout.anchor.y);
-        log_line("layout scene-adaptive font=%d x=%.1f y=%.1f label=%d colors=%06x/%06x",
-            layout.font_size, layout.anchor.x, layout.anchor.y, frame.config.show_label ? 1 : 0,
+        log_line("layout scene-adaptive scene=%.1fx%.1f font=%d x=%.1f y=%.1f label=%d colors=%06x/%06x",
+            scene_width, scene_height, layout.font_size, layout.anchor.x, layout.anchor.y, frame.config.show_label ? 1 : 0,
             frame.config.label_color, frame.config.value_color);
     }
     if (!ok) return false;

@@ -36,7 +36,7 @@ set_target_properties(common_fps_shellui PROPERTIES
 )
 
 target_sources(common_fps_shellui PRIVATE
-    "${ROOT}/src/core/config.cpp"
+    "${ROOT}/src/core/overlay_config.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
@@ -120,6 +120,7 @@ set_target_properties(common_fps_controller PROPERTIES
 
 target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/core/config.cpp"
+    "${ROOT}/src/core/overlay_config.cpp"
     "${ROOT}/src/core/settings.cpp"
     "${ROOT}/src/ps5/settings_service.cpp"
     "${ROOT}/src/ps5/media_launcher.cpp"
