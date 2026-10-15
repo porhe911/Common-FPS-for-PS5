@@ -34,7 +34,13 @@ const {chromium} = require('playwright');
     await page.locator('[data-corner="top_right"]').click();
     await page.locator('[data-step="font_size:2"]').click();
     await page.locator('#toggle').click();
+    const initialColor = await page.locator('#value_color').inputValue();
     await page.locator('[data-color="value_color"]').click();
+    await page.getByRole('dialog').waitFor();
+    assert.equal(await page.locator('#palette-grid button').count(),8);
+    assert.equal(await page.locator('#value_color').inputValue(),initialColor); // opening is not a color change
+    await page.locator('#palette-grid [data-rgb="#B366FF"]').click();
+    assert.equal(await page.getByRole('dialog').isVisible(),false);
     await page.locator('#label_color').fill('#123ABC');
     await page.locator('#save').click();
     await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
@@ -54,11 +60,113 @@ const {chromium} = require('playwright');
     await page.locator('#value_color').fill('#GGGGGG');
     await page.locator('#save').click();
     assert.equal(fs.readFileSync(config,'utf8'),text);
-    // Native keyboard focus can reach the next corner and activate it.
-    await page.locator('[data-corner="top_left"]').focus();
+    // Recover from invalid custom text without silently changing disk state.
+    await page.locator('#value_color').fill('#B366FF');
+    await page.locator('#label_color').focus();
+    await page.locator('#value_color').blur();
+    const posts = [];
+    page.on('request',request=>{if(request.method()==='POST' && request.url().endsWith('/api/config'))posts.push(request.postData());});
+    await page.addInitScript(() => {
+      window.__pad = null;
+      Object.defineProperty(navigator,'getGamepads',{value:()=>window.__pad?[window.__pad]:[]});
+    });
+    await page.evaluate(() => {
+      window.__pad = null;
+      Object.defineProperty(navigator,'getGamepads',{value:()=>window.__pad?[window.__pad]:[]});
+    });
+    async function padPress(index,numeric=false,hold=80) {
+      await page.evaluate(({index,numeric})=>{window.__pad.buttons[index]=numeric?1:{pressed:true,value:1};},{index,numeric});
+      await page.waitForTimeout(hold);
+      await page.evaluate(({index,numeric})=>{window.__pad.buttons[index]=numeric?0:{pressed:false,value:0};},{index,numeric});
+      await page.waitForTimeout(80);
+    }
+    async function setPad(numeric=false,rawSony=false) {
+      await page.evaluate(({numeric,rawSony})=>{
+        window.__pad={id:rawSony?'Wireless Controller (Vendor: 054c Product: 09cc)':'Controller',mapping:rawSony?'':'standard',connected:true,axes:[0,0],buttons:Array.from({length:17},()=>numeric?0:{pressed:false,value:0})};
+      },{numeric,rawSony});
+      await page.waitForTimeout(80);
+    }
+    async function focusSaveWithDpad() {
+      await page.locator('[data-color="label_color"]').focus();
+      await padPress(15); // right, using the actual polling loop
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'save');
+    }
+    // Standard GamepadButton objects: D-pad focuses Save; Cross persists to disk.
+    await page.waitForTimeout(350);
+    await setPad();
+    await focusSaveWithDpad();
+    let count=posts.length;
+    await padPress(0,false,600); // held Cross still emits exactly one save
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    // Legacy numeric Gamepad API used by older WebKit variants.
+    await page.waitForTimeout(350);
+    await setPad(true);
+    await focusSaveWithDpad(); count=posts.length;
+    await padPress(0,true);
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    // Raw Sony face-button order: Cross is button 1, not Circle.
+    await page.waitForTimeout(350);
+    await setPad(false,true);
+    await page.locator('#save').focus(); count=posts.length;
+    await padPress(1);
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    // Legacy keyCode without KeyboardEvent.key must activate Save too.
+    await page.waitForTimeout(350);
+    count=posts.length;
+    await page.evaluate(()=>{
+      document.querySelector('#save').focus();
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'',keyCode:13,bubbles:true,cancelable:true}));
+      document.dispatchEvent(new KeyboardEvent('keyup',{key:'',keyCode:13,bubbles:true,cancelable:true}));
+    });
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    // A native click at the stationary cursor must honor D-pad focus.
+    const pointerButton=await page.locator('[data-corner="top_left"]').boundingBox();
+    await page.mouse.move(pointerButton.x+10,pointerButton.y+10);
+    await page.waitForTimeout(350);
+    await page.locator('[data-color="label_color"]').focus();
     await page.keyboard.press('ArrowRight');
-    assert.equal(await page.evaluate(()=>document.activeElement.dataset.corner),'top_right');
-    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'save');
+    count=posts.length;
+    await page.mouse.down(); await page.mouse.up();
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    assert(fs.readFileSync(config,'utf8').includes('corner=top_right\n'));
+    // One physical Cross delivered as gamepad + Enter + native click is one action.
+    await page.waitForTimeout(350);
+    await setPad(); await page.locator('#save').focus(); count=posts.length;
+    await page.evaluate(()=>{window.__pad.buttons[0]={pressed:true,value:1};});
+    await page.waitForTimeout(50);
+    await page.keyboard.press('Enter'); await page.mouse.down(); await page.mouse.up();
+    await page.evaluate(()=>{window.__pad.buttons[0]={pressed:false,value:0};});
+    await page.waitForTimeout(150);
+    assert.equal(posts.length,count+1);
+    // Selecting a swatch with Cross, canceling a palette, and no hidden HEX traps.
+    await page.waitForTimeout(350);
+    await page.locator('[data-color="label_color"]').focus();
+    await padPress(0); await page.getByRole('dialog').waitFor();
+    await padPress(15); // next explicit swatch, green after blue/custom default fallback
+    const rgb=await page.evaluate(()=>document.activeElement.dataset.rgb);
+    await padPress(0);
+    assert.equal(await page.getByRole('dialog').isVisible(),false);
+    assert.equal(await page.locator('#label_color').inputValue(),rgb);
+    await padPress(0); await page.getByRole('dialog').waitFor();
+    await padPress(1);
+    assert.equal(await page.getByRole('dialog').isVisible(),false);
+    assert.equal(await page.locator('#label_color').inputValue(),rgb);
+    await padPress(13);
+    assert.equal(await page.evaluate(()=>document.activeElement.tagName),'BUTTON');
+    // OPTIONS saves without depending on pointer position.
+    count=posts.length; await padPress(9);
+    await page.getByRole('status').filter({hasText:'Сохранено.'}).waitFor();
+    assert.equal(posts.length,count+1);
+    // Mouse remains usable after controller navigation.
+    await page.mouse.move(20,20);
+    await page.waitForTimeout(350);
+    text=fs.readFileSync(config,'utf8');
     await page.locator('#reset').click();
     assert.equal(fs.readFileSync(config,'utf8'),text); // reset needs Save
     await page.locator('#save').click();
@@ -77,7 +185,7 @@ const {chromium} = require('playwright');
     const screenshot = process.argv[3];
     if (screenshot) await page.screenshot({path:screenshot,fullPage:true});
     assert.deepEqual(errors,[]);
-    console.log('Real HTTP worker + browser: controls, save, process restart, colors, keyboard, viewport PASS');
+    console.log('Real HTTP worker + browser: controls, save, process restart, palette, standard/raw/legacy Gamepad, mixed-event deduplication, keyboard, viewport PASS');
   } finally {
     if (browser) await browser.close();
     if (child) await stop();

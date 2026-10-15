@@ -61,6 +61,11 @@ if(COMMON_FPS_BUILD_TESTS)
     add_test(NAME common_fps_preflight_tests COMMAND common_fps_preflight_tests)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(common_fps_presentation_tests tests/test_shellui_presentation.cpp)
+        target_link_libraries(common_fps_presentation_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_presentation_tests PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+        target_link_options(common_fps_presentation_tests PRIVATE -Wl,--gc-sections)
+        add_test(NAME common_fps_presentation_tests COMMAND common_fps_presentation_tests)
         add_executable(common_fps_shellui_read_tests
             tests/test_shellui_code_read.cpp src/ps5/shellui_mdbg_io.cpp)
         target_include_directories(common_fps_shellui_read_tests PRIVATE

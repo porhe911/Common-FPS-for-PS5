@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 #include "settings_service.hpp"
 #include "common_fps/session_log.hpp"
+#include "common_fps/config.hpp"
 
 #include <arpa/inet.h>
 #include <cerrno>
@@ -57,6 +58,14 @@ void client(int fd, SettingsStore& store) {
     }
     const auto reply = settings_http_response(std::string_view(buffer, used), store,
         std::string_view(reinterpret_cast<const char*>(commonfps_settings_html), commonfps_settings_html_size));
+    if (std::string_view(buffer, used).find("POST /api/config ") == 0 &&
+        reply.find("HTTP/1.1 200 ") == 0) {
+        const auto cfg = store.get();
+        log_durable_message(kControllerLogPath,
+            "Settings saved corner=%s font=%d margins=%.0f/%.0f label=%d colors=%06x/%06x",
+            corner_name(cfg.corner), cfg.font_size, cfg.margin_x, cfg.margin_y,
+            cfg.show_label ? 1 : 0, cfg.label_color, cfg.value_color);
+    }
     std::size_t sent = 0;
     const auto send_deadline = monotonic_ms()+2000;
     while (sent < reply.size() && monotonic_ms() < send_deadline) {

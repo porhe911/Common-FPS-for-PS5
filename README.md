@@ -1,4 +1,4 @@
-# Common FPS for PS5 v1.2.3 RC8
+# Common FPS for PS5 v1.2.3 RC9
 
 Real-time FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 
@@ -12,7 +12,8 @@ available as a standalone ELF or etaHEN plugin.
 - compact bottom-left overlay with purple label and white digits by default;
 - Media shortcut opening an embedded offline settings page (FW below 12);
 - saved settings applied to existing overlay widgets without reinjection;
-- placement and font scale follow the PUI scene dimensions;
+- explicit eight-color palettes and D-pad/Cross/OPTIONS controls;
+- stable logical placement with adjustable size and margins;
 - 22px default font with a 4px bottom margin;
 - `FPS: Loading` while the FPS source is being prepared;
 - VideoOut sampling with adaptive `/dev/dce` fallback;
@@ -33,19 +34,21 @@ available as a standalone ELF or etaHEN plugin.
 | **9.60** | **Confirmed baseline** | Existing hardware-tested FPS and lifecycle path |
 | **7.60** | Test pending | Current v1.2.1 build needs a fresh hardware regression test |
 | **10.xx** | Experimental | Code path exists, but hardware validation is still required |
-| **11.60** | **RC7 confirmed by user** | User reports RC7 works perfectly. RC8 Media shortcut/live settings and other screen modes await hardware testing; broader lifecycle coverage remains pending |
+| **11.60** | **RC7 confirmed by user** | RC8 Media shortcut works, but a game freeze was reported after settings changes. RC9 hardens rendering and controls; a new console test is required |
 
 A code path being present does not mean every firmware revision has been
 physically tested. Confirmed and experimental status are kept separate.
 
-## RC8 settings preview
+## RC9 settings test build
 
-RC8 is a test build described in [the RC8 notes](release/RELEASE_NOTES_v1.2.3_RC8.md).
+RC9 is a test build described in [the RC9 notes](release/RELEASE_NOTES_v1.2.3_RC9.md).
 The public stable download below remains v1.2.1.
 
-After launching RC8, open **Media → Common FPS**. Choose a corner, size (14–64
+After launching RC9, open **Media → Common FPS**. Choose a corner, size (14–64
 logical units), label visibility, digit/label colors and edge margins, then
-select **Save**. The controller applies the saved configuration on its next
+select **Save** with Cross (or press OPTIONS). Each color button opens a named
+eight-color palette; opening it does not change the selected color. HEX fields
+remain available for custom colors. The controller applies the saved configuration on its next
 one-second update. Defaults match the user-confirmed RC7 appearance.
 
 The launcher opens `http://127.0.0.1:39029/` on the PS5. Everything is embedded
@@ -55,15 +58,16 @@ The launcher checks its own title ID `CFPS00060` on each activation and register
 it through AppInstUtil only when missing. It does not directly edit app.db or
 patch ShellCore. The direct installer is deliberately skipped on FW 12+.
 
-Screen diagonal is not a rendering coordinate. RC8 reads the actual PUI root
-width/height, anchors to that scene and scales font/margins relative to 1920×1080.
-If those dimensions are unavailable, it uses the existing 1920×1080 logical
-layout. This avoids scaling an already-scaled ShellUI twice. Physical text size
-also depends on viewing distance; use the size setting as needed. TV overscan
-can be compensated with the margins.
+Screen diagonal is not a rendering coordinate. RC9 returns to the known RC7
+1920×1080 logical canvas, with size and edge margins configured in those units.
+The RC8 background Width/Height getter calls have been removed while the
+reported freeze is investigated. Physical text size depends on viewing
+distance; use the size setting as needed. TV overscan can be compensated with
+the margins. Alternative PUI canvas sizes remain unverified on hardware.
 
-Reboot before changing from RC7 to RC8: the controller and embedded renderer
-now use IPC version 2 and must be updated together. Use only one ELF/plugin.
+Reboot before changing from RC8 to RC9 so the old resident renderer is unloaded.
+The controller and embedded renderer use IPC version 2 and must be updated
+together. Use only one ELF/plugin.
 The sampling/filter and protected ShellUI injection paths are unchanged.
 
 ## Download

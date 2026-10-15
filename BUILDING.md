@@ -46,7 +46,7 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC8 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC9 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
@@ -58,21 +58,29 @@ supported; individual drops and recovery from a short drop remain visible.
 Changing PID/source or losing sampling restarts settling. This is numerical
 filtering, not detection of a game's loading-screen state.
 
-On 2026-10-15 the user confirmed RC7 now works perfectly on FW 11.60.
-RC8 retains its sampler/filter and protected injection code. It adds an embedded
-loopback HTTP settings service on port 39029, atomic persistent configuration,
-a Media deeplink launcher and live PUI styles. The service has one worker and
-bounded requests/timeouts; it never touches process credentials. Media
-registration runs synchronously before sampling/HTTP startup and restores the
-exact original auth ID. Firmware 12+ skips that direct registration path.
-The installer is checked once per activation, and operates only on CFPS00060.
-No app.db writes or ShellCore modifications are introduced.
+On 2026-10-15 the user confirmed RC7 works perfectly on FW 11.60. They then
+confirmed RC8's Media shortcut works, but reported a game freeze after changing
+styles and controller activation failures in the page. The controller log
+proves successful registration/bootstrap/guard restoration, not the hang cause.
+See [RC8 evidence](docs/evidence/FW1160_RC8_SETTINGS_FREEZE_20261015.md).
 
-Both controller and renderer use wire version 2 (44 bytes). Reboot when
-upgrading from RC7. Scene dimensions come from the PUI root Widget Width/Height,
-with the existing logical 1920×1080 fallback. Settings preserve defaults until
-Save succeeds. New Media/live settings and display modes still need console
-testing. See [RC8 notes](release/RELEASE_NOTES_v1.2.3_RC8.md) and
-[RC6 confirmation](docs/evidence/FW1160_RC6_OVERLAY_20261015.md).
+RC9 keeps the sampler, startup filter, installer and stopped-process injector.
+Its page has explicit palettes and unified native/keyboard/Gamepad activation,
+including legacy numeric buttons and duplicate event suppression. Successful
+saves are logged after the atomic store update.
+
+The renderer pins all temporary UIFont/UIColor owners, strings and new labels.
+It applies initial styles once, changes fonts only on actual size changes and
+forgets cached children when RootWidget changes within the same Scene.
+Width/Height managed getters are removed. Rendering uses the known logical
+1920×1080 canvas pending investigation; no physical screen diagonal is queried.
+A Linux host test compiles the actual renderer with a fake collecting Mono/PUI
+runtime to test lifetimes, selective updates, root changes and failed setters.
+Console hang recovery and other PUI scene sizes are still unverified.
+
+Both components use wire version 2 (44 bytes). Reboot when upgrading from RC8
+to unload its resident renderer. Settings stay in /data/CommonFPS/config.ini;
+HTTP remains loopback-only and logs remain 64 KiB each/reset on activation.
+See [RC9 notes](release/RELEASE_NOTES_v1.2.3_RC9.md).
 The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
 contains no FPS renderer and is not the full counter.

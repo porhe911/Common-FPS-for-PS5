@@ -203,7 +203,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC8\n"
+        "Common FPS for PS5 v1.2.3 RC9\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
         "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"

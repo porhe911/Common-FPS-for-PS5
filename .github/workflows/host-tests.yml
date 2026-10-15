@@ -42,5 +42,5 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-RC8-settings-preview
+          name: Common-FPS-RC9-settings-preview
           path: build/settings-preview.png
