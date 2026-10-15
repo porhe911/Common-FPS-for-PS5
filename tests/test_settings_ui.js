@@ -139,7 +139,7 @@ const {chromium} = require('playwright');
     await page.waitForTimeout(350);
     await setPad(); await page.locator('#save').focus(); count=posts.length;
     await page.evaluate(()=>{window.__pad.buttons[0]={pressed:true,value:1};});
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(600); // delayed native events after a held Cross
     await page.keyboard.press('Enter'); await page.mouse.down(); await page.mouse.up();
     await page.evaluate(()=>{window.__pad.buttons[0]={pressed:false,value:0};});
     await page.waitForTimeout(150);
@@ -148,7 +148,7 @@ const {chromium} = require('playwright');
     await page.waitForTimeout(350);
     await page.locator('[data-color="label_color"]').focus();
     await padPress(0); await page.getByRole('dialog').waitFor();
-    await padPress(15); // next explicit swatch, green after blue/custom default fallback
+    await padPress(15); // next explicit swatch in the palette grid
     const rgb=await page.evaluate(()=>document.activeElement.dataset.rgb);
     await padPress(0);
     assert.equal(await page.getByRole('dialog').isVisible(),false);

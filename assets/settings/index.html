@@ -60,7 +60,7 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
  var cfg = Object.assign({}, defaults), ready = false, busy = false;
  var palette = [['#FFFFFF','Белый'],['#B366FF','Фиолетовый'],['#73D8FF','Голубой'],['#76F5AA','Зелёный'],['#FFE17D','Жёлтый'],['#FF9A67','Оранжевый'],['#FF707E','Красный'],['#000000','Чёрный']];
  var paletteKey = null, paletteReturn = null, selected = null, navMode = false;
- var dispatching = false, lastAction = null, lastDirection = null, acceptHeld = false;
+ var dispatching = false, lastAction = null, lastDirection = null, acceptHeld = false, lastAcceptRelease = -Infinity;
  var previous = {}, lastRepeat = 0, pointer = null, pointerActivationTarget = null, lastFormButton = null;
  var $ = function (id) { return document.getElementById(id); };
  var clock = function () { return performance.now(); };
@@ -196,7 +196,9 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
   var now = clock();
   // One Cross press may arrive through Gamepad, Enter and a native cursor click.
   // Coalesce different transports even if the first action moved modal focus.
-  if (lastAction && lastAction.source !== source && now - lastAction.time < 300) return;
+  var otherTransportHeld = (source !== 'keyboard' && acceptHeld) || (source !== 'gamepad' && previous.ok);
+  if (lastAction && lastAction.source !== source &&
+      (now - lastAction.time < 300 || otherTransportHeld || now - lastAcceptRelease < 150)) return;
   lastAction = {source:source,time:now};
   dispatching = true;
   try { button.click(); } finally { dispatching = false; }
@@ -277,7 +279,9 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
  });
  document.addEventListener('keyup', function (e) {
   var key = keyName(e);
-  if (key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Space' || key === 'Cross' || key === 'GamepadAccept') acceptHeld = false;
+  if (key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Space' || key === 'Cross' || key === 'GamepadAccept') {
+   acceptHeld = false; lastAcceptRelease = clock();
+  }
  });
  window.addEventListener('blur', function () { acceptHeld = false; previous = {}; pointerActivationTarget = null; });
  function pressed(pad, index) {
@@ -293,6 +297,7 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
     var axes = pad.axes || [];
     var held = {up:pressed(pad,12) || axes[1] < -.6,down:pressed(pad,13) || axes[1] > .6,left:pressed(pad,14) || axes[0] < -.6,right:pressed(pad,15) || axes[0] > .6,
      ok:pressed(pad,rawSony ? 1 : 0),cancel:pressed(pad,rawSony ? 2 : 1),save:pressed(pad,9)};
+    if (previous.ok && !held.ok) lastAcceptRelease = clock();
     var editing = document.activeElement.tagName === 'INPUT';
     if (!editing) {
      ['up','down','left','right'].some(function (key) {
