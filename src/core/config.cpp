@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <cmath>
+#include <iomanip>
 #include <sstream>
 
 namespace common_fps {
@@ -44,6 +46,43 @@ OverlayConfig default_config() {
     return {};
 }
 
+OverlayConfig sanitize_config(OverlayConfig cfg) {
+    if (cfg.corner != Corner::TopLeft && cfg.corner != Corner::TopRight &&
+        cfg.corner != Corner::BottomLeft && cfg.corner != Corner::BottomRight)
+        cfg.corner = Corner::BottomLeft;
+    cfg.font_size = std::clamp(cfg.font_size, kMinFontSize, kMaxFontSize);
+    cfg.margin_x = std::isfinite(cfg.margin_x)
+        ? std::clamp(cfg.margin_x, 0.0f, 240.0f) : kDefaultMarginX;
+    cfg.margin_y = std::isfinite(cfg.margin_y)
+        ? std::clamp(cfg.margin_y, 0.0f, 240.0f) : kDefaultMarginY;
+    cfg.label_color &= 0xFFFFFF;
+    cfg.value_color &= 0xFFFFFF;
+    return cfg;
+}
+
+bool same_config(const OverlayConfig& a, const OverlayConfig& b) {
+    return a.corner == b.corner && a.font_size == b.font_size &&
+        a.margin_x == b.margin_x && a.margin_y == b.margin_y &&
+        a.show_label == b.show_label && a.label_color == b.label_color &&
+        a.value_color == b.value_color;
+}
+
+static bool number(const std::string& text, float& result) {
+    char* end = nullptr;
+    const float value = std::strtof(text.c_str(), &end);
+    if (end == text.c_str() || *end || !std::isfinite(value))
+        return false;
+    result = value;
+    return true;
+}
+
+static void parse_color(std::string text, std::uint32_t& result) {
+    if (!text.empty() && text.front() == '#') text.erase(0, 1);
+    if (text.size() != 6 || text.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos)
+        return;
+    result = static_cast<std::uint32_t>(std::strtoul(text.c_str(), nullptr, 16));
+}
+
 OverlayConfig parse_config_text(std::string_view text) {
     OverlayConfig cfg = default_config();
     std::istringstream in{std::string(text)};
@@ -64,16 +103,24 @@ OverlayConfig parse_config_text(std::string_view text) {
         if (key == "corner") {
             cfg.corner = parse_corner(value);
         } else if (key == "font_size") {
-            const int v = std::atoi(value.c_str());
-            cfg.font_size = std::clamp(v, kMinFontSize, kMaxFontSize);
+            float v = 0;
+            if (number(value, v))
+                cfg.font_size = static_cast<int>(std::clamp(v, float(kMinFontSize), float(kMaxFontSize)));
         } else if (key == "margin_x") {
-            cfg.margin_x = std::max(0.0f, static_cast<float>(std::atof(value.c_str())));
+            (void)number(value, cfg.margin_x);
         } else if (key == "margin_y") {
-            cfg.margin_y = std::max(0.0f, static_cast<float>(std::atof(value.c_str())));
+            (void)number(value, cfg.margin_y);
+        } else if (key == "show_label") {
+            if (value == "0" || value == "false") cfg.show_label = false;
+            if (value == "1" || value == "true") cfg.show_label = true;
+        } else if (key == "label_color") {
+            parse_color(value, cfg.label_color);
+        } else if (key == "value_color") {
+            parse_color(value, cfg.value_color);
         }
     }
 
-    return cfg;
+    return sanitize_config(cfg);
 }
 
 std::string serialize_config(const OverlayConfig& cfg) {
@@ -83,6 +130,10 @@ std::string serialize_config(const OverlayConfig& cfg) {
     out << "font_size=" << cfg.font_size << "\n";
     out << "margin_x=" << cfg.margin_x << "\n";
     out << "margin_y=" << cfg.margin_y << "\n";
+    out << "show_label=" << (cfg.show_label ? 1 : 0) << "\n";
+    out << std::hex << std::uppercase << std::setfill('0');
+    out << "label_color=#" << std::setw(6) << (cfg.label_color & 0xFFFFFF) << "\n";
+    out << "value_color=#" << std::setw(6) << (cfg.value_color & 0xFFFFFF) << "\n";
     return out.str();
 }
 

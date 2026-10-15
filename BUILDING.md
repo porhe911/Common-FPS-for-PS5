@@ -46,7 +46,7 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC7 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC8 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
@@ -58,12 +58,21 @@ supported; individual drops and recovery from a short drop remain visible.
 Changing PID/source or losing sampling restarts settling. This is numerical
 filtering, not detection of a game's loading-screen state.
 
-On 2026-10-15 the user confirmed the RC6 overlay appeared on FW 11.60,
-while requesting a smaller/lower overlay and reporting 89/120 FPS during
-loading. RC7 retains that injector and protected guard-write path unchanged;
-only presentation/defaults and release markers change. RC7 hardware testing
-and broader FW 11.60 lifecycle validation remain pending. See
-[RC7 notes](release/RELEASE_NOTES_v1.2.3_RC7.md) and
+On 2026-10-15 the user confirmed RC7 now works perfectly on FW 11.60.
+RC8 retains its sampler/filter and protected injection code. It adds an embedded
+loopback HTTP settings service on port 39029, atomic persistent configuration,
+a Media deeplink launcher and live PUI styles. The service has one worker and
+bounded requests/timeouts; it never touches process credentials. Media
+registration runs synchronously before sampling/HTTP startup and restores the
+exact original auth ID. Firmware 12+ skips that direct registration path.
+The installer is checked once per activation, and operates only on CFPS00060.
+No app.db writes or ShellCore modifications are introduced.
+
+Both controller and renderer use wire version 2 (44 bytes). Reboot when
+upgrading from RC7. Scene dimensions come from the PUI root Widget Width/Height,
+with the existing logical 1920×1080 fallback. Settings preserve defaults until
+Save succeeds. New Media/live settings and display modes still need console
+testing. See [RC8 notes](release/RELEASE_NOTES_v1.2.3_RC8.md) and
 [RC6 confirmation](docs/evidence/FW1160_RC6_OVERLAY_20261015.md).
 The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
 contains no FPS renderer and is not the full counter.

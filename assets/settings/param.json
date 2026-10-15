@@ -1,0 +1,10 @@
+{
+  "applicationCategoryType": 66048,
+  "titleId": "CFPS00060",
+  "deeplinkUri": "http://127.0.0.1:39029/",
+  "localizedParameters": {
+    "defaultLanguage": "en-US",
+    "en-US": { "titleName": "Common FPS" },
+    "ru-RU": { "titleName": "Common FPS — Настройки" }
+  }
+}

@@ -1,6 +1,6 @@
 # Common FPS configuration
 #
-# v1.2.3 RC7 defaults:
+# v1.2.3 RC8 defaults. Saved on PS5 at /data/CommonFPS/config.ini.
 #   corner=bottom_left
 #   font_size=22
 #
@@ -10,3 +10,6 @@ corner=bottom_left
 font_size=22
 margin_x=10
 margin_y=4
+show_label=1
+label_color=#B366FF
+value_color=#FFFFFF

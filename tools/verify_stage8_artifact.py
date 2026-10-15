@@ -66,6 +66,11 @@ def main() -> int:
     renderer_offset = elf.find(renderer)
 
     checks = [
+        (b"settings=media_live_v1" in elf, "embedded settings service missing"),
+        (b"http://127.0.0.1:39029/" in elf, "Media deeplink missing"),
+        (b"sceAppInstUtilAppInstallTitleDir" in elf, "Media installer missing"),
+        (b"/data/CommonFPS/config.ini" in elf, "persistent settings missing"),
+        (b"layout scene-adaptive" in renderer, "adaptive/live layout missing"),
         (elf.startswith(b"\x7fELF"), "controller is not an ELF"),
         (renderer.startswith(b"\x7fELF"), "renderer is not an ELF"),
         (plugin.startswith(PLUGIN_HEADER), "plugin metadata mismatch"),
@@ -73,9 +78,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.3 RC7"
+            b"Common FPS for PS5 v1.2.3 RC8"
             in elf,
-            "v1.2.3 RC7 runtime marker missing",
+            "v1.2.3 RC8 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
@@ -83,8 +88,8 @@ def main() -> int:
          "FW 11.60 full-counter test path missing"),
         (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
         (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
-        (b"Common FPS for PS5 v1.2.3 RC7 renderer" in renderer,
-         "RC7 renderer marker missing"),
+        (b"Common FPS for PS5 v1.2.3 RC8 renderer" in renderer,
+         "RC8 renderer marker missing"),
         (b"ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3" in elf,
          "compact UI / settling filter marker missing"),
         (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,

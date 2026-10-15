@@ -16,6 +16,8 @@
 #include "dce_fps_sampler.hpp"
 #include "shellui_injector.hpp"
 #include "state_sender.hpp"
+#include "settings_service.hpp"
+#include "media_launcher.hpp"
 
 #include <cerrno>
 #include <cstddef>
@@ -26,6 +28,7 @@
 #include <optional>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 extern "C" int sceKernelSetProcessName(const char* name);
@@ -200,7 +203,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC7\n"
+        "Common FPS for PS5 v1.2.3 RC8\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
         "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
@@ -320,11 +323,22 @@ void append_first_fps_record(
             common_fps::ps5::stable_sampler::firmware_sdk_version())) {
         common_fps::log_durable_message(common_fps::kControllerLogPath,
             "fw1160_runtime=experimental_full_counter sampler=enabled "
-            "renderer=deferred_until_stable_game hardware_validation=rc6_overlay_confirmed "
+            "renderer=deferred_until_stable_game hardware_validation=rc7_user_confirmed "
             "fw1160_code_read=ptrace_then_checked_mdbg_on_efault");
     }
 
     common_fps::ps5::Ps5Platform platform;
+    (void)mkdir("/data/CommonFPS", 0755);
+    common_fps::SettingsStore settings(common_fps::kSettingsPath);
+    if (!common_fps::ps5::ensure_media_launcher(
+            common_fps::ps5::stable_sampler::firmware_sdk_version())) {
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "Media launcher credential restoration failed; sampler quarantined");
+        for (;;) platform.sleep_ms(1000);
+    }
+    if (!common_fps::ps5::start_settings_service(settings))
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "Settings listener unavailable; saved overlay settings remain active");
     common_fps::FpsSampler sampler(platform);
     common_fps::ps5::DceFpsSampler dce_sampler(platform);
     common_fps::ps5::StateSender sender;
@@ -343,7 +357,6 @@ void append_first_fps_record(
     bool have_fps = false;
     int latest_fps = 0;
     std::uint64_t sequence = 1;
-    const common_fps::OverlayConfig overlay_config{};
 
     /*
      * The controller remains in etaHEN's tracked process: no second fork,
@@ -539,7 +552,7 @@ void append_first_fps_record(
             frame.visible = true;
             frame.loading = !display_fps;
             frame.fps = display_fps.value_or(0);
-            frame.config = overlay_config;
+            frame.config = settings.get();
             frame.anchor = common_fps::compute_anchor(frame.config);
             (void)sender.send(common_fps::make_wire_packet(frame, sequence++));
         }

@@ -36,6 +36,7 @@ set_target_properties(common_fps_shellui PROPERTIES
 )
 
 target_sources(common_fps_shellui PRIVATE
+    "${ROOT}/src/core/config.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
@@ -101,6 +102,13 @@ add_custom_command(
     VERBATIM
 )
 
+set(SETTINGS_ASSETS_CPP "${GENERATED_DIR}/commonfps_settings_assets.cpp")
+add_custom_command(OUTPUT "${SETTINGS_ASSETS_CPP}"
+    COMMAND python3 "${ROOT}/tools/build_settings_assets.py" "${ROOT}" "${SETTINGS_ASSETS_CPP}"
+    DEPENDS "${ROOT}/tools/build_settings_assets.py"
+        "${ROOT}/assets/settings/index.html" "${ROOT}/assets/settings/param.json"
+    VERBATIM)
+
 # ------------------------------------------------------------------
 # Controller/plugin ELF.
 # ------------------------------------------------------------------
@@ -111,6 +119,11 @@ set_target_properties(common_fps_controller PROPERTIES
 )
 
 target_sources(common_fps_controller PRIVATE
+    "${ROOT}/src/core/config.cpp"
+    "${ROOT}/src/core/settings.cpp"
+    "${ROOT}/src/ps5/settings_service.cpp"
+    "${ROOT}/src/ps5/media_launcher.cpp"
+    "${SETTINGS_ASSETS_CPP}"
     # Current v1.2.3 sampler, lifecycle and ShellUI implementation.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/dce_counter_sampler.cpp"

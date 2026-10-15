@@ -16,6 +16,10 @@ add_library(common_fps_core STATIC
     src/core/wire.cpp
 )
 
+if(UNIX)
+    target_sources(common_fps_core PRIVATE src/core/settings.cpp)
+endif()
+
 target_include_directories(common_fps_core PUBLIC include)
 target_compile_options(common_fps_core PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -70,6 +74,21 @@ if(COMMON_FPS_BUILD_TESTS)
         add_test(NAME common_fps_shellui_write_tests COMMAND common_fps_shellui_write_tests)
     endif()
     if(UNIX)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        set(common_fps_settings_assets "${CMAKE_CURRENT_BINARY_DIR}/settings_assets.cpp")
+        add_custom_command(OUTPUT "${common_fps_settings_assets}"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_settings_assets.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}" "${common_fps_settings_assets}"
+            DEPENDS tools/build_settings_assets.py assets/settings/index.html assets/settings/param.json
+            VERBATIM)
+        add_executable(common_fps_settings_server
+            tests/settings_server_host.cpp src/ps5/settings_service.cpp "${common_fps_settings_assets}")
+        target_include_directories(common_fps_settings_server PRIVATE src/ps5)
+        target_link_libraries(common_fps_settings_server PRIVATE common_fps_core)
+        add_executable(common_fps_settings_tests tests/test_settings.cpp)
+        target_link_libraries(common_fps_settings_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_settings_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_settings_tests COMMAND common_fps_settings_tests)
         add_executable(common_fps_logging_tests tests/test_session_log.cpp)
         target_link_libraries(common_fps_logging_tests PRIVATE common_fps_core)
         target_compile_options(common_fps_logging_tests PRIVATE -UNDEBUG)

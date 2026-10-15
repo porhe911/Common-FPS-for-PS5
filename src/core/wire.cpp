@@ -8,6 +8,7 @@
 #include "common_fps/wire.hpp"
 #include "common_fps/constants.hpp"
 #include "common_fps/layout.hpp"
+#include "common_fps/config.hpp"
 
 #include <algorithm>
 
@@ -47,6 +48,9 @@ WirePacket make_wire_packet(
         std::clamp(frame.config.font_size, kMinFontSize, kMaxFontSize));
     packet.margin_x = frame.config.margin_x;
     packet.margin_y = frame.config.margin_y;
+    packet.show_label = frame.config.show_label ? 1 : 0;
+    packet.label_color = frame.config.label_color & 0xFFFFFF;
+    packet.value_color = frame.config.value_color & 0xFFFFFF;
     return packet;
 }
 
@@ -84,6 +88,10 @@ decode_wire_packet(const WirePacket& packet) {
         kMaxFontSize);
     frame.config.margin_x = std::max(0.0f, packet.margin_x);
     frame.config.margin_y = std::max(0.0f, packet.margin_y);
+    frame.config.show_label = packet.show_label != 0;
+    frame.config.label_color = packet.label_color;
+    frame.config.value_color = packet.value_color;
+    frame.config = sanitize_config(frame.config);
     frame.anchor = compute_anchor(frame.config);
     return frame;
 }

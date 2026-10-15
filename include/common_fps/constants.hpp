@@ -36,8 +36,8 @@ inline constexpr float kLogicalHeight = 1080.0f;
 inline constexpr int kDefaultFontSize = 22;
 inline constexpr float kDefaultMarginX = 10.0f;
 inline constexpr float kDefaultMarginY = 4.0f;
-inline constexpr int kMinFontSize = 18;
-inline constexpr int kMaxFontSize = 36;
+inline constexpr int kMinFontSize = 14;
+inline constexpr int kMaxFontSize = 64;
 
 /* PS5 output is at most 120 Hz; allow only a small measurement tolerance. */
 inline constexpr int kMaxDisplayFps = 120;

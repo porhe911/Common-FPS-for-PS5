@@ -16,6 +16,8 @@
 #include "commonfps_shellui.hpp"
 #include "common_fps/shellui_hook_protocol.hpp"
 #include "common_fps/session_log.hpp"
+#include "common_fps/config.hpp"
+#include "common_fps/layout.hpp"
 
 #include <arpa/inet.h>
 #include <array>
@@ -24,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -129,6 +132,9 @@ MonoImage* g_pui_image{};
 std::uint32_t g_game_scene_handle{};
 std::uint32_t g_label_handle{};
 std::uint32_t g_value_handle{};
+bool g_style_applied = false;
+OverlayConfig g_applied_config{};
+OverlayLayout g_applied_layout{};
 MonoMethod* g_find_scene_method{};
 bool g_background_render_mode = false;
 
@@ -735,6 +741,7 @@ bool refresh_game_scene() {
     if (managed_target(g_game_scene_handle) != game_scene) {
         release_managed_handle(g_label_handle);
         release_managed_handle(g_value_handle);
+        g_style_applied = false;
         if (!replace_managed_handle(g_game_scene_handle, game_scene))
             return false;
         log_line(
@@ -793,6 +800,18 @@ MonoObject* get_root_widget() {
         "Scene");
     MonoMethod* getter = property_getter(scene, "RootWidget");
     return getter ? invoke(getter, game_scene) : nullptr;
+}
+
+float widget_dimension(MonoObject* widget, const char* property, float fallback) {
+    MonoClass* klass = mono_class_from_name_(g_pui_image,
+        "Sce.PlayStation.PUI.UI2", "Widget");
+    MonoMethod* getter = klass ? property_getter(klass, property) : nullptr;
+    MonoObject* boxed = getter ? invoke(getter, widget) : nullptr;
+    void* unboxed = boxed ? mono_object_unbox_(boxed) : nullptr;
+    if (!unboxed) return fallback;
+    float value = 0;
+    std::memcpy(&value, unboxed, sizeof(value));
+    return std::isfinite(value) && value > 0 ? value : fallback;
 }
 
 MonoObject* create_font(int size) {
@@ -952,6 +971,9 @@ bool apply_packet_on_render(const WirePacket& packet) {
         return false;
     }
 
+    const auto layout = compute_layout(frame.config,
+        widget_dimension(root, "Width", kLogicalWidth),
+        widget_dimension(root, "Height", kLogicalHeight), frame.loading);
     MonoObject* label = managed_target(g_label_handle);
     MonoObject* value = managed_target(g_value_handle);
 
@@ -961,23 +983,23 @@ bool apply_packet_on_render(const WirePacket& packet) {
         value = find_widget(root, kValueId);
 
     if (!label || !value) {
-        MonoObject* font = create_font(frame.config.font_size);
+        g_style_applied = false;
+        MonoObject* font = create_font(layout.font_size);
         if (!font) {
             log_line("UIFont create failed");
             return false;
         }
 
-        const float x = frame.anchor.x;
-        const float y = frame.anchor.y;
-        const float value_x =
-            x + static_cast<float>(frame.config.font_size) * 2.7f;
+        const float x = layout.anchor.x;
+        const float y = layout.anchor.y;
+        const float value_x = x + layout.label_advance;
 
         if (!label) {
             label = create_label(
                 kLabelId,
                 x,
                 y,
-                "FPS:",
+                frame.config.show_label ? "FPS:" : "",
                 font,
                 1,
                 0.702f,
@@ -1009,7 +1031,7 @@ bool apply_packet_on_render(const WirePacket& packet) {
             static_cast<unsigned long long>(packet.sequence),
             static_cast<void*>(label),
             static_cast<void*>(value),
-            frame.config.font_size,
+            layout.font_size,
             x,
             y);
     }
@@ -1025,6 +1047,48 @@ bool apply_packet_on_render(const WirePacket& packet) {
             g_value_handle);
         return false;
     }
+
+    const bool style_changed = !g_style_applied ||
+        !same_config(frame.config, g_applied_config) ||
+        layout.font_size != g_applied_layout.font_size;
+    const bool layout_changed = style_changed ||
+        layout.anchor.x != g_applied_layout.anchor.x ||
+        layout.anchor.y != g_applied_layout.anchor.y ||
+        layout.label_advance != g_applied_layout.label_advance;
+    MonoClass* klass = mono_class_from_name_(g_pui_image,
+        "Sce.PlayStation.PUI.UI2", "Label");
+    if (!klass) return false;
+    bool ok = true;
+    if (style_changed) {
+        MonoObject* font = create_font(layout.font_size);
+        if (!font) return false;
+        ok &= set_property_object(klass, label, "Font", font);
+        ok &= set_property_object(klass, value, "Font", font);
+        const auto color = [](std::uint32_t rgb) {
+            return create_color(((rgb >> 16) & 255) / 255.0f,
+                ((rgb >> 8) & 255) / 255.0f, (rgb & 255) / 255.0f, 1.0f);
+        };
+        MonoObject* lc = color(frame.config.label_color);
+        if (!lc) return false;
+        ok &= set_property_object(klass, label, "TextColor", lc);
+        MonoObject* vc = color(frame.config.value_color);
+        if (!vc) return false;
+        ok &= set_property_object(klass, value, "TextColor", vc);
+        ok &= set_label_text(label, frame.config.show_label ? "FPS:" : "");
+    }
+    if (layout_changed) {
+        ok &= set_property_direct(klass, label, "X", layout.anchor.x);
+        ok &= set_property_direct(klass, label, "Y", layout.anchor.y);
+        ok &= set_property_direct(klass, value, "X", layout.anchor.x + layout.label_advance);
+        ok &= set_property_direct(klass, value, "Y", layout.anchor.y);
+        log_line("layout scene-adaptive font=%d x=%.1f y=%.1f label=%d colors=%06x/%06x",
+            layout.font_size, layout.anchor.x, layout.anchor.y, frame.config.show_label ? 1 : 0,
+            frame.config.label_color, frame.config.value_color);
+    }
+    if (!ok) return false;
+    g_applied_config = frame.config;
+    g_applied_layout = layout;
+    g_style_applied = true;
 
     char text[32]{};
     if (frame.loading)

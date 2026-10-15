@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Common FPS — Настройки</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101722;color:#eef3fa;font:22px system-ui,sans-serif}
+main{max-width:1500px;margin:auto;padding:4vh 5vw}header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
+h1{font-size:40px;margin:0}header span,.hint{color:#aebdce;font-size:18px}h2{font-size:24px;margin:0 0 18px}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:30px}.card{background:#192433;border:1px solid #314154;border-radius:18px;padding:26px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:14px 0}.row>span{min-width:140px}
+button,input{font:inherit;color:inherit;background:#27394e;border:2px solid transparent;border-radius:10px;min-height:54px;padding:10px 18px}
+button{cursor:pointer}button:focus,input:focus{outline:3px solid #9bc9ff;outline-offset:3px}button[aria-pressed="true"]{background:#3f5079;border-color:#be9bff}
+.corners{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}.step{display:flex;align-items:center;gap:12px}.step output{min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
+.swatch{display:inline-block;width:18px;height:18px;border-radius:50%;margin-right:10px;border:1px solid #aebdce}
+.color-controls{display:flex;gap:10px}input.hex{width:125px;font:18px monospace;text-transform:uppercase}button.color{min-width:130px;font-size:18px}
+.preview{aspect-ratio:16/9;position:relative;overflow:hidden;background:linear-gradient(135deg,#223c55,#121923 70%);border:1px solid #43576b;border-radius:10px}
+.cross{position:absolute;inset:12%;border:1px dashed #44576d;border-radius:3px}.preview-caption{position:absolute;inset:43% 0;text-align:center;font-size:18px;color:#879caf}
+#sample{position:absolute;white-space:nowrap;font-weight:500;line-height:1.45;text-shadow:0 1px 4px #000}#sample-label{padding-right:.35em}
+.actions{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}#save{background:#a6d7ff;color:#102336;font-weight:700;flex:1}#status{min-height:48px;margin:20px 0 0;color:#b7d9c9}
+.hint{line-height:1.6;margin-top:22px}.small{font-size:15px;color:#879caf;margin-top:24px}a{color:#a6d7ff}
+@media(max-width:900px){body{font-size:18px}.columns{grid-template-columns:1fr}main{padding:24px}h1{font-size:30px}header span{display:none}.card{padding:20px}.row{gap:10px}.row>span{min-width:110px}}
+</style></head>
+<body><main>
+<header><h1>Common FPS</h1><span>Настройки счётчика</span></header>
+<div class="columns">
+<section class="card"><h2>Расположение</h2>
+<div class="corners">
+<button data-corner="top_left">↖ Слева сверху</button><button data-corner="top_right">↗ Справа сверху</button>
+<button data-corner="bottom_left">↙ Слева снизу</button><button data-corner="bottom_right">↘ Справа снизу</button>
+</div>
+<div class="row"><span>Размер</span><div class="step"><button data-step="font_size:-2" aria-label="Уменьшить размер">−</button><output id="font_size">22</output><button data-step="font_size:2" aria-label="Увеличить размер">+</button></div></div>
+<div class="row"><span>Отступ по X</span><div class="step"><button data-step="margin_x:-2" aria-label="Уменьшить горизонтальный отступ">−</button><output id="margin_x">10</output><button data-step="margin_x:2" aria-label="Увеличить горизонтальный отступ">+</button></div></div>
+<div class="row"><span>Отступ по Y</span><div class="step"><button data-step="margin_y:-2" aria-label="Уменьшить вертикальный отступ">−</button><output id="margin_y">4</output><button data-step="margin_y:2" aria-label="Увеличить вертикальный отступ">+</button></div></div>
+<div class="row"><span>Подпись FPS</span><button id="toggle" aria-pressed="true">Показывать</button></div>
+<div class="row"><span>Цвет цифр</span><div class="color-controls"><button class="color" data-color="value_color"><i class="swatch"></i><span>Белый</span></button><input class="hex" id="value_color" aria-label="Цвет цифр HEX" maxlength="7" value="#FFFFFF" spellcheck="false"></div></div>
+<div class="row"><span>Цвет подписи</span><div class="color-controls"><button class="color" data-color="label_color"><i class="swatch"></i><span>Фиолетовый</span></button><input class="hex" id="label_color" aria-label="Цвет подписи HEX" maxlength="7" value="#B366FF" spellcheck="false"></div></div>
+</section>
+<section class="card"><h2>Предпросмотр</h2>
+<div class="preview" id="preview"><div class="cross"></div><div class="preview-caption">Экран игры</div><div id="sample"><span id="sample-label">FPS:</span><span id="sample-value">60</span></div></div>
+<div class="actions"><button id="save" disabled>Сохранить</button><button id="reset" disabled>По умолчанию</button></div>
+<p id="status" role="status" aria-live="polite">Загрузка настроек…</p>
+<p class="hint">Изменения появятся в игре после сохранения.<br>Размер автоматически учитывает масштаб интерфейса PS5.<br>Для возврата в игру нажмите кнопку PS.</p>
+<p class="hint">Управление: стрелки или крестовина — выбор; ✕ — нажать. Цвет можно выбрать кнопкой или ввести код HEX.</p>
+</section></div>
+<p class="small">Common FPS · porhe911 · GPL-3.0-or-later · <a href="https://github.com/porhe911/Common-FPS-for-PS5">Исходный код и лицензия</a></p>
+</main>
+<script>
+(function(){'use strict';
+var defaults={corner:'bottom_left',font_size:22,margin_x:10,margin_y:4,show_label:1,label_color:'#B366FF',value_color:'#FFFFFF'};
+var cfg=Object.assign({},defaults),ready=false,busy=false,dirty=false;
+var palette=[['#FFFFFF','Белый'],['#B366FF','Фиолетовый'],['#73D8FF','Голубой'],['#76F5AA','Зелёный'],['#FFE17D','Жёлтый'],['#FF9A67','Оранжевый'],['#FF707E','Красный'],['#000000','Чёрный']];
+var $=function(id){return document.getElementById(id);};
+function status(text,error){$('status').textContent=text;$('status').style.color=error?'#ff9da7':'#b7d9c9';}
+function render(){
+ document.querySelectorAll('button,input').forEach(function(b){b.disabled=!ready||busy;});
+ document.querySelectorAll('[data-corner]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.corner===cfg.corner));});
+ ['font_size','margin_x','margin_y'].forEach(function(k){$(k).textContent=cfg[k];});
+ $('toggle').textContent=cfg.show_label?'Показывать':'Только цифры';$('toggle').setAttribute('aria-pressed',String(!!cfg.show_label));
+ document.querySelectorAll('[data-color]').forEach(function(b){var c=cfg[b.dataset.color],p=palette.filter(function(p){return p[0]===c;})[0];b.querySelector('i').style.backgroundColor=c;b.querySelector('span').textContent=p?p[1]:'Свой цвет';$(b.dataset.color).value=c;});
+ var scale=$('preview').clientWidth/1920,s=$('sample');s.style.fontSize=(cfg.font_size*scale)+'px';s.style.top='auto';s.style.bottom='auto';s.style.left='auto';s.style.right='auto';
+ s.style[cfg.corner.indexOf('top')===0?'top':'bottom']=(cfg.margin_y*scale)+'px';s.style[cfg.corner.indexOf('left')!==-1?'left':'right']=(cfg.margin_x*scale)+'px';
+ $('sample-label').style.display=cfg.show_label?'':'none';$('sample-label').style.color=cfg.label_color;$('sample-value').style.color=cfg.value_color;
+ $('save').disabled=!ready||busy;$('reset').disabled=!ready||busy;
+}
+function changed(){dirty=true;status('Есть несохранённые изменения');render();}
+document.querySelectorAll('[data-corner]').forEach(function(b){b.onclick=function(){cfg.corner=b.dataset.corner;changed();};});
+document.querySelectorAll('[data-step]').forEach(function(b){b.onclick=function(){var p=b.dataset.step.split(':'),k=p[0];cfg[k]=Math.max(k==='font_size'?14:0,Math.min(k==='font_size'?64:240,cfg[k]+Number(p[1])));changed();};});
+$('toggle').onclick=function(){cfg.show_label=cfg.show_label?0:1;changed();};
+document.querySelectorAll('[data-color]').forEach(function(b){b.onclick=function(){var k=b.dataset.color,i=palette.map(function(p){return p[0];}).indexOf(cfg[k]);cfg[k]=palette[(i+1)%palette.length][0];changed();};});
+['value_color','label_color'].forEach(function(k){$(k).onchange=function(){var v=$(k).value.toUpperCase();if(v.charAt(0)!=='#')v='#'+v;if(!/^#[0-9A-F]{6}$/.test(v)){status('Введите цвет: # и шесть цифр HEX',true);return;}cfg[k]=v;changed();};});
+function request(method,body){var opts={method:method,cache:'no-store'};if(body){opts.headers={'Content-Type':'application/x-www-form-urlencoded','X-CommonFPS':'1'};opts.body=body;}return fetch('/api/config',opts).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();});}
+function decode(text){var out=Object.assign({},defaults);text.split('\n').forEach(function(line){var i=line.indexOf('=');if(i<0)return;var k=line.slice(0,i),v=line.slice(i+1).trim();if(Object.prototype.hasOwnProperty.call(out,k))out[k]=typeof defaults[k]==='number'?Number(v):v;});return out;}
+function save(){if(!ready||busy)return;var valid=true;['value_color','label_color'].forEach(function(k){var v=$(k).value.toUpperCase();if(v.charAt(0)!=='#')v='#'+v;if(!/^#[0-9A-F]{6}$/.test(v))valid=false;else cfg[k]=v;});if(!valid){status('Проверьте коды цветов HEX',true);return;}
+ busy=true;status('Сохранение…');render();var body=Object.keys(defaults).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(cfg[k]);}).join('&');
+ request('POST',body).then(function(text){cfg=decode(text);dirty=false;status('Сохранено. Можно вернуться в игру.');}).catch(function(){status('Не удалось сохранить. Настройки в игре не изменены.',true);}).then(function(){busy=false;render();});}
+$('save').onclick=save;$('reset').onclick=function(){cfg=Object.assign({},defaults);changed();};
+window.addEventListener('resize',render);
+// Spatial navigation works with key events and the standard Gamepad API.
+function controls(){return Array.prototype.slice.call(document.querySelectorAll('button,input')).filter(function(b){return !b.disabled;});}
+function move(key){var all=controls(),el=document.activeElement;if(all.indexOf(el)<0){if(all[0])all[0].focus();return;}var r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,best=null,score=Infinity;
+ all.forEach(function(b){if(b===el)return;var q=b.getBoundingClientRect(),dx=q.left+q.width/2-cx,dy=q.top+q.height/2-cy,primary=(key==='ArrowRight'?dx:key==='ArrowLeft'?-dx:key==='ArrowDown'?dy:-dy),cross=(key==='ArrowRight'||key==='ArrowLeft')?Math.abs(dy):Math.abs(dx);if(primary>4&&primary+cross*3<score){best=b;score=primary+cross*3;}});if(best)best.focus();}
+document.addEventListener('keydown',function(e){if(document.activeElement.tagName==='INPUT')return;if(e.key.indexOf('Arrow')===0){e.preventDefault();move(e.key);}else if(e.key==='Enter'&&document.activeElement.tagName==='BUTTON'){e.preventDefault();document.activeElement.click();}});
+var previous={},lastMove=0;
+function pad(now){try{var pads=navigator.getGamepads?navigator.getGamepads():[],p=null;for(var i=0;i<pads.length;i++)if(pads[i]){p=pads[i];break;}if(p&&document.activeElement.tagName!=='INPUT'){
+ var held={up:!!(p.buttons[12]&&p.buttons[12].pressed)||p.axes[1]<-.6,down:!!(p.buttons[13]&&p.buttons[13].pressed)||p.axes[1]>.6,left:!!(p.buttons[14]&&p.buttons[14].pressed)||p.axes[0]<-.6,right:!!(p.buttons[15]&&p.buttons[15].pressed)||p.axes[0]>.6,ok:!!(p.buttons[0]&&p.buttons[0].pressed)};
+ if(held.ok&&!previous.ok&&document.activeElement.tagName==='BUTTON')document.activeElement.click();
+ ['up','down','left','right'].some(function(k){if(held[k]&&(!previous[k]||now-lastMove>250)){move({up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[k]);lastMove=now;return true;}return false;});previous=held;
+ }}catch(e){}requestAnimationFrame(pad);}requestAnimationFrame(pad);
+render();request('GET').then(function(text){cfg=decode(text);ready=true;status('Настройки загружены');render();document.querySelector('[data-corner="'+cfg.corner+'"]').focus();}).catch(function(){status('Счётчик недоступен. Запустите ELF и откройте ярлык снова.',true);});
+})();
+</script></body></html>

@@ -31,6 +31,9 @@ struct OverlayConfig {
     int font_size = kDefaultFontSize;
     float margin_x = kDefaultMarginX;
     float margin_y = kDefaultMarginY;
+    bool show_label = true;
+    std::uint32_t label_color = 0xB366FF;
+    std::uint32_t value_color = 0xFFFFFF;
 };
 
 struct OverlayFrame {
