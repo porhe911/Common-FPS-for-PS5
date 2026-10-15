@@ -291,11 +291,11 @@ static void test_layout_all_corners() {
 
     cfg.corner = Corner::TopLeft;
     auto a = compute_anchor(cfg);
-    assert(a.x == 10.0f && a.y == 10.0f);
+    assert(a.x == 10.0f && a.y == 4.0f);
 
     cfg.corner = Corner::TopRight;
     a = compute_anchor(cfg);
-    assert(a.x > 1700.0f && a.y == 10.0f);
+    assert(a.x > 1700.0f && a.y == 4.0f);
 
     cfg.corner = Corner::BottomLeft;
     a = compute_anchor(cfg);

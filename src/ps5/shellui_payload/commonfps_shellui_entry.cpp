@@ -76,7 +76,7 @@ void* elf_main(void* payload_args) {
 
     common_fps::reset_session_log(common_fps::kRendererLogPath);
     common_fps::log_message(common_fps::kRendererLogPath,
-        "Common FPS for PS5 v1.2.3 RC6 renderer log_limit=65536");
+        "Common FPS for PS5 v1.2.3 RC7 renderer log_limit=65536");
 
 #if defined(COMMON_FPS_TEST23_PARK_BEFORE_RUNTIME)
     if (common_fps_test23_runtime_gate == 0) {

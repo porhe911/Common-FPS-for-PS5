@@ -46,23 +46,24 @@ python3 tests/test_plugin_wrapper.py
 
 ## Runtime model
 
-The v1.2.3 RC6 controller tracks the active game process, samples integer FPS,
+The v1.2.3 RC7 controller tracks the active game process, samples integer FPS,
 sends state to the embedded ShellUI component, follows game PID changes and
 recovers the overlay after supported ShellUI lifecycle changes.
 
-The default overlay font size is 24.
+The default font size is 22 with a 4px bottom margin (about 9 logical pixels
+lower than RC6). The display waits five seconds after valid sampling starts,
+then uses the median of the latest three observations. Large rises require
+three observations spanning at least two seconds. Sustained 120 FPS remains
+supported; individual drops and recovery from a short drop remain visible.
+Changing PID/source or losing sampling restarts settling. This is numerical
+filtering, not detection of a game's loading-screen state.
 
-RC5's FW 11.60 log confirms execute-only original VM flags (4), successful
-temporary protection setup/recovery, and rejection of MDBG guard writing (1).
-RC6 tries ptrace writing inside that writable window, with checked MDBG only
-after EFAULT/EPERM. Only the existing verified guard byte is written. Exact
-original VM flags are restored before detach and retained through rollback.
-The SDK changes the containing VM entry, not an isolated hardware page.
-Expected-byte checks, full code verification and credential restoration stay
-mandatory. Initial write results remain visible after rollback. Previous
-firmware paths remain unchanged. Firmware 11.60 overlay operation remains
-experimental and is not hardware-confirmed. See
-[RC6 notes](release/RELEASE_NOTES_v1.2.3_RC6.md) and
-[hardware evidence](docs/evidence/FW1160_RC5_MDBG_WRITE_20261015.md).
+On 2026-10-15 the user confirmed the RC6 overlay appeared on FW 11.60,
+while requesting a smaller/lower overlay and reporting 89/120 FPS during
+loading. RC7 retains that injector and protected guard-write path unchanged;
+only presentation/defaults and release markers change. RC7 hardware testing
+and broader FW 11.60 lifecycle validation remain pending. See
+[RC7 notes](release/RELEASE_NOTES_v1.2.3_RC7.md) and
+[RC6 confirmation](docs/evidence/FW1160_RC6_OVERLAY_20261015.md).
 The distinct [Preflight](release/FW1160_PREFLIGHT_v0.1_RU.md) intentionally
 contains no FPS renderer and is not the full counter.

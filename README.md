@@ -1,4 +1,4 @@
-# Common FPS for PS5 v1.2.1
+# Common FPS for PS5 v1.2.3 RC7
 
 Real-time FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 
@@ -10,9 +10,10 @@ available as a standalone ELF or etaHEN plugin.
 - real-time integer FPS for PS4 and PS5 games;
 - compact bottom-left overlay;
 - purple `FPS:` label and white FPS value;
-- 24px default font;
+- 22px default font with a 4px bottom margin;
 - `FPS: Loading` while the FPS source is being prepared;
 - VideoOut sampling with adaptive `/dev/dce` fallback;
+- startup settling and confirmation of brief FPS rises without a 60 FPS cap;
 - no game-memory writes from the FPS sampler;
 - automatic game PID reattachment;
 - automatic ShellUI PID recovery;
@@ -29,7 +30,7 @@ available as a standalone ELF or etaHEN plugin.
 | **9.60** | **Confirmed baseline** | Existing hardware-tested FPS and lifecycle path |
 | **7.60** | Test pending | Current v1.2.1 build needs a fresh hardware regression test |
 | **10.xx** | Experimental | Code path exists, but hardware validation is still required |
-| **11.60** | **Experimental in v1.2.3 RC6** | RC5 confirms execute-only JIT flags and rejects MDBG writes; RC6 tries ptrace while writing is enabled, then restores original flags; overlay hardware validation remains pending |
+| **11.60** | **Overlay confirmed in RC6** | User confirms the counter is visible; RC7 adjusts size/position and filters brief loading rises. RC7 and broader lifecycle checks still need hardware testing |
 
 A code path being present does not mean every firmware revision has been
 physically tested. Confirmed and experimental status are kept separate.

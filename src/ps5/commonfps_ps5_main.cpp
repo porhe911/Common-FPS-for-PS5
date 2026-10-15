@@ -6,6 +6,7 @@
  */
 
 #include "common_fps/fps_sampler.hpp"
+#include "common_fps/fps_display_filter.hpp"
 #include "common_fps/layout.hpp"
 #include "common_fps/wire.hpp"
 #include "common_fps/session_log.hpp"
@@ -199,9 +200,10 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC6\n"
+        "Common FPS for PS5 v1.2.3 RC7\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
+        "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -318,7 +320,7 @@ void append_first_fps_record(
             common_fps::ps5::stable_sampler::firmware_sdk_version())) {
         common_fps::log_durable_message(common_fps::kControllerLogPath,
             "fw1160_runtime=experimental_full_counter sampler=enabled "
-            "renderer=deferred_until_stable_game hardware_validation=pending "
+            "renderer=deferred_until_stable_game hardware_validation=rc6_overlay_confirmed "
             "fw1160_code_read=ptrace_then_checked_mdbg_on_efault");
     }
 
@@ -326,6 +328,7 @@ void append_first_fps_record(
     common_fps::FpsSampler sampler(platform);
     common_fps::ps5::DceFpsSampler dce_sampler(platform);
     common_fps::ps5::StateSender sender;
+    common_fps::FpsDisplayFilter display_filter;
     pid_t reported_pid = -1;
     pid_t dce_reported_pid = -1;
     pid_t stable_shellui_pid = -1;
@@ -358,6 +361,7 @@ void append_first_fps_record(
                 stable_shellui_pid = shellui.pid;
                 stable_shellui_observations = 1;
                 renderer_online = false;
+                display_filter.reset();
             }
         } else {
             stable_shellui_pid = -1;
@@ -437,7 +441,9 @@ void append_first_fps_record(
             ? dce_sampler.sample()
             : std::optional<int>{};
 
+        auto display_source = common_fps::FpsDisplaySource::None;
         if (process_fps) {
+            display_source = common_fps::FpsDisplaySource::VideoOut;
             have_fps = true;
             latest_fps = *process_fps;
 
@@ -462,6 +468,12 @@ void append_first_fps_record(
                     "videoout-process");
             }
         } else if (dce_fps && observed_game_pid) {
+            const char* backend = dce_sampler.backend_name();
+            display_source = std::strcmp(backend, "hen-shared") == 0
+                ? common_fps::FpsDisplaySource::SharedHen
+                : (std::strcmp(backend, "dce-fixed") == 0
+                    ? common_fps::FpsDisplaySource::DceFixed
+                    : common_fps::FpsDisplaySource::DceAdaptive);
             have_fps = true;
             latest_fps = *dce_fps;
             dce_miss_streak = 0;
@@ -519,11 +531,14 @@ void append_first_fps_record(
                 common_fps::ps5::ensure_shellui_renderer();
         }
 
+        const auto display_fps = display_filter.sample(
+            have_fps ? std::optional<int>{latest_fps} : std::nullopt,
+            platform.monotonic_us(), stable_game_pid, display_source);
         if (renderer_online) {
             common_fps::OverlayFrame frame{};
             frame.visible = true;
-            frame.loading = !have_fps;
-            frame.fps = latest_fps;
+            frame.loading = !display_fps;
+            frame.fps = display_fps.value_or(0);
             frame.config = overlay_config;
             frame.anchor = common_fps::compute_anchor(frame.config);
             (void)sender.send(common_fps::make_wire_packet(frame, sequence++));

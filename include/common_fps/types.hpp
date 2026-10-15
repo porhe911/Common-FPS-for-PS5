@@ -6,6 +6,7 @@
  */
 
 #pragma once
+#include "common_fps/constants.hpp"
 #include <cstdint>
 #include <string>
 
@@ -27,9 +28,9 @@ struct Vec2 {
 
 struct OverlayConfig {
     Corner corner = Corner::BottomLeft;
-    int font_size = 24;
-    float margin_x = 10.0f;
-    float margin_y = 10.0f;
+    int font_size = kDefaultFontSize;
+    float margin_x = kDefaultMarginX;
+    float margin_y = kDefaultMarginY;
 };
 
 struct OverlayFrame {

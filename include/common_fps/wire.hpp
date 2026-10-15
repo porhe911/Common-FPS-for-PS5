@@ -30,10 +30,10 @@ struct WirePacket {
     std::int32_t fps = 0;
     std::uint8_t loading = 1;
     std::uint8_t corner = 2; // BottomLeft
-    std::uint16_t font_size = 24;
+    std::uint16_t font_size = kDefaultFontSize;
 
-    float margin_x = 10.0f;
-    float margin_y = 10.0f;
+    float margin_x = kDefaultMarginX;
+    float margin_y = kDefaultMarginY;
 };
 #pragma pack(pop)
 

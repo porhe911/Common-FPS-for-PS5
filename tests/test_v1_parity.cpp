@@ -20,7 +20,7 @@ int main() {
 
     // Current public UI defaults.
     assert(cfg.corner == Corner::BottomLeft);
-    assert(cfg.font_size == 24);
+    assert(cfg.font_size == 22);
 
     // Integer-only public transport.
     OverlayFrame frame;
@@ -35,6 +35,6 @@ int main() {
     assert(display == "FPS: 59");
     assert(display.find('.') == std::string::npos);
 
-    std::cout << "v1.2.0 public defaults: PASS\n";
+    std::cout << "Current public defaults and integer display: PASS\n";
     return 0;
 }
