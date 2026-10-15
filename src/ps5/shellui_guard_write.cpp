@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 extern "C" {
 #include <ps5/kernel.h>
+#include "pt.h"
 }
 
 namespace common_fps::ps5 {
@@ -16,7 +17,8 @@ int shellui_write_guard_byte(pid_t pid, std::uintptr_t address,
         (state.original_protection >= 0 &&
          (state.pid != pid || state.address != address)))
         return EINVAL;
-    state.protect_rc = state.mdbg_write_rc = state.restore_protection_rc = -1;
+    state.protect_rc = state.ptrace_write_rc = state.mdbg_write_rc =
+        state.restore_protection_rc = -1;
     state.protection_restored = false;
     int current = kernel_get_vmem_protection(pid, address, 1);
     if (current < 0) {
@@ -45,9 +47,21 @@ int shellui_write_guard_byte(pid_t pid, std::uintptr_t address,
 
     state.protect_rc = current == writable ? 0 :
         kernel_mprotect(pid, address, 1, writable);
+    int write_rc = EIO;
     if (state.protect_rc == 0 &&
-        kernel_get_vmem_protection(pid, address, 1) == writable)
-        state.mdbg_write_rc = shellui_mdbg_write_byte(pid, address, byte);
+        kernel_get_vmem_protection(pid, address, 1) == writable) {
+        // RC4 tried PT_IO on the original execute-only mapping; RC5 made it
+        // writable but tried only MDBG, which returned 1. Try PT_IO while the
+        // writable flags are active, before restoring the exact original.
+        errno = 0;
+        const int rc = pt_copyin(pid, &byte, address, 1);
+        state.ptrace_write_rc = rc == -1 ? (errno != 0 ? errno : EIO) : rc;
+        write_rc = state.ptrace_write_rc;
+        if (write_rc == EFAULT || write_rc == EPERM) {
+            state.mdbg_write_rc = shellui_mdbg_write_byte(pid, address, byte);
+            write_rc = state.mdbg_write_rc;
+        }
+    }
 
     // Restore even if setup failed after touching the VM entry. The original
     // byte of protection flags, including SDK-specific bits, is preserved.
@@ -59,6 +73,6 @@ int shellui_write_guard_byte(pid_t pid, std::uintptr_t address,
         return -1001;
     if (state.protect_rc != 0)
         return -1000;
-    return state.mdbg_write_rc == -1 ? EIO : state.mdbg_write_rc;
+    return write_rc;
 }
 } // namespace common_fps::ps5

@@ -13,6 +13,7 @@ struct ShellUiGuardWriteState {
     std::uintptr_t address = 0;
     int original_protection = -1;
     int protect_rc = -1;
+    int ptrace_write_rc = -1;
     int mdbg_write_rc = -1;
     int restore_protection_rc = -1;
     bool protection_restored = false;

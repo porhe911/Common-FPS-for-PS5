@@ -195,13 +195,19 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
         if (fw1160_guard_write) {
+            const bool first_write = !guard_write_attempted;
             guard_write_attempted = true;
-            report.backend = "checked-mdbg+vm-protection";
             const int rc = shellui_write_guard_byte(shellui_pid,
                 request.method_address, bytes[0], guard_write_state);
             report.original_protection = guard_write_state.original_protection;
-            report.protect_rc = guard_write_state.protect_rc;
-            report.mdbg_write_rc = guard_write_state.mdbg_write_rc;
+            if (first_write) {
+                report.backend = guard_write_state.mdbg_write_rc == -1
+                    ? "ptrace-io+vm-protection"
+                    : "ptrace-io+mdbg+vm-protection";
+                report.protect_rc = guard_write_state.protect_rc;
+                report.ptrace_write_rc = guard_write_state.ptrace_write_rc;
+                report.mdbg_write_rc = guard_write_state.mdbg_write_rc;
+            }
             report.restore_protection_rc = guard_write_state.restore_protection_rc;
             report.protection_restored = guard_write_state.protection_restored;
             return rc;

@@ -674,7 +674,7 @@ bool ensure_shellui_renderer() {
                 "read_rc=%d read_primary_rc=%d read_fallback_rc=%d "
                 "write_rc=%d expected=%d verified=%d "
                 "restored=%d detached=%d auth_restored=%d "
-                "original_protection=%d protect_rc=%d mdbg_write_rc=%d "
+                "original_protection=%d protect_rc=%d ptrace_write_rc=%d mdbg_write_rc=%d "
                 "restore_protection_rc=%d protection_restored=%d",
                 pid,
                 hook_report.sdk_version,
@@ -700,6 +700,7 @@ bool ensure_shellui_renderer() {
                 hook_report.auth_restored ? 1 : 0,
                 hook_report.original_protection,
                 hook_report.protect_rc,
+                hook_report.ptrace_write_rc,
                 hook_report.mdbg_write_rc,
                 hook_report.restore_protection_rc,
                 hook_report.protection_restored ? 1 : 0);

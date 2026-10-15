@@ -22,6 +22,8 @@ struct KernelState {
     Mode mode = Mode::Normal;
     unsigned queries = 0, setups = 0, restores = 0, writes = 0;
     unsigned query_errors_remaining = 0;
+    unsigned ptrace_calls = 0, mdbg_calls = 0;
+    int ptrace_result = 0, ptrace_errno = 0, mdbg_result = 0;
     std::array<std::uint8_t, 16> code{};
 } kernel;
 void reset(Mode mode = Mode::Normal) {
@@ -65,12 +67,27 @@ namespace common_fps::ps5 {
 int shellui_mdbg_write_byte(pid_t pid, std::uintptr_t address, std::uint8_t byte) noexcept {
     assert(pid == kPid && address == kAddress);
     assert(kernel.protection == (kernel.baseline | PROT_READ | PROT_WRITE));
-    ++kernel.writes;
-    kernel.code[0] = byte;
-    // A debugger may copy data before reporting an error. The controller must
-    // verify/rollback rather than equating a nonzero return with no change.
-    return kernel.mode == Mode::WriteError ? EFAULT : 0;
+    ++kernel.mdbg_calls;
+    if (kernel.mdbg_result == 0) {
+        ++kernel.writes;
+        kernel.code[0] = byte;
+    }
+    return kernel.mdbg_result;
 }
+}
+
+extern "C" int pt_copyin(pid_t pid, const void* buffer, intptr_t address, size_t length) {
+    assert(pid == kPid && std::uintptr_t(address) == kAddress && length == 1);
+    assert(kernel.protection == (kernel.baseline | PROT_READ | PROT_WRITE));
+    ++kernel.ptrace_calls;
+    if (kernel.ptrace_result != 0) {
+        errno = kernel.ptrace_errno;
+        return kernel.ptrace_result;
+    }
+    ++kernel.writes;
+    kernel.code[0] = *static_cast<const std::uint8_t*>(buffer);
+    // Copying can happen before an error is returned; preserve rollback tests.
+    return kernel.mode == Mode::WriteError ? EIO : 0;
 }
 
 static void test_guard_and_exact_original_protection() {
@@ -78,7 +95,8 @@ static void test_guard_and_exact_original_protection() {
     ShellUiGuardWriteState state{};
     assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == 0);
     assert(state.original_protection == kOriginal && state.protection_restored);
-    assert(state.protect_rc == 0 && state.mdbg_write_rc == 0 && state.restore_protection_rc == 0);
+    assert(state.protect_rc == 0 && state.ptrace_write_rc == 0 &&
+           state.mdbg_write_rc == -1 && state.restore_protection_rc == 0);
     assert(kernel.protection == kOriginal && kernel.code[0] == 0xc3);
     assert(kernel.setups == 1 && kernel.restores == 1 && kernel.writes == 1);
     unchanged_tail();
@@ -89,6 +107,51 @@ static void test_guard_and_exact_original_protection() {
     assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == 0);
     assert(kernel.setups == 0 && kernel.protection == kWritable && state.protection_restored);
     assert(state.original_protection == kWritable);
+}
+
+static void test_rc5_execute_only_and_mdbg_denied() {
+    reset();
+    kernel.protection = kernel.baseline = PROT_EXEC; // RC5 measured flags = 4
+    kernel.mdbg_result = EPERM;
+    ShellUiGuardWriteState state{};
+    assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == 0);
+    assert(state.original_protection == 4 && state.protection_restored);
+    assert(kernel.protection == 4 && kernel.code[0] == 0xc3);
+    assert(kernel.ptrace_calls == 1 && kernel.mdbg_calls == 0);
+    assert(state.ptrace_write_rc == 0 && state.mdbg_write_rc == -1);
+    assert(kernel.setups == 1 && kernel.restores == 1 && kernel.writes == 1);
+    unchanged_tail();
+}
+
+static void test_write_fallback_and_failures() {
+    for (int error : {EFAULT, EPERM}) {
+        for (bool libc_error : {false, true}) {
+            reset();
+            kernel.ptrace_result = libc_error ? -1 : error;
+            kernel.ptrace_errno = libc_error ? error : 0;
+            ShellUiGuardWriteState state{};
+            assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == 0);
+            assert(state.ptrace_write_rc == error && state.mdbg_write_rc == 0);
+            assert(kernel.ptrace_calls == 1 && kernel.mdbg_calls == 1 && kernel.writes == 1);
+            assert(kernel.protection == kOriginal && state.protection_restored);
+            unchanged_tail();
+        }
+    }
+    reset();
+    kernel.ptrace_result = EFAULT;
+    kernel.mdbg_result = EPERM;
+    ShellUiGuardWriteState state{};
+    assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == EPERM);
+    assert(kernel.code[0] == 0x55 && kernel.writes == 0);
+    assert(kernel.ptrace_calls == 1 && kernel.mdbg_calls == 1);
+    assert(kernel.protection == kOriginal && state.protection_restored);
+    for (int error : {EIO, EINVAL}) {
+        reset();
+        kernel.ptrace_result = error;
+        state = {};
+        assert(shellui_write_guard_byte(kPid, kAddress, 0xc3, state) == error);
+        assert(kernel.mdbg_calls == 0 && kernel.writes == 0 && state.protection_restored);
+    }
 }
 
 static void test_setup_and_write_errors_restore() {
@@ -161,9 +224,11 @@ static void test_setup_failure_and_query_failure_during_rollback() {
 
 int main() {
     test_guard_and_exact_original_protection();
+    test_rc5_execute_only_and_mdbg_denied();
+    test_write_fallback_and_failures();
     test_setup_and_write_errors_restore();
     test_rollback_retains_initial_protection();
     test_bad_scope_and_unrelated_protection();
     test_setup_failure_and_query_failure_during_rollback();
-    std::cout << "FW1160 guard byte, VM protection and rollback recovery: PASS\n";
+    std::cout << "FW1160 execute-only guard, writable-window PT_IO, fallback and recovery: PASS\n";
 }

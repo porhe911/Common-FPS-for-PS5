@@ -29,7 +29,7 @@ available as a standalone ELF or etaHEN plugin.
 | **9.60** | **Confirmed baseline** | Existing hardware-tested FPS and lifecycle path |
 | **7.60** | Test pending | Current v1.2.1 build needs a fresh hardware regression test |
 | **10.xx** | Experimental | Code path exists, but hardware validation is still required |
-| **11.60** | **Experimental in v1.2.3 RC5** | RC4 confirms code reads but guard writing fails; RC5 adds checked MDBG guard writing with original VM protection recovery; overlay hardware validation remains pending |
+| **11.60** | **Experimental in v1.2.3 RC6** | RC5 confirms execute-only JIT flags and rejects MDBG writes; RC6 tries ptrace while writing is enabled, then restores original flags; overlay hardware validation remains pending |
 
 A code path being present does not mean every firmware revision has been
 physically tested. Confirmed and experimental status are kept separate.

@@ -1310,8 +1310,8 @@ bool initialize_runtime() {
     /*
      * The current renderer first asks the controller for a one-byte, stopped-process
      * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families and FW 11.60
-     * use ptrace I/O for the probe. FW 11.60 writes the guard through checked
-     * MDBG with saved/restored VM protection. FW 9.60 rejects the guard so the existing
+     * use ptrace I/O for the probe. FW 11.60 writes the guard through ptrace
+     * inside saved/restored VM protection, with checked MDBG fallback. FW 9.60 rejects the guard so the existing
      * hardware-proven Application.Update chain renderer is retained.
      */
     g_hook_attempted = true;
