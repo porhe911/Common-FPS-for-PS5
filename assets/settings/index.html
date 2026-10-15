@@ -61,7 +61,7 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
  var palette = [['#FFFFFF','Белый'],['#B366FF','Фиолетовый'],['#73D8FF','Голубой'],['#76F5AA','Зелёный'],['#FFE17D','Жёлтый'],['#FF9A67','Оранжевый'],['#FF707E','Красный'],['#000000','Чёрный']];
  var paletteKey = null, paletteReturn = null, selected = null, navMode = false;
  var dispatching = false, lastAction = null, lastDirection = null, acceptHeld = false;
- var previous = {}, lastRepeat = 0, pointer = null, pointerActivationTarget = null;
+ var previous = {}, lastRepeat = 0, pointer = null, pointerActivationTarget = null, lastFormButton = null;
  var $ = function (id) { return document.getElementById(id); };
  var clock = function () { return performance.now(); };
  function status(text, error) {
@@ -208,6 +208,22 @@ button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
   navMode = true;
   var all = controls(), el = all.indexOf(document.activeElement) !== -1 ? document.activeElement : selected;
   if (all.indexOf(el) === -1) { focusButton(all[0]); return; }
+  // Main form rows lead to Save, rather than a diagonally adjacent row whose
+  // button happens to be a few pixels wider. Stepper +/- remains in-row.
+  if (!paletteKey && (key === 'ArrowRight' || key === 'ArrowLeft')) {
+   var row = el.closest('.row'), corners = el.closest('.corners');
+   if (row || corners) {
+    var peers = Array.prototype.slice.call((row || corners).querySelectorAll('button'));
+    var index = peers.indexOf(el), right = key === 'ArrowRight';
+    var hasNext = corners ? (right ? index % 2 === 0 : index % 2 === 1) : (right ? index < peers.length - 1 : index > 0);
+    if (hasNext) focusButton(peers[index + (right ? 1 : -1)]);
+    else if (right) { lastFormButton = el; focusButton($('save')); }
+    else focusButton(el);
+    return;
+   }
+   if (el === $('save')) { focusButton(key === 'ArrowRight' ? $('reset') : (lastFormButton || document.querySelector('[data-color="label_color"]'))); return; }
+   if (el === $('reset')) { focusButton(key === 'ArrowLeft' ? $('save') : el); return; }
+  }
   var rect = el.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2, best = null, score = Infinity;
   all.forEach(function (b) {
    if (b === el) return;
