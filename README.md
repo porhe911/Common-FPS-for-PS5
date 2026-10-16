@@ -40,7 +40,7 @@ is not queried. Other PUI canvas sizes still need hardware testing.
 
 | System software | Hardware validation |
 |---|---|
-| **11.60** | RC9 reported working by the user on 2026-10-16; promoted to v1.2.3 with version-label changes only |
+| **11.60** | v1.2.3 tested by the user; working overlay and settings confirmed on 2026-10-16 |
 | **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.3 regression pending |
 | **9.00** | Previously confirmed FPS and Rest Mode recovery; v1.2.3 regression pending |
 | **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.3 regression pending |
