@@ -6,6 +6,7 @@
 
 #include "commonfps_shellui.hpp"
 #include "common_fps/shellui_stage.hpp"
+#include "common_fps/session_log.hpp"
 
 #include <cstdio>
 #include <unistd.h>
@@ -13,8 +14,6 @@
 namespace {
 
 constexpr const char* kMarker = "/system_tmp/commonfps_shellui.pid";
-constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_1_shellui.log";
 
 void write_online_marker() {
     FILE* fp = std::fopen(kMarker, "w");
@@ -25,18 +24,13 @@ void write_online_marker() {
 }
 
 [[noreturn]] void park_renderer_failure(const char* stage) {
-    if (FILE* fp = std::fopen(kLog, "a")) {
-        std::fprintf(
-            fp,
-            "renderer parked stage=%s injected_thread_return=disabled\n",
-            stage);
-        std::fclose(fp);
-    }
+    common_fps::log_message(common_fps::kRendererLogPath,
+        "renderer parked stage=%s injected_thread_return=disabled", stage);
 
     /*
      * Returning an injected ShellUI ELF thread can destabilize the console.
      * A compatibility or socket failure therefore remains inert and resident
-     * instead of returning through the loader. The v1.2.1 renderer preserves that proven
+     * instead of returning through the loader. The v1.2.3 renderer preserves that proven
      * lifecycle and patches a native hook only while ShellUI is stopped.
      */
     for (;;)
@@ -80,12 +74,9 @@ void* elf_main(void* payload_args) {
 
     record_stage("entry");
 
-    if (FILE* fp = std::fopen(kLog, "w")) {
-        std::fputs(
-            "Common FPS for PS5 v1.2.1 renderer\n",
-            fp);
-        std::fclose(fp);
-    }
+    common_fps::reset_session_log(common_fps::kRendererLogPath);
+    common_fps::log_message(common_fps::kRendererLogPath,
+        "Common FPS for PS5 v1.2.3 renderer log_limit=65536");
 
 #if defined(COMMON_FPS_TEST23_PARK_BEFORE_RUNTIME)
     if (common_fps_test23_runtime_gate == 0) {

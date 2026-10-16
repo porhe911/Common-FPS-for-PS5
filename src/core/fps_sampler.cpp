@@ -7,6 +7,9 @@
 
 #include "common_fps/fps_sampler.hpp"
 #include "common_fps/constants.hpp"
+#if defined(PS5)
+#include "common_fps/session_log.hpp"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -20,18 +23,10 @@ namespace {
 
 #if defined(PS5)
 void sampler_log(const char* fmt, ...) {
-    FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_1.log",
-        "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kControllerLogPath, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 #else
 #define sampler_log(...) ((void)0)
@@ -478,8 +473,15 @@ std::optional<int> FpsSampler::sample() {
         return std::nullopt;
     }
 
+    if (now_us <= previous_time_us_ ||
+        now_us - previous_time_us_ > kMaxFpsWindowUs) {
+        previous_counter_ = current_counter;
+        previous_time_us_ = now_us;
+        warmup_deltas_remaining_ = kWarmupDeltasToDiscard;
+        return std::nullopt;
+    }
     const std::uint64_t elapsed_us = now_us - previous_time_us_;
-    if (elapsed_us == 0)
+    if (elapsed_us < kMinFpsWindowUs)
         return std::nullopt;
 
     const std::uint32_t delta =
@@ -499,8 +501,8 @@ std::optional<int> FpsSampler::sample() {
     const std::uint64_t scaled =
         static_cast<std::uint64_t>(delta) * 10'000'000ULL;
 
-    const std::uint32_t tenths =
-        static_cast<std::uint32_t>(scaled / elapsed_us);
+    /* Keep 64 bits until validation: a reset must not alias a plausible rate. */
+    const std::uint64_t tenths = scaled / elapsed_us;
 
     previous_counter_ = current_counter;
     previous_time_us_ = now_us;
@@ -528,7 +530,7 @@ std::optional<int> FpsSampler::sample() {
     const int integer_fps =
         static_cast<int>((tenths + 5U) / 10U);
 
-    return integer_fps;
+    return std::min(integer_fps, kMaxDisplayFps);
 }
 
 #if !defined(PS5)

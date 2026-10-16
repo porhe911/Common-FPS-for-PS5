@@ -1,5 +1,6 @@
 /build*/
 /dist/
+/.deps/
 /RESOLVED_BUILD_DEPENDENCIES.txt
 __pycache__/
 *.pyc

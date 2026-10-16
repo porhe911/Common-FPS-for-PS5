@@ -1,0 +1,41 @@
+name: PS5 FW1160 Preflight Build
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/ps5/fw1160_preflight_main.cpp"
+      - "include/common_fps/preflight_process_view.hpp"
+      - "include/common_fps/session_log.hpp"
+      - "tests/test_preflight_process_view.cpp"
+      - "ps5/CMakeLists.txt"
+      - "scripts/ps5_fw1160_preflight_build.sh"
+      - "tools/verify_fw1160_preflight.py"
+      - ".github/workflows/ps5-fw1160-preflight.yml"
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget unzip cmake meson pkg-config python3 clang-18 lld-18 xxd
+      - name: Prepare pinned SDK
+        run: bash ./scripts/prepare_ps5_deps.sh
+      - name: Host regressions
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+      - name: Build and verify observation-only ELF and plugin
+        run: bash ./scripts/ps5_fw1160_preflight_build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-FW1160-Preflight-v0.1
+          path: |
+            dist/Common_FPS_PS5_FW1160_Preflight_v0.1.elf
+            dist/Common_FPS_PS5_etaHEN_FW1160_Preflight_v0.1.plugin
+            dist/FW1160_PREFLIGHT_SHA256SUMS.txt
+            release/FW1160_PREFLIGHT_v0.1_RU.md
+          if-no-files-found: error

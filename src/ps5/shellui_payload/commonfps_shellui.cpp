@@ -8,13 +8,16 @@
 /*
  * Source-only ShellUI renderer.
  *
- * The v1.2.1 renderer never writes Sony method memory from the renderer. Both native
+ * The v1.2.3 renderer never writes Sony method memory from the renderer. Both native
  * methods and pre-existing absolute jumps are patched by the controller
  * while SceShellUI is stopped, with expected-byte and readback checks.
  */
 
 #include "commonfps_shellui.hpp"
 #include "common_fps/shellui_hook_protocol.hpp"
+#include "common_fps/session_log.hpp"
+#include "common_fps/config.hpp"
+#include "common_fps/layout.hpp"
 
 #include <arpa/inet.h>
 #include <array>
@@ -23,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -33,8 +37,10 @@ namespace common_fps::ps5::shellui {
 
 namespace {
 
+#if !defined(COMMON_FPS_SHELLUI_HOST_TEST)
 static_assert(SOL_SOCKET == 0xffff);
 static_assert(SO_RCVTIMEO == 0x1006);
+#endif
 static_assert(sizeof(timeval) == 16);
 
 /* Mono is intentionally represented by opaque types here. */
@@ -126,8 +132,12 @@ mono_gchandle_free_t mono_gchandle_free_ = mono_gchandle_free;
 MonoDomain* g_domain{};
 MonoImage* g_pui_image{};
 std::uint32_t g_game_scene_handle{};
+std::uint32_t g_root_handle{};
 std::uint32_t g_label_handle{};
 std::uint32_t g_value_handle{};
+bool g_style_applied = false;
+OverlayConfig g_applied_config{};
+OverlayLayout g_applied_layout{};
 MonoMethod* g_find_scene_method{};
 bool g_background_render_mode = false;
 
@@ -639,17 +649,10 @@ MainThreadGuardResult install_main_thread_guard() {
 }
 
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_1_shellui.log", "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kRendererLogPath, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 
 MonoImage* open_image(const char* path) {
@@ -710,12 +713,16 @@ bool replace_managed_handle(
     if (handle != 0 && managed_target(handle) == object)
         return true;
 
-    if (handle != 0 && mono_gchandle_free_)
-        mono_gchandle_free_(handle);
-
     /* Match the hardware-stable v1.0.0 renderer: retain a pinned object. */
-    handle = mono_gchandle_new_(object, 1);
-    return handle != 0 && managed_target(handle) == object;
+    const auto next = mono_gchandle_new_(object, 1);
+    if (next == 0 || managed_target(next) != object) {
+        if (next && mono_gchandle_free_) mono_gchandle_free_(next);
+        return false;
+    }
+    const auto previous = handle;
+    handle = next;
+    if (previous && mono_gchandle_free_) mono_gchandle_free_(previous);
+    return true;
 }
 
 void release_managed_handle(std::uint32_t& handle) {
@@ -724,15 +731,39 @@ void release_managed_handle(std::uint32_t& handle) {
     handle = 0;
 }
 
+// A pointer returned by mono_object_unbox is an interior GC pointer, not an
+// object reference. Keep its boxed owner pinned until every native call ends.
+class PinnedObject {
+public:
+    PinnedObject() = default;
+    explicit PinnedObject(MonoObject* object) {
+        if (object) replace_managed_handle(handle_, object);
+    }
+    ~PinnedObject() { release_managed_handle(handle_); }
+    PinnedObject(const PinnedObject&) = delete;
+    PinnedObject& operator=(const PinnedObject&) = delete;
+    PinnedObject(PinnedObject&& other) noexcept : handle_(other.handle_) {
+        other.handle_ = 0;
+    }
+    MonoObject* object() const { return managed_target(handle_); }
+    void* value() const {
+        MonoObject* owner = object();
+        return owner ? mono_object_unbox_(owner) : nullptr;
+    }
+    explicit operator bool() const { return object() != nullptr; }
+private:
+    std::uint32_t handle_ = 0;
+};
+
 bool refresh_game_scene() {
     if (!g_domain || !g_find_scene_method || !mono_string_new_)
         return false;
 
     MonoDomain* active_domain = mono_domain_get_();
-    MonoString* game_path = mono_string_new_(
-        active_domain ? active_domain : g_domain,
-        "Game");
-    void* find_args[1] = {game_path};
+    PinnedObject game_path(reinterpret_cast<MonoObject*>(mono_string_new_(
+        active_domain ? active_domain : g_domain, "Game")));
+    if (!game_path) return false;
+    void* find_args[1] = {game_path.object()};
     MonoObject* game_scene = invoke(
         g_find_scene_method, nullptr, find_args);
     if (!game_scene)
@@ -741,6 +772,8 @@ bool refresh_game_scene() {
     if (managed_target(g_game_scene_handle) != game_scene) {
         release_managed_handle(g_label_handle);
         release_managed_handle(g_value_handle);
+        release_managed_handle(g_root_handle);
+        g_style_applied = false;
         if (!replace_managed_handle(g_game_scene_handle, game_scene))
             return false;
         log_line(
@@ -801,58 +834,58 @@ MonoObject* get_root_widget() {
     return getter ? invoke(getter, game_scene) : nullptr;
 }
 
-MonoObject* create_font(int size) {
+PinnedObject create_font(int size) {
     MonoClass* klass = mono_class_from_name_(
         g_pui_image,
         "Sce.PlayStation.PUI.UI2",
         "UIFont");
     if (!klass)
-        return nullptr;
+        return {};
 
-    MonoObject* boxed = mono_object_new_(g_domain, klass);
+    PinnedObject boxed(mono_object_new_(g_domain, klass));
     if (!boxed)
-        return nullptr;
+        return {};
 
-    void* real = mono_object_unbox_(boxed);
+    void* real = boxed.value();
     MonoMethod* ctor = mono_class_get_method_from_name_(klass, ".ctor", 3);
     void* thunk = ctor ? mono_compile_method_(ctor) : nullptr;
     if (!real || !thunk)
-        return nullptr;
+        return {};
 
     auto fn = reinterpret_cast<void (*)(void*, int, int, int)>(thunk);
     fn(real, size, 0, 0);
-    return reinterpret_cast<MonoObject*>(real);
+    return boxed;
 }
 
-MonoObject* create_color(float r, float g, float b, float a) {
+PinnedObject create_color(float r, float g, float b, float a) {
     MonoClass* klass = mono_class_from_name_(
         g_pui_image,
         "Sce.PlayStation.PUI",
         "UIColor");
     if (!klass)
-        return nullptr;
+        return {};
 
-    MonoObject* boxed = mono_object_new_(g_domain, klass);
+    PinnedObject boxed(mono_object_new_(g_domain, klass));
     if (!boxed)
-        return nullptr;
+        return {};
 
-    void* real = mono_object_unbox_(boxed);
+    void* real = boxed.value();
     MonoMethod* ctor = mono_class_get_method_from_name_(klass, ".ctor", 4);
     void* thunk = ctor ? mono_compile_method_(ctor) : nullptr;
     if (!real || !thunk)
-        return nullptr;
+        return {};
 
     auto fn = reinterpret_cast<void (*)(void*, float, float, float, float)>(thunk);
     fn(real, r, g, b, a);
-    return reinterpret_cast<MonoObject*>(real);
+    return boxed;
 }
 
-MonoObject* create_label(
+PinnedObject create_label(
     const char* name,
     float x,
     float y,
     const char* text,
-    MonoObject* font,
+    const PinnedObject& font,
     int horizontal_alignment,
     float r,
     float g,
@@ -864,32 +897,35 @@ MonoObject* create_label(
         "Sce.PlayStation.PUI.UI2",
         "Label");
     if (!klass)
-        return nullptr;
+        return {};
 
-    MonoObject* label = mono_object_new_(g_domain, klass);
+    PinnedObject label(mono_object_new_(g_domain, klass));
     if (!label)
-        return nullptr;
+        return {};
 
-    mono_runtime_object_init_(label);
+    mono_runtime_object_init_(label.object());
 
-    MonoString* mono_name = mono_string_new_(g_domain, name);
-    MonoString* mono_text = mono_string_new_(g_domain, text);
-    MonoObject* color = create_color(r, g, b, a);
+    PinnedObject mono_name(reinterpret_cast<MonoObject*>(mono_string_new_(g_domain, name)));
+    PinnedObject mono_text(reinterpret_cast<MonoObject*>(mono_string_new_(g_domain, text)));
+    auto color = create_color(r, g, b, a);
+    if (!mono_name || !mono_text || !color || !font) return {};
+    MonoObject* instance = label.object();
 
     bool ok = true;
-    ok &= set_property_direct(klass, label, "Name", mono_name);
-    ok &= set_property_direct(klass, label, "X", x);
-    ok &= set_property_direct(klass, label, "Y", y);
-    ok &= set_property_direct(klass, label, "Text", mono_text);
-    ok &= set_property_object(klass, label, "Font", font);
+    ok &= set_property_direct(klass, instance, "Name", reinterpret_cast<MonoString*>(mono_name.object()));
+    ok &= set_property_direct(klass, instance, "X", x);
+    ok &= set_property_direct(klass, instance, "Y", y);
+    ok &= set_property_direct(klass, instance, "Text", reinterpret_cast<MonoString*>(mono_text.object()));
+    ok &= set_property_object(klass, instance, "Font", reinterpret_cast<MonoObject*>(font.value()));
     ok &= set_property_direct(
-        klass, label, "HorizontalAlignment", horizontal_alignment);
-    ok &= set_property_direct(klass, label, "VerticalAlignment", 0);
-    ok &= set_property_object(klass, label, "TextColor", color);
-    ok &= set_property_direct(klass, label, "FitWidthToText", true);
-    ok &= set_property_direct(klass, label, "FitHeightToText", true);
+        klass, instance, "HorizontalAlignment", horizontal_alignment);
+    ok &= set_property_direct(klass, instance, "VerticalAlignment", 0);
+    ok &= set_property_object(klass, instance, "TextColor", reinterpret_cast<MonoObject*>(color.value()));
+    ok &= set_property_direct(klass, instance, "FitWidthToText", true);
+    ok &= set_property_direct(klass, instance, "FitHeightToText", true);
 
-    return ok ? label : nullptr;
+    if (!ok) return {};
+    return label;
 }
 
 MonoObject* find_widget(MonoObject* root, const char* id) {
@@ -904,9 +940,10 @@ MonoObject* find_widget(MonoObject* root, const char* id) {
     if (!root || !thunk)
         return nullptr;
 
-    MonoString* name = mono_string_new_(g_domain, id);
+    PinnedObject name(reinterpret_cast<MonoObject*>(mono_string_new_(g_domain, id)));
+    if (!name) return nullptr;
     auto fn = reinterpret_cast<MonoObject* (*)(MonoObject*, MonoString*)>(thunk);
-    return fn(root, name);
+    return fn(root, reinterpret_cast<MonoString*>(name.object()));
 }
 
 bool append_child(MonoObject* root, MonoObject* child) {
@@ -934,110 +971,124 @@ bool set_label_text(MonoObject* label, const char* text) {
         g_pui_image,
         "Sce.PlayStation.PUI.UI2",
         "Label");
-    MonoString* mono_text = mono_string_new_(g_domain, text);
-    return set_property_direct(klass, label, "Text", mono_text);
+    PinnedObject mono_text(reinterpret_cast<MonoObject*>(mono_string_new_(g_domain, text)));
+    return mono_text && set_property_direct(klass, label, "Text",
+        reinterpret_cast<MonoString*>(mono_text.object()));
+}
+
+bool apply_rgb(MonoClass* klass, MonoObject* label, std::uint32_t rgb) {
+    auto color = create_color(((rgb >> 16) & 255) / 255.0f,
+        ((rgb >> 8) & 255) / 255.0f, (rgb & 255) / 255.0f, 1.0f);
+    return color && set_property_object(klass, label, "TextColor",
+        reinterpret_cast<MonoObject*>(color.value()));
 }
 
 bool apply_packet_on_render(const WirePacket& packet) {
     const auto decoded = decode_wire_packet(packet);
-    if (!decoded)
-        return false;
-
-    if (!refresh_game_scene())
-        return false;
-
+    if (!decoded) return false;
+    if (!g_style_applied) record_stage("ui_scene_lookup");
+    if (!refresh_game_scene()) return false;
     const OverlayFrame& frame = *decoded;
     MonoObject* root = get_root_widget();
-    if (!root) {
-        static std::uint64_t last_logged_sequence = 0;
-        if (last_logged_sequence != packet.sequence) {
-            last_logged_sequence = packet.sequence;
-            log_line("UI root unavailable seq=%llu",
-                     static_cast<unsigned long long>(packet.sequence));
-        }
-        return false;
+    if (!root) return false;
+
+    // A Scene may retain its identity while replacing RootWidget during a game
+    // transition. Cached children must never outlive the root they belong to.
+    if (managed_target(g_root_handle) != root) {
+        if (!replace_managed_handle(g_root_handle, root)) return false;
+        release_managed_handle(g_label_handle);
+        release_managed_handle(g_value_handle);
+        g_style_applied = false;
+        log_line("UI root refreshed root=%p", static_cast<void*>(root));
     }
 
+    // Use the RC7 logical coordinate system. RC8's background Width/Height
+    // calls are removed; font/margins remain relative to this PUI canvas.
+    const auto layout = compute_layout(frame.config, kLogicalWidth, kLogicalHeight, frame.loading);
     MonoObject* label = managed_target(g_label_handle);
     MonoObject* value = managed_target(g_value_handle);
-
-    if (!label)
-        label = find_widget(root, kLabelId);
-    if (!value)
-        value = find_widget(root, kValueId);
-
-    if (!label || !value) {
-        MonoObject* font = create_font(frame.config.font_size);
-        if (!font) {
-            log_line("UIFont create failed");
-            return false;
-        }
-
-        const float x = frame.anchor.x;
-        const float y = frame.anchor.y;
-        const float value_x =
-            x + static_cast<float>(frame.config.font_size) * 2.7f;
-
-        if (!label) {
-            label = create_label(
-                kLabelId,
-                x,
-                y,
-                "FPS:",
-                font,
-                1,
-                0.702f,
-                0.400f,
-                1.000f,
-                1.000f);
-            if (label && !append_child(root, label))
-                label = nullptr;
-        }
-
-        if (!value) {
-            value = create_label(
-                kValueId,
-                value_x,
-                y,
-                "Loading",
-                font,
-                0,
-                1.0f,
-                1.0f,
-                1.0f,
-                1.0f);
-            if (value && !append_child(root, value))
-                value = nullptr;
-        }
-
-        log_line(
-            "widgets create seq=%llu label=%p value=%p font=%d x=%.1f y=%.1f",
-            static_cast<unsigned long long>(packet.sequence),
-            static_cast<void*>(label),
-            static_cast<void*>(value),
-            frame.config.font_size,
-            x,
-            y);
+    if (!label) label = find_widget(root, kLabelId);
+    if (!value) value = find_widget(root, kValueId);
+    const bool new_label = !label;
+    const bool new_value = !value;
+    const bool font_changed = !g_style_applied || layout.font_size != g_applied_layout.font_size;
+    const bool label_color_changed = !g_style_applied || frame.config.label_color != g_applied_config.label_color;
+    const bool value_color_changed = !g_style_applied || frame.config.value_color != g_applied_config.value_color;
+    const bool label_text_changed = !g_style_applied || frame.config.show_label != g_applied_config.show_label;
+    const bool layout_changed = !g_style_applied || layout.anchor.x != g_applied_layout.anchor.x ||
+        layout.anchor.y != g_applied_layout.anchor.y || layout.label_advance != g_applied_layout.label_advance;
+    const bool change = new_label || new_value || font_changed || label_color_changed ||
+        value_color_changed || label_text_changed || layout_changed;
+    if (change) {
+        record_stage("ui_style_begin");
+        log_line("ui style begin seq=%llu geometry=logical1920x1080 font=%d corner=%u label=%d colors=%06x/%06x new=%d/%d",
+            static_cast<unsigned long long>(packet.sequence), layout.font_size,
+            static_cast<unsigned>(frame.config.corner), frame.config.show_label ? 1 : 0,
+            frame.config.label_color, frame.config.value_color, new_label ? 1 : 0, new_value ? 1 : 0);
     }
 
-    if (!label || !value)
-        return false;
-
-    if (!replace_managed_handle(g_label_handle, label) ||
-        !replace_managed_handle(g_value_handle, value)) {
-        log_line(
-            "widget GC handle failed label=%u value=%u",
-            g_label_handle,
-            g_value_handle);
-        return false;
-    }
-
+    // One rooted font for initial construction or a real size change.
+    // A color/position-only change must not allocate or reassign fonts.
+    auto font = new_label || new_value || font_changed ? create_font(layout.font_size) : PinnedObject{};
+    if ((new_label || new_value || font_changed) && !font) return false;
     char text[32]{};
-    if (frame.loading)
-        std::snprintf(text, sizeof(text), "Loading");
-    else
-        std::snprintf(text, sizeof(text), "%d", frame.fps);
-    return set_label_text(value, text);
+    if (frame.loading) std::snprintf(text, sizeof(text), "Loading");
+    else std::snprintf(text, sizeof(text), "%d", frame.fps);
+    if (new_label) {
+        const auto rgb = frame.config.label_color;
+        auto created = create_label(kLabelId, layout.anchor.x, layout.anchor.y,
+            frame.config.show_label ? "FPS:" : "", font, 1,
+            ((rgb >> 16) & 255) / 255.0f, ((rgb >> 8) & 255) / 255.0f, (rgb & 255) / 255.0f, 1);
+        if (!created || !append_child(root, created.object()) ||
+            !replace_managed_handle(g_label_handle, created.object())) return false;
+        label = managed_target(g_label_handle);
+    } else if (!replace_managed_handle(g_label_handle, label)) return false;
+    if (new_value) {
+        const auto rgb = frame.config.value_color;
+        auto created = create_label(kValueId, layout.anchor.x + layout.label_advance, layout.anchor.y,
+            text, font, 0, ((rgb >> 16) & 255) / 255.0f,
+            ((rgb >> 8) & 255) / 255.0f, (rgb & 255) / 255.0f, 1);
+        if (!created || !append_child(root, created.object()) ||
+            !replace_managed_handle(g_value_handle, created.object())) return false;
+        value = managed_target(g_value_handle);
+    } else if (!replace_managed_handle(g_value_handle, value)) return false;
+
+    MonoClass* klass = mono_class_from_name_(g_pui_image, "Sce.PlayStation.PUI.UI2", "Label");
+    if (!klass) return false;
+    bool ok = true;
+    if (!new_label) {
+        if (font_changed) ok &= set_property_object(klass, label, "Font", reinterpret_cast<MonoObject*>(font.value()));
+        if (label_color_changed) ok &= apply_rgb(klass, label, frame.config.label_color);
+        if (label_text_changed) ok &= set_label_text(label, frame.config.show_label ? "FPS:" : "");
+        if (layout_changed) {
+            ok &= set_property_direct(klass, label, "X", layout.anchor.x);
+            ok &= set_property_direct(klass, label, "Y", layout.anchor.y);
+        }
+    }
+    if (!new_value) {
+        if (font_changed) ok &= set_property_object(klass, value, "Font", reinterpret_cast<MonoObject*>(font.value()));
+        if (value_color_changed) ok &= apply_rgb(klass, value, frame.config.value_color);
+        if (layout_changed) {
+            ok &= set_property_direct(klass, value, "X", layout.anchor.x + layout.label_advance);
+            ok &= set_property_direct(klass, value, "Y", layout.anchor.y);
+        }
+        ok &= set_label_text(value, text);
+    }
+    if (!ok) {
+        g_style_applied = false;
+        record_stage("ui_style_failed");
+        return false;
+    }
+    g_applied_config = frame.config;
+    g_applied_layout = layout;
+    g_style_applied = true;
+    if (change) {
+        record_stage("ui_style_ready");
+        log_line("ui style ready seq=%llu root=%p font=%d x=%.1f y=%.1f pinned_values=1 selective_updates=1",
+            static_cast<unsigned long long>(packet.sequence), static_cast<void*>(root),
+            layout.font_size, layout.anchor.x, layout.anchor.y);
+    }
+    return true;
 }
 
 void apply_latest_state_on_render() {
@@ -1315,8 +1366,9 @@ bool initialize_runtime() {
 
     /*
      * The current renderer first asks the controller for a one-byte, stopped-process
-     * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families
-     * use ptrace I/O. FW 9.60 intentionally rejects the guard so the existing
+     * UI-thread guard. FW 1.xx-8.20 uses MDBG; selected 8.30-10.xx families and FW 11.60
+     * use ptrace I/O for the probe. FW 11.60 writes the guard through ptrace
+     * inside saved/restored VM protection, with checked MDBG fallback. FW 9.60 rejects the guard so the existing
      * hardware-proven Application.Update chain renderer is retained.
      */
     g_hook_attempted = true;

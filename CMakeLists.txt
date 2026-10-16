@@ -9,11 +9,17 @@ add_library(common_fps_core STATIC
     src/core/scene_guard.cpp
     src/core/app.cpp
     src/core/config.cpp
+    src/core/overlay_config.cpp
+    src/core/dce_counter_sampler.cpp
     src/core/fps_sampler.cpp
     src/core/layout.cpp
     src/core/lifecycle.cpp
     src/core/wire.cpp
 )
+
+if(UNIX)
+    target_sources(common_fps_core PRIVATE src/core/settings.cpp)
+endif()
 
 target_include_directories(common_fps_core PUBLIC include)
 target_compile_options(common_fps_core PRIVATE -Wall -Wextra -Wpedantic)
@@ -47,6 +53,53 @@ if(COMMON_FPS_BUILD_TESTS)
     )
     target_link_libraries(common_fps_autoload_tests PRIVATE common_fps_core)
     add_test(NAME common_fps_autoload_tests COMMAND common_fps_autoload_tests)
+    add_executable(common_fps_sampling_tests tests/test_sampling.cpp)
+    target_link_libraries(common_fps_sampling_tests PRIVATE common_fps_core)
+    add_test(NAME common_fps_sampling_tests COMMAND common_fps_sampling_tests)
+    add_executable(common_fps_preflight_tests tests/test_preflight_process_view.cpp)
+    target_link_libraries(common_fps_preflight_tests PRIVATE common_fps_core)
+    add_test(NAME common_fps_preflight_tests COMMAND common_fps_preflight_tests)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(common_fps_presentation_tests tests/test_shellui_presentation.cpp)
+        target_link_libraries(common_fps_presentation_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_presentation_tests PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+        target_link_options(common_fps_presentation_tests PRIVATE -Wl,--gc-sections)
+        add_test(NAME common_fps_presentation_tests COMMAND common_fps_presentation_tests)
+        add_executable(common_fps_shellui_read_tests
+            tests/test_shellui_code_read.cpp src/ps5/shellui_mdbg_io.cpp)
+        target_include_directories(common_fps_shellui_read_tests PRIVATE
+            tests/ps5_sdk_mock src/ps5 include)
+        target_compile_options(common_fps_shellui_read_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_shellui_read_tests COMMAND common_fps_shellui_read_tests)
+        add_executable(common_fps_shellui_write_tests
+            tests/test_shellui_guard_write.cpp src/ps5/shellui_guard_write.cpp)
+        target_include_directories(common_fps_shellui_write_tests PRIVATE
+            tests/ps5_sdk_mock src/ps5 include)
+        target_compile_options(common_fps_shellui_write_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_shellui_write_tests COMMAND common_fps_shellui_write_tests)
+    endif()
+    if(UNIX)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        set(common_fps_settings_assets "${CMAKE_CURRENT_BINARY_DIR}/settings_assets.cpp")
+        add_custom_command(OUTPUT "${common_fps_settings_assets}"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_settings_assets.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}" "${common_fps_settings_assets}"
+            DEPENDS tools/build_settings_assets.py assets/settings/index.html assets/settings/param.json
+            VERBATIM)
+        add_executable(common_fps_settings_server
+            tests/settings_server_host.cpp src/ps5/settings_service.cpp "${common_fps_settings_assets}")
+        target_include_directories(common_fps_settings_server PRIVATE src/ps5)
+        target_link_libraries(common_fps_settings_server PRIVATE common_fps_core)
+        add_executable(common_fps_settings_tests tests/test_settings.cpp)
+        target_link_libraries(common_fps_settings_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_settings_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_settings_tests COMMAND common_fps_settings_tests)
+        add_executable(common_fps_logging_tests tests/test_session_log.cpp)
+        target_link_libraries(common_fps_logging_tests PRIVATE common_fps_core)
+        target_compile_options(common_fps_logging_tests PRIVATE -UNDEBUG)
+        add_test(NAME common_fps_logging_tests COMMAND common_fps_logging_tests)
+    endif()
 endif()
 
 if(COMMON_FPS_BUILD_TESTS)
@@ -55,6 +108,8 @@ if(COMMON_FPS_BUILD_TESTS)
     foreach(common_fps_test_target IN ITEMS
             common_fps_tests
             common_fps_v1_parity_tests
+            common_fps_sampling_tests
+            common_fps_preflight_tests
             common_fps_autoload_tests)
         if(MSVC)
             target_compile_options(${common_fps_test_target} PRIVATE /UNDEBUG)

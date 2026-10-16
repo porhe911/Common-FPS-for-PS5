@@ -6,12 +6,18 @@
  */
 
 #include "common_fps/fps_sampler.hpp"
+#include "common_fps/fps_display_filter.hpp"
 #include "common_fps/layout.hpp"
 #include "common_fps/wire.hpp"
+#include "common_fps/session_log.hpp"
+#include "common_fps/firmware_runtime_policy.hpp"
+#include "stable_sampler/proc_rw_v960.hpp"
 #include "ps5_platform.hpp"
 #include "dce_fps_sampler.hpp"
 #include "shellui_injector.hpp"
 #include "state_sender.hpp"
+#include "settings_service.hpp"
+#include "media_launcher.hpp"
 
 #include <cerrno>
 #include <cstddef>
@@ -19,15 +25,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <fcntl.h>
 #include <optional>
 #include <sys/types.h>
+#include <sys/syscall.h>
+#include <sys/stat.h>
 #include <unistd.h>
+
+extern "C" int sceKernelSetProcessName(const char* name);
 
 namespace {
 
-constexpr const char* kControllerLog =
-    "/data/CommonFPS_v1_2_1.log";
+constexpr const char* kPayloadProcessName = "CommonFPS.elf";
 
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
@@ -54,18 +62,28 @@ struct ShellUiObservation {
     unsigned malformed_records = 0;
 };
 
-void write_all(int fd, const char* data, std::size_t size) noexcept {
-    while (size != 0) {
-        const ssize_t written = write(fd, data, size);
-        if (written > 0) {
-            data += written;
-            size -= static_cast<std::size_t>(written);
-            continue;
-        }
-        if (written < 0 && errno == EINTR)
-            continue;
-        break;
-    }
+struct PayloadIdentityResult {
+    int process_name_rc = -1;
+    int process_name_errno = 0;
+    long thread_name_rc = -1;
+    int thread_name_errno = 0;
+};
+
+PayloadIdentityResult set_payload_identity() noexcept {
+    PayloadIdentityResult result{};
+
+    errno = 0;
+    result.process_name_rc = sceKernelSetProcessName(kPayloadProcessName);
+    result.process_name_errno = result.process_name_rc == 0 ? 0 : errno;
+
+    errno = 0;
+    result.thread_name_rc = syscall(
+        SYS_thr_set_name,
+        -1,
+        kPayloadProcessName);
+    result.thread_name_errno = result.thread_name_rc == 0 ? 0 : errno;
+
+    return result;
 }
 
 bool record_is_shellui(
@@ -178,20 +196,17 @@ ShellUiObservation observe_shellui_once() noexcept {
 }
 
 void write_worker_ready_record(
-    const ShellUiObservation& first) noexcept {
+    const ShellUiObservation& first,
+    const PayloadIdentityResult& identity) noexcept {
 
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_TRUNC | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
-
-    char record[1024]{};
+    char record[2048]{};
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.1\n"
+        "Common FPS for PS5 v1.2.3\n"
+        "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
+        "fw1160_guard=ptrace_vm_protection_1byte\n"
+        "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
         "Mode=loader-tracked internal_fork=absent spawned_pid=resident "
         "shellui_observation=sysctl_tdname_1s stability_gate=10 "
         "game_gate=process_present_stable_3s "
@@ -199,14 +214,16 @@ void write_worker_ready_record(
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
         "mono_gc=pinned sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe "
-        "read=mdbg+dce_ioctl highfw_guard=ptrace_io_1byte "
+        "read=mdbg+dce_ioctl highfw_guard=firmware_routed_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"
         "Worker ready pid=%d ppid=%d first_shellui_pid=%d "
         "size_rc=%d data_rc=%d errno=%d bytes=%zu records=%u "
-        "malformed=%u log_fd=closing periodic_log=disabled "
-        "platform_log=enabled\n",
+        "malformed=%u process_name=%s process_name_rc=%d "
+        "process_name_errno=%d thread_name_rc=%ld thread_name_errno=%d "
+        "log_fd=closing periodic_log=disabled platform_log=enabled\n",
+        common_fps::ps5::stable_sampler::firmware_sdk_version(),
         getpid(),
         getppid(),
         first.pid,
@@ -215,18 +232,21 @@ void write_worker_ready_record(
         first.saved_errno,
         first.bytes,
         first.records,
-        first.malformed_records);
+        first.malformed_records,
+        kPayloadProcessName,
+        identity.process_name_rc,
+        identity.process_name_errno,
+        identity.thread_name_rc,
+        identity.thread_name_errno);
 
     if (record_size > 0) {
         const std::size_t safe_size =
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 void append_sampler_policy_record(
@@ -234,13 +254,6 @@ void append_sampler_policy_record(
     const char* state,
     const char* backend,
     std::uint64_t retry_after_us) noexcept {
-
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
 
     char record[320]{};
     const unsigned long long retry_ms =
@@ -260,11 +273,9 @@ void append_sampler_policy_record(
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 void append_first_fps_record(
@@ -272,13 +283,6 @@ void append_first_fps_record(
     std::uintptr_t counter_address,
     int fps,
     const char* backend) noexcept {
-
-    const int fd = open(
-        kControllerLog,
-        O_WRONLY | O_CREAT | O_APPEND | O_SYNC,
-        0644);
-    if (fd < 0)
-        return;
 
     char record[256]{};
     const int record_size = std::snprintf(
@@ -296,21 +300,49 @@ void append_first_fps_record(
             static_cast<std::size_t>(record_size) < sizeof(record)
                 ? static_cast<std::size_t>(record_size)
                 : sizeof(record) - 1;
-        write_all(fd, record, safe_size);
+        common_fps::write_session_log(
+            common_fps::kControllerLogPath, record, safe_size);
     }
-
-    (void)fsync(fd);
-    (void)close(fd);
 }
 
 [[noreturn]] void run_tracked_worker() noexcept {
+    common_fps::reset_session_log(common_fps::kControllerLogPath);
+    common_fps::reset_session_log(common_fps::kRendererLogPath);
+    /*
+     * Payload Manager's default Active Processes view recognizes resident
+     * payloads by ki_comm ending in ".elf". Set both the process command name
+     * and the main-thread name before the first diagnostic snapshot so the
+     * controller appears as CommonFPS.elf instead of inheriting its loader
+     * identity.
+     */
+    const PayloadIdentityResult identity = set_payload_identity();
     const ShellUiObservation first = observe_shellui_once();
-    write_worker_ready_record(first);
+    write_worker_ready_record(first, identity);
+
+    if (common_fps::firmware_is_fw1160(
+            common_fps::ps5::stable_sampler::firmware_sdk_version())) {
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "fw1160_runtime=experimental_full_counter sampler=enabled "
+            "renderer=deferred_until_stable_game hardware_validation=rc9_user_confirmed "
+            "fw1160_code_read=ptrace_then_checked_mdbg_on_efault");
+    }
 
     common_fps::ps5::Ps5Platform platform;
+    (void)mkdir("/data/CommonFPS", 0755);
+    common_fps::SettingsStore settings(common_fps::kSettingsPath);
+    if (!common_fps::ps5::ensure_media_launcher(
+            common_fps::ps5::stable_sampler::firmware_sdk_version())) {
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "Media launcher credential restoration failed; sampler quarantined");
+        for (;;) platform.sleep_ms(1000);
+    }
+    if (!common_fps::ps5::start_settings_service(settings))
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "Settings listener unavailable; saved overlay settings remain active");
     common_fps::FpsSampler sampler(platform);
     common_fps::ps5::DceFpsSampler dce_sampler(platform);
     common_fps::ps5::StateSender sender;
+    common_fps::FpsDisplayFilter display_filter;
     pid_t reported_pid = -1;
     pid_t dce_reported_pid = -1;
     pid_t stable_shellui_pid = -1;
@@ -325,7 +357,6 @@ void append_first_fps_record(
     bool have_fps = false;
     int latest_fps = 0;
     std::uint64_t sequence = 1;
-    const common_fps::OverlayConfig overlay_config{};
 
     /*
      * The controller remains in etaHEN's tracked process: no second fork,
@@ -343,6 +374,7 @@ void append_first_fps_record(
                 stable_shellui_pid = shellui.pid;
                 stable_shellui_observations = 1;
                 renderer_online = false;
+                display_filter.reset();
             }
         } else {
             stable_shellui_pid = -1;
@@ -422,7 +454,9 @@ void append_first_fps_record(
             ? dce_sampler.sample()
             : std::optional<int>{};
 
+        auto display_source = common_fps::FpsDisplaySource::None;
         if (process_fps) {
+            display_source = common_fps::FpsDisplaySource::VideoOut;
             have_fps = true;
             latest_fps = *process_fps;
 
@@ -447,6 +481,12 @@ void append_first_fps_record(
                     "videoout-process");
             }
         } else if (dce_fps && observed_game_pid) {
+            const char* backend = dce_sampler.backend_name();
+            display_source = std::strcmp(backend, "hen-shared") == 0
+                ? common_fps::FpsDisplaySource::SharedHen
+                : (std::strcmp(backend, "dce-fixed") == 0
+                    ? common_fps::FpsDisplaySource::DceFixed
+                    : common_fps::FpsDisplaySource::DceAdaptive);
             have_fps = true;
             latest_fps = *dce_fps;
             dce_miss_streak = 0;
@@ -504,12 +544,15 @@ void append_first_fps_record(
                 common_fps::ps5::ensure_shellui_renderer();
         }
 
+        const auto display_fps = display_filter.sample(
+            have_fps ? std::optional<int>{latest_fps} : std::nullopt,
+            platform.monotonic_us(), stable_game_pid, display_source);
         if (renderer_online) {
             common_fps::OverlayFrame frame{};
             frame.visible = true;
-            frame.loading = !have_fps;
-            frame.fps = latest_fps;
-            frame.config = overlay_config;
+            frame.loading = !display_fps;
+            frame.fps = display_fps.value_or(0);
+            frame.config = settings.get();
             frame.anchor = common_fps::compute_anchor(frame.config);
             (void)sender.send(common_fps::make_wire_packet(frame, sequence++));
         }

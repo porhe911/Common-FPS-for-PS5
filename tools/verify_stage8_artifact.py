@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Common FPS for PS5 v1.2.1 release boundary."""
+"""Verify the Common FPS for PS5 v1.2.3 release boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00058\0" + b"1.21\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.23\0"
 
 
 def digest(data: bytes) -> str:
@@ -66,6 +66,13 @@ def main() -> int:
     renderer_offset = elf.find(renderer)
 
     checks = [
+        (b"settings=media_live_v1" in elf, "embedded settings service missing"),
+        (b"http://127.0.0.1:39029/" in elf, "Media deeplink missing"),
+        (b"sceAppInstUtilAppInstallTitleDir" in elf, "Media installer missing"),
+        (b"/data/CommonFPS/config.ini" in elf, "persistent settings missing"),
+        (b"geometry=logical1920x1080" in renderer, "stable logical layout missing"),
+        (b"pinned_values=1 selective_updates=1" in renderer, "pinned/selective UI updates missing"),
+        (b"palette-grid" in elf, "explicit color palette missing"),
         (elf.startswith(b"\x7fELF"), "controller is not an ELF"),
         (renderer.startswith(b"\x7fELF"), "renderer is not an ELF"),
         (plugin.startswith(PLUGIN_HEADER), "plugin metadata mismatch"),
@@ -73,11 +80,37 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.1"
+            b"Common FPS for PS5 v1.2.3\n"
             in elf,
-            "v1.2.1 runtime marker missing",
+            "v1.2.3 stable runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
+        (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
+        (b"fw1160_runtime=experimental_full_counter sampler=enabled" in elf,
+         "FW 11.60 full-counter test path missing"),
+        (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
+        (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
+        (b"Common FPS for PS5 v1.2.3 renderer" in renderer,
+         "v1.2.3 stable renderer marker missing"),
+        (b"ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3" in elf,
+         "compact UI / settling filter marker missing"),
+        (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,
+         "FW 11.60 checked code-read fallback marker missing"),
+        (b"ptrace-io+mdbg-read" in elf,
+         "checked MDBG code-read backend missing"),
+        (b"read_primary_rc=%d read_fallback_rc=%d" in elf,
+         "code-read fallback result logging missing"),
+        (b"log_limit=65536 log_reset=activation" in elf, "bounded session log missing"),
+        (b"fw1160_guard=ptrace_vm_protection_1byte" in elf,
+         "FW 11.60 protected ptrace guard-write marker missing"),
+        (b"ptrace-io+vm-protection" in elf,
+         "FW 11.60 protected ptrace write backend missing"),
+        (b"ptrace_write_rc=%d mdbg_write_rc=%d" in elf,
+         "separate guard-write results missing"),
+        (b"restore_protection_rc=%d protection_restored=%d" in elf,
+         "VM protection restoration logging missing"),
+        (b"CommonFPS.elf" in elf, "Payload Manager process name marker missing"),
+        (b"sceKernelSetProcessName" in elf, "process-name API import missing"),
         (
             b"renderer=shared_elf_stopped_chain_hook" in elf,
             "stopped MDBG hook marker missing",
@@ -124,16 +157,16 @@ def main() -> int:
             "DCE device path missing",
         ),
         (
-            b"highfw_guard=ptrace_io_1byte" in elf,
-            "high firmware guard marker missing",
+            b"highfw_guard=firmware_routed_1byte" in elf,
+            "high firmware guard routing marker missing",
         ),
         (b"read=mdbg" in elf, "MDBG read marker missing"),
         (
-            b"/data/CommonFPS_v1_2_1.log" in elf,
+            b"/data/CommonFPS.log" in elf,
             "controller diagnostic log path missing",
         ),
         (
-            b"/data/CommonFPS_v1_2_1_shellui.log" in renderer,
+            b"/data/CommonFPS_shellui.log" in renderer,
             "renderer diagnostic log path missing",
         ),
         (
@@ -168,7 +201,7 @@ def main() -> int:
         ),
         (b"id_commonfps_value" in renderer, "PUI renderer missing"),
         (
-            b"commonfps_v121_hook_request.bin" in renderer,
+            b"commonfps_v123_hook_request.bin" in renderer,
             "renderer hook request protocol missing",
         ),
         (

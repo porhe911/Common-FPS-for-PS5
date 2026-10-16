@@ -225,6 +225,47 @@ public:
     }
 };
 
+static void test_videoout_loading_and_clock_recovery() {
+    MockPlatform p;
+    p.active_pid = 100;
+    p.alive = true;
+    FpsSampler sampler(p);
+    assert(sampler.attach(100));
+    assert(!sampler.sample());
+    p.advance(300, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(sampler.sample() == 60);
+    p.advance(300, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(sampler.sample() == 60);
+    p.counter = 0;
+    p.advance(0, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(sampler.sample() == 60);
+    p.advance(126, 1000);
+    assert(sampler.sample() == 120);
+    p.counter = 0xfffffff0U;
+    p.advance(0, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000); // genuine uint32 wrap is still valid
+    assert(sampler.sample() == 60);
+    p.advance(500, 5000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(sampler.sample() == 60);
+    p.now_us -= 2'000'000;
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(!sampler.sample());
+    p.advance(60, 1000);
+    assert(sampler.sample() == 60);
+}
+
 static void test_config() {
     auto cfg = parse_config_text(R"(
         [overlay]
@@ -250,11 +291,11 @@ static void test_layout_all_corners() {
 
     cfg.corner = Corner::TopLeft;
     auto a = compute_anchor(cfg);
-    assert(a.x == 10.0f && a.y == 10.0f);
+    assert(a.x == 10.0f && a.y == 4.0f);
 
     cfg.corner = Corner::TopRight;
     a = compute_anchor(cfg);
-    assert(a.x > 1700.0f && a.y == 10.0f);
+    assert(a.x > 1700.0f && a.y == 4.0f);
 
     cfg.corner = Corner::BottomLeft;
     a = compute_anchor(cfg);
@@ -360,13 +401,13 @@ static void test_integer_only_fps() {
     auto f = life.tick();
     assert(f.loading);
 
-    // 596 frame increments over 10 seconds = 59.6 FPS internally.
+    // 149 frame increments over 2.5 seconds = 59.6 FPS internally.
     // Public/displayed result must be integer 60.
-    p.advance(596, 10000);
+    p.advance(149, 2500);
     f = life.tick();
     assert(f.loading); // discarded warmup delta
 
-    p.advance(596, 10000);
+    p.advance(149, 2500);
     f = life.tick();
 
     assert(!f.loading);
@@ -520,6 +561,16 @@ static void test_legacy_main_thread_guard_request() {
         ShellUiHookBackend::PtraceIo);
     assert(shellui_main_thread_guard_backend(0x11000000U) ==
         ShellUiHookBackend::Unsupported);
+    assert(shellui_main_thread_guard_backend(0x10600000U) ==
+        ShellUiHookBackend::PtraceIo);
+    assert(shellui_main_thread_guard_backend(0x11600045U) ==
+        ShellUiHookBackend::PtraceIo);
+    assert(shellui_hook_probe_backend(0x11600045U) ==
+        ShellUiHookBackend::PtraceIo);
+    assert(shellui_main_thread_guard_backend(0x12000000U) ==
+        ShellUiHookBackend::Unsupported);
+    assert(shellui_hook_probe_backend(0x12000000U) ==
+        ShellUiHookBackend::Unsupported);
 
     const auto valid = request;
     request.desired[1] ^= 1U;
@@ -544,6 +595,7 @@ static void test_stopped_hook_backend_is_firmware_guarded() {
 }
 
 int main() {
+    test_videoout_loading_and_clock_recovery();
     test_config();
     test_layout_all_corners();
     test_exact_counter_algorithm_and_lifecycle();

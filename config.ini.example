@@ -1,12 +1,15 @@
 # Common FPS configuration
 #
-# v1.2.0 defaults:
+# v1.2.3 defaults. Saved on PS5 at /data/CommonFPS/config.ini.
 #   corner=bottom_left
-#   font_size=24
+#   font_size=22
 #
 
 [overlay]
 corner=bottom_left
-font_size=24
+font_size=22
 margin_x=10
-margin_y=10
+margin_y=4
+show_label=1
+label_color=#B366FF
+value_color=#FFFFFF

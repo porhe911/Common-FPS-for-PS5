@@ -9,9 +9,9 @@ checks = [
      "include/common_fps/types.hpp",
      "int fps = 0"),
 
-    ("font 24",
+    ("compact font 22",
      "include/common_fps/constants.hpp",
-     "kDefaultFontSize = 24"),
+     "kDefaultFontSize = 22"),
 
     ("payload args",
      "integration/loader/v1_loader_contract.cpp",

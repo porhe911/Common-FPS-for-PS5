@@ -5,6 +5,8 @@
  */
 
 #include "dce_fps_sampler.hpp"
+#include "common_fps/fps_rate.hpp"
+#include "common_fps/session_log.hpp"
 
 #include <cerrno>
 #include <cstdarg>
@@ -35,26 +37,10 @@ struct DceIoctlArg {
 };
 
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(
-        "/data/CommonFPS_v1_2_1.log", "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kControllerLogPath, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
-}
-
-bool plausible_fps(double fps) noexcept {
-    return fps >= 1.0 && fps <= 245.0;
-}
-
-int rounded_fps(double fps) noexcept {
-    const int rounded = static_cast<int>(fps + 0.5);
-    return rounded >= 1 && rounded <= 245 ? rounded : 0;
 }
 
 bool begin_auth_window(
@@ -114,11 +100,11 @@ std::optional<int> DceFpsSampler::sample_shared_hen() noexcept {
 
     const bool valid = buffer[12] != 0;
     if (magic != kSharedFpsMagic || !valid ||
-        fps < 1.0F || fps > 245.0F) {
+        !validated_fps(static_cast<double>(fps))) {
         return std::nullopt;
     }
 
-    const int rounded = rounded_fps(static_cast<double>(fps));
+    const int rounded = *validated_fps(static_cast<double>(fps));
     if (rounded == 0)
         return std::nullopt;
 
@@ -302,138 +288,8 @@ bool DceFpsSampler::query_dce(
     return true;
 }
 
-std::optional<int> DceFpsSampler::derive_fps(
-    const std::array<std::uint64_t, 12>& words,
-    std::uint64_t now_us) noexcept {
-
-    if (!have_dce_baseline_) {
-        previous_words_ = words;
-        previous_time_us_ = now_us;
-        have_dce_baseline_ = true;
-        return std::nullopt;
-    }
-
-    if (now_us <= previous_time_us_)
-        return std::nullopt;
-
-    const std::uint64_t elapsed_us = now_us - previous_time_us_;
-    if (elapsed_us < 200000ULL)
-        return std::nullopt;
-
-    auto fps_for_word = [&](std::size_t index) -> int {
-        if (words[index] < previous_words_[index])
-            return 0;
-        const std::uint64_t delta =
-            words[index] - previous_words_[index];
-        const double fps =
-            static_cast<double>(delta) * 1000000.0 /
-            static_cast<double>(elapsed_us);
-        return plausible_fps(fps) ? rounded_fps(fps) : 0;
-    };
-
-    /*
-     * The known layout places the flip counter at +0x08. Keep that fast path
-     * first. If firmware changed the returned structure, discover a stable
-     * monotonic counter across the remaining aligned 64-bit fields.
-     */
-    int chosen_fps = 0;
-    int chosen_word = selected_word_;
-
-    const int fixed_fps = fps_for_word(1);
-    if (fixed_fps != 0) {
-        chosen_word = 1;
-        chosen_fps = fixed_fps;
-        selected_word_ = 1;
-        selected_invalid_ = 0;
-    } else if (selected_word_ >= 0 &&
-               selected_word_ < static_cast<int>(words.size())) {
-        chosen_fps = fps_for_word(
-            static_cast<std::size_t>(selected_word_));
-        if (chosen_fps == 0) {
-            ++selected_invalid_;
-            if (selected_invalid_ >= 3) {
-                selected_word_ = -1;
-                selected_invalid_ = 0;
-            }
-        } else {
-            selected_invalid_ = 0;
-        }
-    }
-
-    if (chosen_fps == 0 && selected_word_ < 0) {
-        unsigned best_streak = 0;
-        int best_word = -1;
-        int best_fps = 0;
-
-        for (std::size_t i = 0; i < words.size(); ++i) {
-            const int fps = fps_for_word(i);
-            if (fps == 0) {
-                candidate_streak_[i] = 0;
-                candidate_last_fps_[i] = 0;
-                continue;
-            }
-
-            const int previous = candidate_last_fps_[i];
-            const int difference =
-                previous > fps ? previous - fps : fps - previous;
-
-            if (previous != 0 && difference <= 12)
-                ++candidate_streak_[i];
-            else
-                candidate_streak_[i] = 1;
-
-            candidate_last_fps_[i] = fps;
-
-            if (candidate_streak_[i] >= 2 &&
-                candidate_streak_[i] > best_streak) {
-                best_streak = candidate_streak_[i];
-                best_word = static_cast<int>(i);
-                best_fps = fps;
-            }
-        }
-
-        if (best_word >= 0) {
-            selected_word_ = best_word;
-            chosen_word = best_word;
-            chosen_fps = best_fps;
-            log_line(
-                "DCE adaptive counter selected offset=0x%x "
-                "streak=%u fps=%d",
-                best_word * 8,
-                best_streak,
-                best_fps);
-        }
-    }
-
-    previous_words_ = words;
-    previous_time_us_ = now_us;
-
-    if (chosen_fps == 0)
-        return std::nullopt;
-
-    backend_name_ =
-        chosen_word == 1 ? "dce-fixed" : "dce-adaptive";
-    if (!backend_logged_) {
-        backend_logged_ = true;
-        log_line(
-            "Fallback sampler online backend=%s offset=0x%x "
-            "first_fps=%d game_memory_reads=0 game_memory_writes=0",
-            backend_name_,
-            chosen_word * 8,
-            chosen_fps);
-    }
-
-    return chosen_fps;
-}
-
 void DceFpsSampler::reset() noexcept {
-    have_dce_baseline_ = false;
-    previous_words_.fill(0);
-    previous_time_us_ = 0;
-    candidate_streak_.fill(0);
-    candidate_last_fps_.fill(0);
-    selected_word_ = -1;
-    selected_invalid_ = 0;
+    counter_sampler_.reset();
     backend_logged_ = false;
     backend_name_ = "none";
 }
@@ -446,7 +302,22 @@ std::optional<int> DceFpsSampler::sample() noexcept {
     if (!query_dce(words))
         return std::nullopt;
 
-    return derive_fps(words, platform_.monotonic_us());
+    const int previous_word = counter_sampler_.selected_word();
+    const auto fps = counter_sampler_.sample(words, platform_.monotonic_us());
+    if (!fps)
+        return std::nullopt;
+    const int word = counter_sampler_.selected_word();
+    backend_name_ = word == 1 ? "dce-fixed" : "dce-adaptive";
+    if (word != 1 && word != previous_word) {
+        log_line("DCE adaptive counter selected offset=0x%x fps=%d", word * 8, *fps);
+    }
+    if (!backend_logged_) {
+        backend_logged_ = true;
+        log_line("Fallback sampler online backend=%s offset=0x%x "
+                 "first_fps=%d game_memory_reads=0 game_memory_writes=0",
+                 backend_name_, word * 8, *fps);
+    }
+    return fps;
 }
 
 } // namespace common_fps::ps5

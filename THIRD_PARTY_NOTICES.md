@@ -50,6 +50,15 @@ PHU ELF/SO renderer blob.
 
 ## Common FPS-owned files
 
+The Media launcher uses the parameter format, media category, deeplink approach
+and direct AppInstUtil registration demonstrated by drakmor/ShadowMountPlus,
+GPLv3, commit `98c524890176c7b474fcb03387bec88c4a559861` (2026-10-15 snapshot):
+`src/sm_shell_icon.c`, `src/sm_install.c`, `assets/shell_icon_param.json`.
+Reference: https://github.com/drakmor/ShadowMountPlus
+Common FPS uses its own icon, settings page, ownership checks, bounded atomic
+asset writes and scoped credential restoration. No upstream icon is copied.
+
+
 Files carrying:
 
 ```text

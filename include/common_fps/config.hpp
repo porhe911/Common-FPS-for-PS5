@@ -13,6 +13,8 @@
 namespace common_fps {
 
 OverlayConfig default_config();
+OverlayConfig sanitize_config(OverlayConfig cfg);
+bool same_config(const OverlayConfig& a, const OverlayConfig& b);
 OverlayConfig parse_config_text(std::string_view text);
 std::string serialize_config(const OverlayConfig& cfg);
 const char* corner_name(Corner corner);

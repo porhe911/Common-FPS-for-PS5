@@ -14,13 +14,13 @@
 namespace common_fps {
 
 inline constexpr const char* kShellUiHookRequestPath =
-    "/system_tmp/commonfps_v121_hook_request.bin";
+    "/system_tmp/commonfps_v123_hook_request.bin";
 inline constexpr const char* kShellUiHookRequestTempPath =
-    "/system_tmp/commonfps_v121_hook_request.tmp";
+    "/system_tmp/commonfps_v123_hook_request.tmp";
 inline constexpr const char* kShellUiHookAckPath =
-    "/system_tmp/commonfps_v121_hook_ack.bin";
+    "/system_tmp/commonfps_v123_hook_ack.bin";
 inline constexpr const char* kShellUiHookAckTempPath =
-    "/system_tmp/commonfps_v121_hook_ack.tmp";
+    "/system_tmp/commonfps_v123_hook_ack.tmp";
 
 inline constexpr std::uint64_t kShellUiHookRequestMagic =
     0x395145524b484643ULL; /* "CFHKREQ9" */
@@ -54,7 +54,8 @@ inline ShellUiHookBackend shellui_hook_backend(
  * The background-PUI path never replaces Application.Update. It changes only
  * the first byte of Diagnostics.CheckRunningOnMainThread to RET while ShellUI
  * is ptrace-stopped. FW 1.xx-8.20 uses MDBG; selected higher firmware uses
- * ptrace I/O. FW 9.60 deliberately keeps the hardware-proven update-chain
+ * ptrace I/O for probes. FW 11.60 writes the guard through ptrace inside a
+ * saved VM protection window, with checked MDBG fallback. FW 9.60 keeps the update-chain
  * backend. Unknown future firmware fails closed.
  */
 inline ShellUiHookBackend shellui_main_thread_guard_backend(
@@ -74,7 +75,8 @@ inline ShellUiHookBackend shellui_main_thread_guard_backend(
         return ShellUiHookBackend::Mdbg;
     if ((family >= 0x08300000U && family < 0x09000000U) ||
         (family > 0x09000000U && family < 0x09600000U) ||
-        (family > 0x09600000U && family <= 0x10ff0000U))
+        (family > 0x09600000U && family <= 0x10ff0000U) ||
+        family == 0x11600000U)
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }
@@ -271,7 +273,8 @@ inline ShellUiHookBackend shellui_hook_probe_backend(
     if ((family >= 0x01000000U && family <= 0x08200000U) ||
         family == 0x09000000U)
         return ShellUiHookBackend::Mdbg;
-    if (family >= 0x08300000U && family <= 0x10ff0000U)
+    if ((family >= 0x08300000U && family <= 0x10ff0000U) ||
+        family == 0x11600000U)
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }

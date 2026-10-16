@@ -33,14 +33,19 @@ inline constexpr std::uintptr_t kVideoOutCounterOffset = 0x768;
 inline constexpr float kLogicalWidth = 1920.0f;
 inline constexpr float kLogicalHeight = 1080.0f;
 
-inline constexpr int kDefaultFontSize = 24;
-inline constexpr int kMinFontSize = 18;
-inline constexpr int kMaxFontSize = 36;
+inline constexpr int kDefaultFontSize = 22;
+inline constexpr float kDefaultMarginX = 10.0f;
+inline constexpr float kDefaultMarginY = 4.0f;
+inline constexpr int kMinFontSize = 14;
+inline constexpr int kMaxFontSize = 64;
 
-/* Hardware-proven v11 filter: PS5 output is at most 120 Hz. */
+/* PS5 output is at most 120 Hz; allow only a small measurement tolerance. */
+inline constexpr int kMaxDisplayFps = 120;
 inline constexpr std::uint32_t kMaxTenthsFps = 1300;
+inline constexpr std::uint64_t kMinFpsWindowUs = 200'000ULL;
+inline constexpr std::uint64_t kMaxFpsWindowUs = 3'000'000ULL;
 
-/* Baseline read + one discarded delta suppresses the startup spike. */
+/* Raw counters discard one delta; the display applies additional settling. */
 inline constexpr unsigned kWarmupDeltasToDiscard = 1;
 
 } // namespace common_fps

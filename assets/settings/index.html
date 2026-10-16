@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Common FPS — Настройки</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101722;color:#eef3fa;font:22px system-ui,sans-serif}
+main{max-width:1500px;margin:auto;padding:4vh 5vw}header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:26px}
+h1{font-size:40px;margin:0}header span,.hint{color:#aebdce;font-size:18px}h2{font-size:24px;margin:0 0 18px}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:30px}.card{background:#192433;border:1px solid #314154;border-radius:18px;padding:26px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:14px 0}.row>span{min-width:140px}
+button,input{font:inherit;color:inherit;background:#27394e;border:2px solid transparent;border-radius:10px;min-height:54px;padding:10px 18px}
+button{cursor:pointer}button:focus,input:focus{outline:3px solid #9bc9ff;outline-offset:3px}button[aria-pressed="true"]{background:#3f5079;border-color:#be9bff}
+button.nav-focus{outline:3px solid #9bc9ff;outline-offset:3px}
+[hidden]{display:none!important}.palette-layer{position:fixed;top:0;left:0;width:100%;height:100%;background:#080e18df;z-index:10;display:flex;align-items:center;justify-content:center;padding:24px}
+.palette-dialog{width:720px;max-width:100%;background:#192433;border:1px solid #60728a;border-radius:18px;padding:28px}.palette-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}
+.palette-grid button{display:flex;flex-direction:column;align-items:center;gap:12px;font-size:18px;min-width:0}.palette-grid .swatch{width:48px;height:48px;margin:0}
+@media(max-width:600px){.palette-grid{grid-template-columns:repeat(2,1fr)}.palette-dialog{max-height:94vh;overflow:auto}}
+.corners{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}.step{display:flex;align-items:center;gap:12px}.step output{min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
+.swatch{display:inline-block;width:18px;height:18px;border-radius:50%;margin-right:10px;border:1px solid #aebdce}
+.color-controls{display:flex;gap:10px}input.hex{width:125px;font:18px monospace;text-transform:uppercase}button.color{min-width:130px;font-size:18px}
+.preview{height:0;padding-top:56.25%;position:relative;overflow:hidden;background:linear-gradient(135deg,#223c55,#121923 70%);border:1px solid #43576b;border-radius:10px}
+.cross{position:absolute;inset:12%;border:1px dashed #44576d;border-radius:3px}.preview-caption{position:absolute;inset:43% 0;text-align:center;font-size:18px;color:#879caf}
+#sample{position:absolute;white-space:nowrap;font-weight:500;line-height:1.45;text-shadow:0 1px 4px #000}#sample-label{padding-right:.35em}
+.actions{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}#save{background:#a6d7ff;color:#102336;font-weight:700;flex:1}#status{min-height:48px;margin:20px 0 0;color:#b7d9c9}
+.hint{line-height:1.6;margin-top:22px}.small{font-size:15px;color:#879caf;margin-top:24px}a{color:#a6d7ff}
+@media(max-width:900px){body{font-size:18px}.columns{grid-template-columns:1fr}main{padding:24px}h1{font-size:30px}header span{display:none}.card{padding:20px}.row{gap:10px}.row>span{min-width:110px}}
+</style></head>
+<body><main>
+<header><h1>Common FPS</h1><span>Настройки счётчика</span></header>
+<div class="columns">
+<section class="card"><h2>Расположение</h2>
+<div class="corners">
+<button data-corner="top_left">↖ Слева сверху</button><button data-corner="top_right">↗ Справа сверху</button>
+<button data-corner="bottom_left">↙ Слева снизу</button><button data-corner="bottom_right">↘ Справа снизу</button>
+</div>
+<div class="row"><span>Размер</span><div class="step"><button data-step="font_size:-2" aria-label="Уменьшить размер">−</button><output id="font_size">22</output><button data-step="font_size:2" aria-label="Увеличить размер">+</button></div></div>
+<div class="row"><span>Отступ по X</span><div class="step"><button data-step="margin_x:-2" aria-label="Уменьшить горизонтальный отступ">−</button><output id="margin_x">10</output><button data-step="margin_x:2" aria-label="Увеличить горизонтальный отступ">+</button></div></div>
+<div class="row"><span>Отступ по Y</span><div class="step"><button data-step="margin_y:-2" aria-label="Уменьшить вертикальный отступ">−</button><output id="margin_y">4</output><button data-step="margin_y:2" aria-label="Увеличить вертикальный отступ">+</button></div></div>
+<div class="row"><span>Подпись FPS</span><button id="toggle" aria-pressed="true">Показывать</button></div>
+<div class="row"><span>Цвет цифр</span><div class="color-controls"><button class="color" data-color="value_color"><i class="swatch"></i><span>Белый</span></button><input class="hex" id="value_color" aria-label="Цвет цифр HEX" maxlength="7" value="#FFFFFF" spellcheck="false"></div></div>
+<div class="row"><span>Цвет подписи</span><div class="color-controls"><button class="color" data-color="label_color"><i class="swatch"></i><span>Фиолетовый</span></button><input class="hex" id="label_color" aria-label="Цвет подписи HEX" maxlength="7" value="#B366FF" spellcheck="false"></div></div>
+</section>
+<section class="card"><h2>Предпросмотр</h2>
+<div class="preview" id="preview"><div class="cross"></div><div class="preview-caption">Экран игры</div><div id="sample"><span id="sample-label">FPS:</span><span id="sample-value">60</span></div></div>
+<div class="actions"><button id="save" disabled>Сохранить</button><button id="reset" disabled>По умолчанию</button></div>
+<p id="status" role="status" aria-live="polite">Загрузка настроек…</p>
+<p class="hint">Изменения появятся в игре после сохранения.<br>Размер автоматически учитывает масштаб интерфейса PS5.<br>Для возврата в игру нажмите кнопку PS.</p>
+<p class="hint">Крестовина — выбор; ✕ — нажать; OPTIONS — сохранить.<br>Кнопка цвета открывает палитру. Можно также ввести код HEX.</p>
+</section></div>
+<p class="small">Common FPS · v1.2.3 · porhe911 · GPL-3.0-or-later · <a href="https://github.com/porhe911/Common-FPS-for-PS5">Исходный код и лицензия</a></p>
+</main>
+<div id="palette-layer" class="palette-layer" hidden><section class="palette-dialog" role="dialog" aria-modal="true" aria-labelledby="palette-title">
+<h2 id="palette-title">Выберите цвет</h2><div id="palette-grid" class="palette-grid"></div><button id="palette-close">Отмена</button>
+</section></div>
+<script>
+(function () {
+ 'use strict';
+ var defaults = {corner:'bottom_left',font_size:22,margin_x:10,margin_y:4,show_label:1,label_color:'#B366FF',value_color:'#FFFFFF'};
+ var cfg = Object.assign({}, defaults), ready = false, busy = false;
+ var palette = [['#FFFFFF','Белый'],['#B366FF','Фиолетовый'],['#73D8FF','Голубой'],['#76F5AA','Зелёный'],['#FFE17D','Жёлтый'],['#FF9A67','Оранжевый'],['#FF707E','Красный'],['#000000','Чёрный']];
+ var paletteKey = null, paletteReturn = null, selected = null, navMode = false;
+ var dispatching = false, lastAction = null, lastDirection = null, acceptHeld = false, lastAcceptRelease = -Infinity;
+ var previous = {}, lastRepeat = 0, pointer = null, pointerActivationTarget = null, lastFormButton = null;
+ var $ = function (id) { return document.getElementById(id); };
+ var clock = function () { return performance.now(); };
+ function status(text, error) {
+  $('status').textContent = text;
+  $('status').style.color = error ? '#ff9da7' : '#b7d9c9';
+ }
+ function markFocus() {
+  document.querySelectorAll('button').forEach(function (b) { b.classList.toggle('nav-focus', navMode && b === selected); });
+ }
+ function focusButton(button) {
+  if (!button || button.disabled) return;
+  selected = button;
+  button.focus();
+  var rect = button.getBoundingClientRect();
+  if (rect.top < 0 || rect.bottom > innerHeight) {
+   try { button.scrollIntoView({block:'nearest'}); } catch (e) { button.scrollIntoView(); }
+  }
+  markFocus();
+ }
+ function controls() {
+  // HEX fields are edited explicitly with the cursor/keyboard, never a D-pad trap.
+  var scope = paletteKey ? $('palette-layer') : document.querySelector('main');
+  return Array.prototype.slice.call(scope.querySelectorAll('button')).filter(function (b) {
+   return !b.disabled && b.getClientRects().length > 0;
+  });
+ }
+ function render() {
+  document.querySelectorAll('button,input').forEach(function (b) { b.disabled = !ready || busy; });
+  document.querySelectorAll('[data-corner]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.corner === cfg.corner)); });
+  ['font_size','margin_x','margin_y'].forEach(function (k) { $(k).textContent = cfg[k]; });
+  $('toggle').textContent = cfg.show_label ? 'Показывать' : 'Только цифры';
+  $('toggle').setAttribute('aria-pressed', String(!!cfg.show_label));
+  document.querySelectorAll('[data-color]').forEach(function (b) {
+   var c = cfg[b.dataset.color], p = palette.filter(function (p) { return p[0] === c; })[0];
+   b.querySelector('i').style.backgroundColor = c;
+   b.querySelector('span').textContent = p ? p[1] : 'Свой цвет';
+   $(b.dataset.color).value = c;
+  });
+  var scale = $('preview').clientWidth / 1920, sample = $('sample');
+  sample.style.fontSize = (cfg.font_size * scale) + 'px';
+  ['top','bottom','left','right'].forEach(function (k) { sample.style[k] = 'auto'; });
+  sample.style[cfg.corner.indexOf('top') === 0 ? 'top' : 'bottom'] = (cfg.margin_y * scale) + 'px';
+  sample.style[cfg.corner.indexOf('left') !== -1 ? 'left' : 'right'] = (cfg.margin_x * scale) + 'px';
+  $('sample-label').style.display = cfg.show_label ? '' : 'none';
+  $('sample-label').style.color = cfg.label_color;
+  $('sample-value').style.color = cfg.value_color;
+  markFocus();
+ }
+ function changed() { status('Есть несохранённые изменения'); render(); }
+ function closePalette() {
+  if (!paletteKey) return;
+  paletteKey = null;
+  $('palette-layer').hidden = true;
+  focusButton(paletteReturn);
+ }
+ function openPalette(key, button) {
+  if (!ready || busy) return;
+  paletteKey = key;
+  paletteReturn = button;
+  $('palette-title').textContent = key === 'label_color' ? 'Цвет подписи FPS' : 'Цвет цифр';
+  $('palette-layer').hidden = false;
+  var chosen = null;
+  $('palette-grid').querySelectorAll('button').forEach(function (b) {
+   var match = b.dataset.rgb === cfg[key];
+   b.setAttribute('aria-pressed', String(match));
+   if (match) chosen = b;
+  });
+  focusButton(chosen || $('palette-grid').querySelector('button'));
+ }
+ palette.forEach(function (entry) {
+  var button = document.createElement('button'), swatch = document.createElement('i'), label = document.createElement('span');
+  button.type = 'button';
+  button.dataset.rgb = entry[0];
+  button.setAttribute('aria-label', entry[1]);
+  swatch.className = 'swatch'; swatch.style.backgroundColor = entry[0]; label.textContent = entry[1];
+  button.appendChild(swatch); button.appendChild(label);
+  button.onclick = function () { if (!paletteKey) return; cfg[paletteKey] = entry[0]; changed(); closePalette(); };
+  $('palette-grid').appendChild(button);
+ });
+ $('palette-close').onclick = closePalette;
+ $('palette-layer').onclick = function (e) { if (e.target === $('palette-layer')) closePalette(); };
+ document.querySelectorAll('[data-color]').forEach(function (b) { b.onclick = function () { openPalette(b.dataset.color, b); }; });
+ document.querySelectorAll('[data-corner]').forEach(function (b) { b.onclick = function () { cfg.corner = b.dataset.corner; changed(); }; });
+ document.querySelectorAll('[data-step]').forEach(function (b) {
+  b.onclick = function () {
+   var part = b.dataset.step.split(':'), key = part[0];
+   cfg[key] = Math.max(key === 'font_size' ? 14 : 0, Math.min(key === 'font_size' ? 64 : 240, cfg[key] + Number(part[1])));
+   changed();
+  };
+ });
+ $('toggle').onclick = function () { cfg.show_label = cfg.show_label ? 0 : 1; changed(); };
+ function readHex(key) {
+  var value = $(key).value.toUpperCase();
+  if (value.charAt(0) !== '#') value = '#' + value;
+  if (!/^#[0-9A-F]{6}$/.test(value)) return false;
+  cfg[key] = value;
+  return true;
+ }
+ ['value_color','label_color'].forEach(function (key) {
+  $(key).onchange = function () { if (!readHex(key)) { status('Введите цвет: # и шесть цифр HEX', true); return; } changed(); };
+ });
+ function request(method, body) {
+  var opts = {method:method,cache:'no-store'};
+  if (body) { opts.headers = {'Content-Type':'application/x-www-form-urlencoded','X-CommonFPS':'1'}; opts.body = body; }
+  return fetch('/api/config', opts).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+ }
+ function decode(text) {
+  var out = Object.assign({}, defaults);
+  text.split('\n').forEach(function (line) {
+   var i = line.indexOf('='); if (i < 0) return;
+   var key = line.slice(0, i), value = line.slice(i + 1).trim();
+   if (Object.prototype.hasOwnProperty.call(out, key)) out[key] = typeof defaults[key] === 'number' ? Number(value) : value;
+  });
+  return out;
+ }
+ function save() {
+  if (!ready || busy || paletteKey) return;
+  var valid = readHex('value_color') && readHex('label_color');
+  if (!valid) { status('Проверьте коды цветов HEX', true); return; }
+  busy = true; status('Сохранение…'); render();
+  var body = Object.keys(defaults).map(function (key) { return encodeURIComponent(key) + '=' + encodeURIComponent(cfg[key]); }).join('&');
+  request('POST', body).then(function (text) {
+   cfg = decode(text); status('Сохранено. Можно вернуться в игру.');
+  }).catch(function () { status('Не удалось сохранить. Настройки в игре не изменены.', true); }).then(function () {
+   busy = false; render(); focusButton($('save'));
+  });
+ }
+ $('save').onclick = save;
+ $('reset').onclick = function () { cfg = Object.assign({}, defaults); changed(); };
+ function activate(button, source) {
+  if (!ready || busy || !button || button.disabled || button.getClientRects().length === 0) return;
+  var now = clock();
+  // One Cross press may arrive through Gamepad, Enter and a native cursor click.
+  // Coalesce different transports even if the first action moved modal focus.
+  var otherTransportHeld = (source !== 'keyboard' && acceptHeld) || (source !== 'gamepad' && previous.ok);
+  if (lastAction && lastAction.source !== source &&
+      (now - lastAction.time < 300 || otherTransportHeld || now - lastAcceptRelease < 150)) return;
+  lastAction = {source:source,time:now};
+  dispatching = true;
+  try { button.click(); } finally { dispatching = false; }
+ }
+ function navigate(key, source) {
+  var now = clock();
+  if (lastDirection && lastDirection.source !== source && lastDirection.key === key && now - lastDirection.time < 100) return;
+  lastDirection = {key:key,source:source,time:now};
+  navMode = true;
+  var all = controls(), el = all.indexOf(document.activeElement) !== -1 ? document.activeElement : selected;
+  if (all.indexOf(el) === -1) { focusButton(all[0]); return; }
+  // Main form rows lead to Save, rather than a diagonally adjacent row whose
+  // button happens to be a few pixels wider. Stepper +/- remains in-row.
+  if (!paletteKey && (key === 'ArrowRight' || key === 'ArrowLeft')) {
+   var row = el.closest('.row'), corners = el.closest('.corners');
+   if (row || corners) {
+    var peers = Array.prototype.slice.call((row || corners).querySelectorAll('button'));
+    var index = peers.indexOf(el), right = key === 'ArrowRight';
+    var hasNext = corners ? (right ? index % 2 === 0 : index % 2 === 1) : (right ? index < peers.length - 1 : index > 0);
+    if (hasNext) focusButton(peers[index + (right ? 1 : -1)]);
+    else if (right) { lastFormButton = el; focusButton($('save')); }
+    else focusButton(el);
+    return;
+   }
+   if (el === $('save')) { focusButton(key === 'ArrowRight' ? $('reset') : (lastFormButton || document.querySelector('[data-color="label_color"]'))); return; }
+   if (el === $('reset')) { focusButton(key === 'ArrowLeft' ? $('save') : el); return; }
+  }
+  var rect = el.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2, best = null, score = Infinity;
+  all.forEach(function (b) {
+   if (b === el) return;
+   var r = b.getBoundingClientRect(), dx = r.left + r.width / 2 - cx, dy = r.top + r.height / 2 - cy;
+   var primary = key === 'ArrowRight' ? dx : key === 'ArrowLeft' ? -dx : key === 'ArrowDown' ? dy : -dy;
+   var cross = key === 'ArrowRight' || key === 'ArrowLeft' ? Math.abs(dy) : Math.abs(dx);
+   if (primary > 4 && cross <= primary * 1.5 && primary + cross * 3 < score) { best = b; score = primary + cross * 3; }
+  });
+  focusButton(best || el);
+ }
+ document.addEventListener('focusin', function (e) {
+  if (e.target.tagName === 'BUTTON') { selected = e.target; markFocus(); }
+ });
+ document.addEventListener('mousemove', function (e) {
+  if (!pointer || Math.abs(e.clientX - pointer.x) + Math.abs(e.clientY - pointer.y) > 2) { navMode = false; markFocus(); }
+  pointer = {x:e.clientX,y:e.clientY};
+ });
+ document.addEventListener('mousedown', function (e) {
+  pointerActivationTarget = navMode ? selected : null;
+  if (e.target.tagName === 'INPUT') { pointerActivationTarget = null; navMode = false; markFocus(); }
+ }, true);
+ document.addEventListener('click', function (e) {
+  if (dispatching || !e.isTrusted) return;
+  var target = e.target.closest ? e.target.closest('button') : null;
+  // PS5 may report Cross at the stationary cursor while D-pad focus is elsewhere.
+  if (!target && !navMode) return;
+  var button = navMode ? (pointerActivationTarget || selected) : target;
+  pointerActivationTarget = null;
+  if (!button) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (navMode) focusButton(button);
+  activate(button, 'native-click');
+ }, true);
+ function keyName(e) {
+  var key = e.key || e.code || '';
+  if (!key || key === 'Unidentified') key = ({13:'Enter',32:' ',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown',27:'Escape'})[e.keyCode || e.which] || '';
+  return key;
+ }
+ document.addEventListener('keydown', function (e) {
+  var key = keyName(e), editing = document.activeElement.tagName === 'INPUT';
+  if (key === 'Tab') { navMode = false; markFocus(); }
+  if (key === 'Escape' && paletteKey) { e.preventDefault(); closePalette(); return; }
+  if (editing) return;
+  if (key.indexOf('Arrow') === 0) { e.preventDefault(); navigate(key, 'keyboard'); }
+  else if (key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Space' || key === 'Cross' || key === 'GamepadAccept') {
+   e.preventDefault();
+   if (acceptHeld || e.repeat) return;
+   acceptHeld = true; navMode = true; markFocus();
+   activate(pointerActivationTarget || selected || document.activeElement, 'keyboard');
+  }
+ });
+ document.addEventListener('keyup', function (e) {
+  var key = keyName(e);
+  if (key === 'Enter' || key === 'NumpadEnter' || key === ' ' || key === 'Space' || key === 'Cross' || key === 'GamepadAccept') {
+   acceptHeld = false; lastAcceptRelease = clock();
+  }
+ });
+ window.addEventListener('blur', function () { acceptHeld = false; previous = {}; pointerActivationTarget = null; });
+ function pressed(pad, index) {
+  var button = pad.buttons && pad.buttons[index];
+  return typeof button === 'number' ? button > .5 : !!button && (button.pressed || button.value > .5);
+ }
+ function pollPad(now) {
+  try {
+   var get = navigator.getGamepads || navigator.webkitGetGamepads, pads = get ? get.call(navigator) : [], pad = null;
+   for (var i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected !== false) { pad = pads[i]; break; }
+   if (pad) {
+    var rawSony = pad.mapping !== 'standard' && /dualsense|dualshock|054c|playstation|wireless controller|sony/i.test(pad.id || '');
+    var axes = pad.axes || [];
+    var held = {up:pressed(pad,12) || axes[1] < -.6,down:pressed(pad,13) || axes[1] > .6,left:pressed(pad,14) || axes[0] < -.6,right:pressed(pad,15) || axes[0] > .6,
+     ok:pressed(pad,rawSony ? 1 : 0),cancel:pressed(pad,rawSony ? 2 : 1),save:pressed(pad,9)};
+    if (previous.ok && !held.ok) lastAcceptRelease = clock();
+    var editing = document.activeElement.tagName === 'INPUT';
+    if (!editing) {
+     ['up','down','left','right'].some(function (key) {
+      if (held[key] && (!previous[key] || now - lastRepeat > 250)) { navigate({up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[key], 'gamepad'); lastRepeat = now; return true; }
+      return false;
+     });
+     if (held.ok && !previous.ok) { navMode = true; markFocus(); activate(pointerActivationTarget || selected || document.activeElement, 'gamepad'); }
+     if (held.cancel && !previous.cancel) closePalette();
+     if (held.save && !previous.save && !paletteKey) activate($('save'), 'gamepad');
+    }
+    previous = held;
+   } else previous = {};
+  } catch (e) {}
+  requestAnimationFrame(pollPad);
+ }
+ requestAnimationFrame(pollPad);
+ window.addEventListener('resize', render);
+ render();
+ request('GET').then(function (text) {
+  cfg = decode(text); ready = true; status('Настройки загружены'); render();
+  focusButton(document.querySelector('[data-corner="' + cfg.corner + '"]'));
+ }).catch(function () { status('Счётчик недоступен. Запустите ELF и откройте ярлык снова.', true); });
+})();
+</script></body></html>

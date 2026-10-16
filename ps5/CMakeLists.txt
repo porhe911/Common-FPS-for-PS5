@@ -29,13 +29,14 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.1"
+    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.3"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
 )
 
 target_sources(common_fps_shellui PRIVATE
+    "${ROOT}/src/core/overlay_config.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/shellui_payload/commonfps_shellui.cpp"
@@ -83,7 +84,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.1.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.3.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -101,18 +102,32 @@ add_custom_command(
     VERBATIM
 )
 
+set(SETTINGS_ASSETS_CPP "${GENERATED_DIR}/commonfps_settings_assets.cpp")
+add_custom_command(OUTPUT "${SETTINGS_ASSETS_CPP}"
+    COMMAND python3 "${ROOT}/tools/build_settings_assets.py" "${ROOT}" "${SETTINGS_ASSETS_CPP}"
+    DEPENDS "${ROOT}/tools/build_settings_assets.py"
+        "${ROOT}/assets/settings/index.html" "${ROOT}/assets/settings/param.json"
+    VERBATIM)
+
 # ------------------------------------------------------------------
 # Controller/plugin ELF.
 # ------------------------------------------------------------------
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.2.1.elf"
+    OUTPUT_NAME "Common_FPS_PS5_v1.2.3.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
-    # Current v1.2.1 sampler, lifecycle and ShellUI implementation.
+    "${ROOT}/src/core/config.cpp"
+    "${ROOT}/src/core/overlay_config.cpp"
+    "${ROOT}/src/core/settings.cpp"
+    "${ROOT}/src/ps5/settings_service.cpp"
+    "${ROOT}/src/ps5/media_launcher.cpp"
+    "${SETTINGS_ASSETS_CPP}"
+    # Current v1.2.3 sampler, lifecycle and ShellUI implementation.
     "${ROOT}/src/core/fps_sampler.cpp"
+    "${ROOT}/src/core/dce_counter_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
     "${ROOT}/src/core/wire.cpp"
     "${ROOT}/src/ps5/commonfps_ps5_main.cpp"
@@ -121,6 +136,8 @@ target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/ps5/state_sender.cpp"
     "${ROOT}/src/ps5/shellui_injector.cpp"
     "${ROOT}/src/ps5/shellui_hook_controller.cpp"
+    "${ROOT}/src/ps5/shellui_mdbg_io.cpp"
+    "${ROOT}/src/ps5/shellui_guard_write.cpp"
     "${ROOT}/src/ps5/stable_shellui_injector.cpp"
     "${ROOT}/src/ps5/remote_call.cpp"
     "${ROOT}/src/ps5/stable_elfldr_bridge.c"
@@ -132,7 +149,7 @@ target_sources(common_fps_controller PRIVATE
 )
 
 target_compile_definitions(common_fps_controller PRIVATE
-    COMMON_FPS_V121=1
+    COMMON_FPS_V123=1
     COMMON_FPS_DIAGNOSTIC_SYSCTL_ONLY=1
 )
 
@@ -182,11 +199,37 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.1.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.3.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.1.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.1.plugin"
-            --title-id CFPS00058
-            --version 1.21
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.3.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.3.plugin"
+            --title-id CFPS00060
+            --version 1.23
 )
+
+# ------------------------------------------------------------------
+# Isolated FW 11.60 preflight after the v1.2.1 hardware KP report.
+# No renderer, ptrace, MDBG, DCE or game-memory adapter is linked here.
+# ------------------------------------------------------------------
+add_executable(common_fps_fw1160_preflight
+    "${ROOT}/src/ps5/fw1160_preflight_main.cpp")
+set_target_properties(common_fps_fw1160_preflight PROPERTIES
+    OUTPUT_NAME "Common_FPS_PS5_FW1160_Preflight_v0.1.elf")
+target_include_directories(common_fps_fw1160_preflight PRIVATE
+    "${ROOT}/include" "${SDK}" "${SDK}/include")
+target_compile_options(common_fps_fw1160_preflight PRIVATE
+    --target=x86_64-sie-ps5 -DPS5 -fPIC -fPIE
+    -ffunction-sections -fdata-sections -march=znver2 -O2 -Wall -Wextra)
+target_link_options(common_fps_fw1160_preflight PRIVATE -Wl,--gc-sections)
+target_link_libraries(common_fps_fw1160_preflight PRIVATE
+    kernel_sys SceLibcInternal SceNet)
+add_custom_command(TARGET common_fps_fw1160_preflight POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE:common_fps_fw1160_preflight>"
+        "${ROOT}/dist/Common_FPS_PS5_FW1160_Preflight_v0.1.elf"
+    COMMAND python3 "${ROOT}/tools/make_etahen_plugin.py"
+        "${ROOT}/dist/Common_FPS_PS5_FW1160_Preflight_v0.1.elf"
+        "${ROOT}/dist/Common_FPS_PS5_etaHEN_FW1160_Preflight_v0.1.plugin"
+        --title-id CFPS00061 --version 0.10)

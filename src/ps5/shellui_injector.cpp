@@ -6,6 +6,7 @@
 
 #include "shellui_injector.hpp"
 #include "common_fps/shellui_stage.hpp"
+#include "common_fps/session_log.hpp"
 #if defined(COMMON_FPS_TEST29_NO_AUTH_ONLY)
 #elif defined(COMMON_FPS_TEST28_AUTH_DIRECT_ONLY)
 #include "shellui_auth_direct_probe.hpp"
@@ -60,9 +61,9 @@ constexpr const char* kLog =
 #elif defined(COMMON_FPS_TEST25_LOAD_ONLY)
 constexpr const char* kLog =
     "/data/CommonFPS_v110_test25_load_only_no_pthread.log";
-#elif defined(COMMON_FPS_V121)
+#elif defined(COMMON_FPS_V123)
 constexpr const char* kLog =
-    "/data/CommonFPS_v1_2_1.log";
+    kControllerLogPath;
 #elif defined(COMMON_FPS_V110_STABLE)
 constexpr const char* kLog =
     "/data/CommonFPS_v110.log";
@@ -249,16 +250,10 @@ ShellUiLookupResult find_shellui_pid() noexcept {
 }
 
 void log_line(const char* fmt, ...) {
-    FILE* fp = std::fopen(kLog, "a");
-    if (!fp)
-        return;
-
     va_list ap;
     va_start(ap, fmt);
-    std::vfprintf(fp, fmt, ap);
+    log_message_v(kLog, fmt, ap);
     va_end(ap);
-    std::fputc('\n', fp);
-    std::fclose(fp);
 }
 
 #if !defined(COMMON_FPS_TEST25_LOAD_ONLY) && \
@@ -676,8 +671,11 @@ bool ensure_shellui_renderer() {
                 "ShellUI hook request pid=%d sdk=0x%08x mode=%s backend=%s "
                 "phase=%s "
                 "method=0x%llx displaced=%u status=%d "
-                "read_rc=%d write_rc=%d expected=%d verified=%d "
-                "restored=%d detached=%d auth_restored=%d",
+                "read_rc=%d read_primary_rc=%d read_fallback_rc=%d "
+                "write_rc=%d expected=%d verified=%d "
+                "restored=%d detached=%d auth_restored=%d "
+                "original_protection=%d protect_rc=%d ptrace_write_rc=%d mdbg_write_rc=%d "
+                "restore_protection_rc=%d protection_restored=%d",
                 pid,
                 hook_report.sdk_version,
                 hook_report.main_thread_guard
@@ -692,12 +690,20 @@ bool ensure_shellui_renderer() {
                 hook_report.displaced_size,
                 static_cast<int>(hook_report.status),
                 hook_report.read_rc,
+                hook_report.read_primary_rc,
+                hook_report.read_fallback_rc,
                 hook_report.write_rc,
                 hook_report.expected_matched ? 1 : 0,
                 hook_report.verified ? 1 : 0,
                 hook_report.restored ? 1 : 0,
                 hook_report.detached ? 1 : 0,
-                hook_report.auth_restored ? 1 : 0);
+                hook_report.auth_restored ? 1 : 0,
+                hook_report.original_protection,
+                hook_report.protect_rc,
+                hook_report.ptrace_write_rc,
+                hook_report.mdbg_write_rc,
+                hook_report.restore_protection_rc,
+                hook_report.protection_restored ? 1 : 0);
         }
         usleep(20000);
     }

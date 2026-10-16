@@ -28,7 +28,15 @@ struct ShellUiHookPatchReport {
     bool eta_chain = false;
     const char* backend = "none";
     int read_rc = -1;
+    int read_primary_rc = -1;
+    int read_fallback_rc = -1;
     int write_rc = -1;
+    int original_protection = -1;
+    int protect_rc = -1;
+    int ptrace_write_rc = -1;
+    int mdbg_write_rc = -1;
+    int restore_protection_rc = -1;
+    bool protection_restored = false;
     bool expected_matched = false;
     bool verified = false;
     bool restored = false;

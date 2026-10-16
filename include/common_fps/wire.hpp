@@ -16,7 +16,7 @@ namespace common_fps {
 
 inline constexpr std::uint32_t kWireMagic = 0x53465043; // "CFPS"
 inline constexpr std::uint32_t kWireShutdownMagic = 0x58465043; // "CFPX"
-inline constexpr std::uint16_t kWireVersion = 1;
+inline constexpr std::uint16_t kWireVersion = 2;
 inline constexpr std::uint16_t kDefaultIpcPort = 39028;
 
 #pragma pack(push, 1)
@@ -30,12 +30,17 @@ struct WirePacket {
     std::int32_t fps = 0;
     std::uint8_t loading = 1;
     std::uint8_t corner = 2; // BottomLeft
-    std::uint16_t font_size = 24;
+    std::uint16_t font_size = kDefaultFontSize;
 
-    float margin_x = 10.0f;
-    float margin_y = 10.0f;
+    float margin_x = kDefaultMarginX;
+    float margin_y = kDefaultMarginY;
+    std::uint8_t show_label = 1;
+    std::uint8_t reserved[3]{};
+    std::uint32_t label_color = 0xB366FF;
+    std::uint32_t value_color = 0xFFFFFF;
 };
 #pragma pack(pop)
+static_assert(sizeof(WirePacket) == 44);
 
 WirePacket make_wire_packet(
     const OverlayFrame& frame,

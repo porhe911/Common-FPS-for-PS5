@@ -27,3 +27,20 @@ jobs:
 
       - name: etaHEN wrapper test
         run: python3 tests/test_plugin_wrapper.py
+
+      - name: Install pinned browser test tools
+        run: |
+          npm install --prefix build-ui --no-save playwright@1.62.1
+          ./build-ui/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Settings UI with the real HTTP worker
+        env:
+          NODE_PATH: ${{ github.workspace }}/build-ui/node_modules
+        run: node tests/test_settings_ui.js ./build/common_fps_settings_server ./build/settings-preview.png
+
+      - name: Upload settings preview
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Common-FPS-v1.2.3-settings-preview
+          path: build/settings-preview.png
