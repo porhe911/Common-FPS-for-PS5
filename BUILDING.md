@@ -73,12 +73,11 @@ in `/data/CommonFPS/config.ini`. Both logs reset on activation and are bounded
 to 64 KiB each. Controller and renderer use wire version 2 (44 bytes); reboot
 before upgrading so that an older resident renderer is unloaded.
 
-The user reported RC9 working on FW 11.60 on 2026-10-16 and authorized stable
-publication. v1.2.3 changes version labels and release metadata, preserving
-RC9's functional code. See [confirmation](docs/evidence/FW1160_RC9_CONFIRMED_20261016.md)
+The user confirmed the tested v1.2.3 build working on FW 11.60 on 2026-10-16
+and authorized publication. See the [console test report](docs/evidence/FW1160_V1_2_3_CONFIRMED_20261016.md)
 and [release notes](release/RELEASE_NOTES_v1.2.3.md).
-The earlier [RC8 freeze report](docs/evidence/FW1160_RC8_SETTINGS_FREEZE_20261015.md)
-is retained as historical evidence; its exact failure cause was not proven.
+Earlier test reports remain in `docs/evidence`; the exact cause of a freeze
+reported in an earlier build was not proven.
 
 ## Stable publication
 
@@ -87,3 +86,7 @@ Merging the v1.2.3 publication marker into `main` triggers
 new tag without moving existing tags, uploads only ELF/plugin to a draft,
 downloads and compares both files, then publishes it as the latest release.
 A retry checks existing tag and asset identities instead of replacing them.
+
+The **Update v1.2.3 release notes** workflow synchronizes the published title and
+description after changes to the current release notes. It preserves the
+release tag and assets.

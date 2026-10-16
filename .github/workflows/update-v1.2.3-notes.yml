@@ -1,0 +1,51 @@
+name: Update v1.2.3 release notes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "release/RELEASE_NOTES_v1.2.3.md"
+      - ".github/workflows/update-v1.2.3-notes.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v1.2.3-release-metadata
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update published title and description
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BEFORE="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v1.2.3" --jq '{tag_name,draft,prerelease,assets:[.assets[]|{id,name,size,digest}]}')"
+          TAG_BEFORE="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v1.2.3" --jq '.object.sha')"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          notes = pathlib.Path('release/RELEASE_NOTES_v1.2.3.md').read_text()
+          header = '# Common FPS for PS5 v1.2.3\n\n'
+          assert notes.startswith(header)
+          body = notes[len(header):]
+          assert not re.search(r'\b(?:RC|CR)\d+\b', body, re.IGNORECASE)
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'release-notes.md').write_text(body)
+          PY
+          gh release edit v1.2.3 \
+            --title "Common FPS for PS5 v1.2.3" \
+            --notes-file "${RUNNER_TEMP}/release-notes.md"
+          AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v1.2.3" --jq '{tag_name,draft,prerelease,assets:[.assets[]|{id,name,size,digest}]}')"
+          TAG_AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v1.2.3" --jq '.object.sha')"
+          test "${BEFORE}" = "${AFTER}"
+          test "${TAG_BEFORE}" = "${TAG_AFTER}"
+          gh release view v1.2.3 --json url,name,tagName

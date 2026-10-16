@@ -1,7 +1,5 @@
 # Common FPS for PS5 v1.2.3
 
-Stable promotion of RC9 after the user's FW 11.60 confirmation.
-
 ## Changes since v1.2.1
 
 - Working FPS overlay on FW 11.60, with checked ShellUI code access and deferred
@@ -21,9 +19,6 @@ Stable promotion of RC9 after the user's FW 11.60 confirmation.
 - Controller and renderer logs reset on each activation and are limited to
   **64 KiB each**.
 
-The stable build changes RC9's version labels and release metadata only;
-sampling, settings behavior, rendering and injection logic are preserved.
-
 ## Installation
 
 Choose **one** asset:
@@ -40,10 +35,10 @@ or press **OPTIONS**. Changes apply on the next one-second update.
 
 ## Validation
 
-FW 11.60: the user reported RC9 working on 2026-10-16 and authorized stable
-publication. This confirms that tested workflow; every game, display mode and
+FW 11.60: the user confirmed the tested v1.2.3 build working on 2026-10-16
+and authorized publication. This confirms that tested workflow; every game, display mode and
 Rest Mode scenario has not been newly verified. The precise cause of the
-previous RC8 freeze was not established.
+freeze reported in an earlier build was not established.
 
 Previously confirmed FPS/lifecycle paths for FW 4.51, 9.00 and 9.60 are retained;
 fresh v1.2.3 hardware regression tests are pending. FW 7.60 needs testing and
