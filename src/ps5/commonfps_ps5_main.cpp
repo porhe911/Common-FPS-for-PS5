@@ -203,7 +203,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.3 RC9\n"
+        "Common FPS for PS5 v1.2.3\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
         "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
@@ -323,7 +323,7 @@ void append_first_fps_record(
             common_fps::ps5::stable_sampler::firmware_sdk_version())) {
         common_fps::log_durable_message(common_fps::kControllerLogPath,
             "fw1160_runtime=experimental_full_counter sampler=enabled "
-            "renderer=deferred_until_stable_game hardware_validation=rc7_user_confirmed "
+            "renderer=deferred_until_stable_game hardware_validation=rc9_user_confirmed "
             "fw1160_code_read=ptrace_then_checked_mdbg_on_efault");
     }
 

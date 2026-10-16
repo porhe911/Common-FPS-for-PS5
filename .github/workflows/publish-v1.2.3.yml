@@ -1,0 +1,107 @@
+name: Publish Common FPS v1.2.3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "release/PUBLISH_v1.2.3"
+      - ".github/workflows/publish-v1.2.3.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v1.2.3
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git wget unzip cmake meson pkg-config \
+            python3 python3-pyelftools \
+            clang-18 lld-18 xxd
+
+      - name: Prepare pinned PS5 dependencies
+        run: bash ./scripts/prepare_ps5_deps.sh
+
+      - name: Host regression tests
+        run: |
+          cmake -S . -B build-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host -j2
+          ctest --test-dir build-host --output-on-failure
+          python3 tools/check_v1_source_gate.py
+
+      - name: Build and verify PS5 artifacts
+        run: bash ./scripts/ps5_source_build.sh
+
+      - name: Create immutable release tag
+        run: |
+          if git show-ref --verify --quiet refs/tags/v1.2.3; then
+            test "$(git rev-parse 'v1.2.3^{commit}')" = "${GITHUB_SHA}"
+          else
+            git tag v1.2.3 "${GITHUB_SHA}"
+            git push origin refs/tags/v1.2.3
+          fi
+
+      - name: Stage, verify and publish the two release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=v1.2.3
+          ASSETS=(
+            "dist/Common_FPS_PS5_v1.2.3.elf"
+            "dist/Common_FPS_PS5_etaHEN_v1.2.3.plugin"
+          )
+
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --verify-tag --draft \
+              --title "Common FPS for PS5 v1.2.3" \
+              --notes-file "release/RELEASE_NOTES_v1.2.3.md"
+          fi
+
+          # A retry may finish an incomplete draft, but never replace an asset.
+          EXISTING="$(gh release view "${TAG}" --json assets --jq '.assets[].name')"
+          while IFS= read -r name; do
+            case "${name}" in
+              ""|Common_FPS_PS5_v1.2.3.elf|Common_FPS_PS5_etaHEN_v1.2.3.plugin) ;;
+              *) echo "Unexpected release asset: ${name}" >&2; exit 1 ;;
+            esac
+          done <<< "${EXISTING}"
+
+          for asset in "${ASSETS[@]}"; do
+            name="$(basename "${asset}")"
+            if ! grep -Fxq "${name}" <<< "${EXISTING}"; then
+              gh release upload "${TAG}" "${asset}"
+            fi
+          done
+
+          test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 2
+          VERIFY_DIR="$(mktemp -d "${RUNNER_TEMP}/common-fps-release.XXXXXX")"
+          gh release download "${TAG}" --dir "${VERIFY_DIR}"
+          for asset in "${ASSETS[@]}"; do
+            cmp -- "${asset}" "${VERIFY_DIR}/$(basename "${asset}")"
+            sha256sum "${asset}"
+          done
+
+          gh release edit "${TAG}" \
+            --title "Common FPS for PS5 v1.2.3" \
+            --notes-file "release/RELEASE_NOTES_v1.2.3.md" \
+            --draft=false --prerelease=false --latest
+          gh release view "${TAG}" --json url,isDraft,isPrerelease,assets

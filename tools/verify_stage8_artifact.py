@@ -80,9 +80,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.3 RC9"
+            b"Common FPS for PS5 v1.2.3\n"
             in elf,
-            "v1.2.3 RC9 runtime marker missing",
+            "v1.2.3 stable runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
@@ -90,8 +90,8 @@ def main() -> int:
          "FW 11.60 full-counter test path missing"),
         (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
         (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
-        (b"Common FPS for PS5 v1.2.3 RC9 renderer" in renderer,
-         "RC9 renderer marker missing"),
+        (b"Common FPS for PS5 v1.2.3 renderer" in renderer,
+         "v1.2.3 stable renderer marker missing"),
         (b"ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3" in elf,
          "compact UI / settling filter marker missing"),
         (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,
