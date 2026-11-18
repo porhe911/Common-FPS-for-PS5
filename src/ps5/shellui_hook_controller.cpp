@@ -154,11 +154,9 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         return ShellUiHookPollResult::Failed;
     }
 
-    const std::uint32_t firmware_family =
-        report.sdk_version & 0xffff0000U;
     const bool fw900_guard_write =
         report.main_thread_guard &&
-        firmware_family == 0x09000000U &&
+        firmware_uses_fw900_mdbg_guard(report.sdk_version) &&
         backend == ShellUiHookBackend::Mdbg;
     const bool fw1160_guard_write = report.main_thread_guard &&
         firmware_is_fw1160(report.sdk_version) &&
@@ -213,7 +211,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
             return rc;
         }
         /*
-         * The UI-thread guard changes one verified byte only. FW 9.00 can
+         * The UI-thread guard changes one verified byte only. FW 9.00/SDK 9.05 can
          * read JIT code through MDBG but rejects a write while the JIT page
          * is RX. That existing firmware-specific branch requests RWX for a
          * 16 KiB range while ShellUI is stopped, writes the byte, and restores

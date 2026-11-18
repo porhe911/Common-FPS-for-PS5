@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common_fps/firmware_runtime_policy.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -71,10 +72,11 @@ inline ShellUiHookBackend shellui_main_thread_guard_backend(
      * chain path; returning Unsupported here selects that existing backend.
      */
     if ((family >= 0x01000000U && family <= 0x08200000U) ||
-        family == 0x09000000U)
+        firmware_uses_fw900_mdbg_guard(sdk))
         return ShellUiHookBackend::Mdbg;
     if ((family >= 0x08300000U && family < 0x09000000U) ||
-        (family > 0x09000000U && family < 0x09600000U) ||
+        (family > 0x09000000U && family < 0x09600000U &&
+         !firmware_uses_fw900_mdbg_guard(sdk)) ||
         (family > 0x09600000U && family <= 0x10ff0000U) ||
         family == 0x11600000U)
         return ShellUiHookBackend::PtraceIo;
@@ -271,7 +273,7 @@ inline ShellUiHookBackend shellui_hook_probe_backend(
     std::uint32_t sdk) noexcept {
     const std::uint32_t family = sdk & 0xffff0000U;
     if ((family >= 0x01000000U && family <= 0x08200000U) ||
-        family == 0x09000000U)
+        firmware_uses_fw900_mdbg_guard(sdk))
         return ShellUiHookBackend::Mdbg;
     if ((family >= 0x08300000U && family <= 0x10ff0000U) ||
         family == 0x11600000U)

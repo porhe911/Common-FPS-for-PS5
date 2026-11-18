@@ -1,4 +1,7 @@
-# Common FPS for PS5 v1.2.3
+# Common FPS for PS5
+
+**Current published stable version: v1.2.3.** The v1.2.4 source candidate
+addresses the observed SDK 9.05 ShellUI probe. Hardware test pending.
 
 Real-time integer FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 Available as a standalone ELF or etaHEN plugin.
@@ -52,8 +55,11 @@ display mode or Rest Mode scenario. See the [release notes](release/RELEASE_NOTE
 
 ## Logs
 
-- Controller: `/data/CommonFPS.log`
-- Renderer: `/data/CommonFPS_shellui.log`
+Published v1.2.3 uses the original root-level log paths.
+The v1.2.4 test candidate uses the existing settings directory:
+
+- Controller: `/data/CommonFPS/CommonFPS.log`
+- Renderer: `/data/CommonFPS/CommonFPS_shellui.log`
 
 Both logs are overwritten on each activation and limited to **64 KiB each**.
 Saved settings are kept separately.

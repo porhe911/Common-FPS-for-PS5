@@ -1,4 +1,6 @@
-# Building Common FPS for PS5 v1.2.3
+# Building Common FPS for PS5 v1.2.4 (test candidate)
+
+Published v1.2.3 remains the stable baseline pending FW 9.x hardware QA.
 
 ## GitHub Actions
 
@@ -11,9 +13,9 @@ verifies the release boundary and generates checksums.
 The source-build artifact contains:
 
 ```text
-Common_FPS_PS5_v1.2.3.elf
-Common_FPS_PS5_etaHEN_v1.2.3.plugin
-Common_FPS_ShellUI_v1.2.3.elf
+Common_FPS_PS5_v1.2.4.elf
+Common_FPS_PS5_etaHEN_v1.2.4.plugin
+Common_FPS_ShellUI_v1.2.4.elf
 SHA256SUMS.txt
 RESOLVED_BUILD_DEPENDENCIES.txt
 ```

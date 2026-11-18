@@ -13,8 +13,8 @@
 
 namespace common_fps {
 
-inline constexpr const char* kControllerLogPath = "/data/CommonFPS.log";
-inline constexpr const char* kRendererLogPath = "/data/CommonFPS_shellui.log";
+inline constexpr const char* kControllerLogPath = "/data/CommonFPS/CommonFPS.log";
+inline constexpr const char* kRendererLogPath = "/data/CommonFPS/CommonFPS_shellui.log";
 inline constexpr std::size_t kSessionLogLimit = 64U * 1024U;
 
 /* Close every descriptor immediately; preserve startup evidence when full. */

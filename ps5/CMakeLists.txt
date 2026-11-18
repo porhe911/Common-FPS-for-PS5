@@ -29,7 +29,7 @@ set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(common_fps_shellui SHARED)
 
 set_target_properties(common_fps_shellui PROPERTIES
-    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.3"
+    OUTPUT_NAME "Common_FPS_ShellUI_v1.2.4"
     PREFIX ""
     SUFFIX ".elf"
     NO_SONAME TRUE
@@ -84,7 +84,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_shellui>"
-            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.3.elf"
+            "${ROOT}/dist/Common_FPS_ShellUI_v1.2.4.elf"
 )
 
 # Convert the source-built renderer ELF into a controller-linked byte array.
@@ -115,7 +115,7 @@ add_custom_command(OUTPUT "${SETTINGS_ASSETS_CPP}"
 add_executable(common_fps_controller)
 
 set_target_properties(common_fps_controller PROPERTIES
-    OUTPUT_NAME "Common_FPS_PS5_v1.2.3.elf"
+    OUTPUT_NAME "Common_FPS_PS5_v1.2.4.elf"
 )
 
 target_sources(common_fps_controller PRIVATE
@@ -125,7 +125,7 @@ target_sources(common_fps_controller PRIVATE
     "${ROOT}/src/ps5/settings_service.cpp"
     "${ROOT}/src/ps5/media_launcher.cpp"
     "${SETTINGS_ASSETS_CPP}"
-    # Current v1.2.3 sampler, lifecycle and ShellUI implementation.
+    # Current v1.2.4 sampler, lifecycle and ShellUI implementation.
     "${ROOT}/src/core/fps_sampler.cpp"
     "${ROOT}/src/core/dce_counter_sampler.cpp"
     "${ROOT}/src/core/layout.cpp"
@@ -199,13 +199,13 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ROOT}/dist"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:common_fps_controller>"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.3.elf"
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.4.elf"
     COMMAND python3
             "${ROOT}/tools/make_etahen_plugin.py"
-            "${ROOT}/dist/Common_FPS_PS5_v1.2.3.elf"
-            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.3.plugin"
+            "${ROOT}/dist/Common_FPS_PS5_v1.2.4.elf"
+            "${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.4.plugin"
             --title-id CFPS00060
-            --version 1.23
+            --version 1.24
 )
 
 # ------------------------------------------------------------------
