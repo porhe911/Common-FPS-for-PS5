@@ -1,5 +1,14 @@
 # Building Common FPS for PS5 v1.2.4
 
+## Experimental DCE-only compatibility build (v1.2.5 test)
+
+A separate, unmerged v1.2.5 diagnostic branch disables **game-process**
+VideoOut reads across all firmware and obtains FPS only from DCE or
+HEN-shared sampling. It is for testing a possible interaction with GTA IV
+at 120 FPS, **not** the public stable version. Use the dedicated build
+artifact, and see `release/TEST_NOTES_v1.2.5_SAFE_DCE.md`. All existing
+firmware tests must be repeated before release.
+
 ## GitHub Actions
 
 Open **Actions → PS5 Source Build → Run workflow**.

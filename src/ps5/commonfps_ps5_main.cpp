@@ -37,6 +37,13 @@ namespace {
 
 constexpr const char* kPayloadProcessName = "CommonFPS.elf";
 
+// Diagnostic A/B: no cross-process memory reads from games on any firmware.
+// ShellUI initialization is independent and remains unchanged.
+#ifndef COMMON_FPS_SAFE_DCE_ONLY
+#error "v1.2.5 diagnostic must compile with COMMON_FPS_SAFE_DCE_ONLY"
+#endif
+constexpr bool kGameProcessMemoryReadsEnabled = false;
+
 constexpr std::uint64_t kDceVideoOutStandbyUs = 60'000'000ULL;
 constexpr unsigned kDceMissesBeforeVideoOutWake = 3;
 
@@ -203,7 +210,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.4\n"
+        "Common FPS for PS5 v1.2.5\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
         "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
@@ -213,8 +220,9 @@ void write_worker_ready_record(
         "renderer_injection=deferred_until_game "
         "renderer=shared_elf_stopped_chain_hook method_writes=controller_only "
         "injection=target_stack_pthread ipc=udp_loopback_1s "
-        "mono_gc=pinned sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe "
-        "read=mdbg+dce_ioctl highfw_guard=firmware_routed_1byte "
+        "mono_gc=pinned sampler=dce_only_no_game_reads standby=disabled "
+        "read=shellui_mdbg_only+dce_ioctl game_process_read=disabled "
+        "highfw_guard=firmware_routed_1byte "
         "shutdown_trace=disabled "
         "shutdown_writes=disabled signal_handlers=default "
         "stop_path=disabled\n"
@@ -320,6 +328,10 @@ void append_first_fps_record(
     const PayloadIdentityResult identity = set_payload_identity();
     const ShellUiObservation first = observe_shellui_once();
     write_worker_ready_record(first, identity);
+    common_fps::log_durable_message(
+        common_fps::kControllerLogPath,
+        "SAFETY_DIAGNOSTIC=1 game_memory_reads=0 game_memory_writes=0 "
+        "VideoOut_scan=disabled source=dce_or_hen_shared");
 
     if (common_fps::firmware_is_fw1160(
             common_fps::ps5::stable_sampler::firmware_sdk_version())) {
@@ -434,22 +446,24 @@ void append_first_fps_record(
             now_us >= next_videoout_probe_us;
 
         std::optional<int> process_fps;
-        if (sampler.attached()) {
-            process_fps = sampler.sample();
-        } else if (observed_game_pid && videoout_probe_due) {
-            const bool attached = sampler.attach(*observed_game_pid);
-            if (!attached && dce_standby_active) {
-                next_videoout_probe_us =
-                    now_us + kDceVideoOutStandbyUs;
+        if (kGameProcessMemoryReadsEnabled) {
+            // Never reached in the v1.2.5 diagnostic on any firmware.
+            // Retained only to compare with the stable VideoOut path.
+            if (sampler.attached()) {
+                process_fps = sampler.sample();
+            } else if (observed_game_pid && videoout_probe_due) {
+                const bool attached = sampler.attach(*observed_game_pid);
+                if (!attached && dce_standby_active) {
+                    next_videoout_probe_us =
+                        now_us + kDceVideoOutStandbyUs;
+                }
             }
         }
 
         /*
-         * v1.2.0 keeps VideoOut as the preferred source, but once the DCE
-         * fallback has produced a valid FPS sample it suppresses expensive
-         * read-only VideoOut discovery for 60 seconds.  A lightweight
-         * periodic re-probe preserves the preferred path without rescanning
-         * thousands of candidates every 10 seconds.
+         * Diagnostic v1.2.5 never reads or scans game process memory.
+         * DCE/HEN sampling, ShellUI renderer and settings remain active.
+         * No game timing / FPS cap adjustments are performed here.
          */
         const auto dce_fps = game_process_ready
             ? dce_sampler.sample()
