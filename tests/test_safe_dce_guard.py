@@ -28,7 +28,8 @@ for i in range(open_brace, len(main)):
             break
 assert end is not None
 guarded = main[begin:end]
-for call in ("sampler.attach(", "sampler.sample("):
+# Match the VideoOut call, not the suffix in dce_sampler.sample().
+for call in ("sampler.attach(", "process_fps = sampler.sample("):
     assert main.count(call) == 1, (call, "unexpected extra call")
     assert guarded.count(call) == 1, (call, "call escaped false guard")
 assert "platform_.read_memory" not in main
