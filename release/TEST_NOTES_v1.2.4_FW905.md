@@ -1,7 +1,8 @@
 # Common FPS for PS5 v1.2.4 — FW 9.x hardware test
 
-**Status: test candidate, NOT stable.** The v1.2.3 release remains
-unchanged until a successful PS5 runtime check.
+**Status:** historical pre-release test plan. The user subsequently
+confirmed working FPS display on the affected FW 9.x console on 2026-11-20.
+The original test checklist remains for reference.
 
 ## Root cause
 
@@ -37,5 +38,6 @@ subsequently timed out and entered quarantine.
    A probe PASS alone does not count as success.
 7. Test game switching, sleep/resume and stability separately.
 
-Host/structural BUILD PASS is not PS5 runtime PASS. Do not publish stable
-until hardware validation.
+Host/structural BUILD PASS is distinct from PS5 runtime PASS. The user
+confirmed the missing FPS overlay now displays and works. Rest Mode,
+game switching and cross-firmware v1.2.4 regression remain unverified.

@@ -1,7 +1,4 @@
-# Common FPS for PS5
-
-**Current published stable version: v1.2.3.** The v1.2.4 source candidate
-addresses the observed SDK 9.05 ShellUI probe. Hardware test pending.
+# Common FPS for PS5 v1.2.4
 
 Real-time integer FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 Available as a standalone ELF or etaHEN plugin.
@@ -10,8 +7,8 @@ Available as a standalone ELF or etaHEN plugin.
 
 Download **one** file from the [latest release](https://github.com/porhe911/Common-FPS-for-PS5/releases/latest):
 
-- `Common_FPS_PS5_v1.2.3.elf` — launch with your usual payload loader.
-- `Common_FPS_PS5_etaHEN_v1.2.3.plugin` — install and enable through etaHEN.
+- `Common_FPS_PS5_v1.2.4.elf` — launch with your usual payload loader.
+- `Common_FPS_PS5_etaHEN_v1.2.4.plugin` — install and enable through etaHEN.
 
 Reboot before replacing an older version, then start one ELF or plugin and
 launch a game. The overlay appears after the game and ShellUI readiness checks.
@@ -45,21 +42,22 @@ is not queried. Other PUI canvas sizes still need hardware testing.
 |---|---|
 | **11.60** | v1.2.3 tested by the user; working overlay and settings confirmed on 2026-10-16 |
 | **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.3 regression pending |
-| **9.00** | Previously confirmed FPS and Rest Mode recovery; v1.2.3 regression pending |
+| **9.x (reported 9.0; SDK 0x09050005)** | v1.2.4 FPS overlay confirmed working on 2026-11-20; other scenarios not newly tested |
 | **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.3 regression pending |
 | **7.60** | Fresh hardware test pending |
 | **10.xx** | Experimental; hardware validation pending |
 
-The latest FW 11.60 report confirms the user's tested workflow, not every game,
-display mode or Rest Mode scenario. See the [release notes](release/RELEASE_NOTES_v1.2.3.md).
+The v1.2.4 confirmation covers the reported FW 9.x FPS display issue, not
+every game, display mode or Rest Mode scenario. FW 11.60 was last hardware
+validated with v1.2.3 and is not separately regression-tested on v1.2.4.
+See the [v1.2.4 release notes](release/RELEASE_NOTES_v1.2.4.md).
 
 ## Logs
 
-Published v1.2.3 uses the original root-level log paths.
-The v1.2.4 test candidate uses the existing settings directory:
-
 - Controller: `/data/CommonFPS/CommonFPS.log`
 - Renderer: `/data/CommonFPS/CommonFPS_shellui.log`
+
+The old v1.2.3 root-level logs may remain; they are not automatically deleted.
 
 Both logs are overwritten on each activation and limited to **64 KiB each**.
 Saved settings are kept separately.
