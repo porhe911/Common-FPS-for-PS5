@@ -1,7 +1,8 @@
-# Common FPS for PS5 v1.2.5 — DCE-only safety A/B candidate
+# Common FPS for PS5 v1.2.5 — DCE-only safety A/B record
 
-**Status: diagnostic test build, NOT a stable release.** Published v1.2.4
-remains unchanged. Do not merge or publish without successful hardware QA.
+**Status: test build user-confirmed on reported FW 9.0 and promoted for
+stable v1.2.5 publication by explicit user request (2026-11-21).** This is
+a narrow hardware PASS; other firmware and actual 120 Hz output are untested.
 
 ## Why this candidate exists
 
@@ -32,7 +33,20 @@ There is not yet evidence proving that the game reads caused the crash.
 - No change to the game's framerate, timing, engine, or files.
 - Source build and host tests verify the DCE-only gate, version and plugin.
 
-## Required test
+## Completed user test (2026-11-21)
+
+- PS5 firmware as reported by user: **9.0**. Previous logs exposed SDK
+  `0x09050005`; these are distinct labels and are preserved as reported.
+- Screen refresh: **60 Hz**. Game mode: user-selected **120 FPS** in GTA IV.
+- With v1.2.4: SIGSEGV had occurred in the GTA IV native PS5 port.
+- With v1.2.5 test ELF/plugin: user reported **excellent working state**,
+  overlay present and crash not reproduced.
+- No measured video output at 120 Hz, FPS above 120, multi-console coverage,
+  alternate firmware, Rest Mode or game-switch regression was provided.
+- These observations support the DCE-only sampler choice but do not prove
+  VideoOut scanning as the sole underlying cause.
+
+## Follow-up testing for other users (not release blockers)
 
 1. Confirm the prior no-plugin **GTA IV at 120 FPS** test was performed
    after reboot with etaHEN Common FPS autoload **disabled**.
@@ -61,4 +75,5 @@ reported, not masked as a pass.
 - Stable but FPS missing/inaccurate: investigate DCE/HEN support and
   sampling accuracy; a universal release needs a separate safe source.
 
-**Offline/structural PASS is not PS5 runtime PASS.**
+**Offline/structural PASS and this single-game runtime PASS are separate.**
+This release does not claim universal firmware coverage or unrestricted FPS.

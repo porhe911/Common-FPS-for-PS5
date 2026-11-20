@@ -1,4 +1,4 @@
-# Common FPS for PS5 v1.2.4
+# Common FPS for PS5 v1.2.5
 
 Real-time integer FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 Available as a standalone ELF or etaHEN plugin.
@@ -7,8 +7,8 @@ Available as a standalone ELF or etaHEN plugin.
 
 Download **one** file from the [latest release](https://github.com/porhe911/Common-FPS-for-PS5/releases/latest):
 
-- `Common_FPS_PS5_v1.2.4.elf` — launch with your usual payload loader.
-- `Common_FPS_PS5_etaHEN_v1.2.4.plugin` — install and enable through etaHEN.
+- `Common_FPS_PS5_v1.2.5.elf` — launch with your usual payload loader.
+- `Common_FPS_PS5_etaHEN_v1.2.5.plugin` — install and enable through etaHEN.
 
 Reboot before replacing an older version, then start one ELF or plugin and
 launch a game. The overlay appears after the game and ShellUI readiness checks.
@@ -16,9 +16,9 @@ launch a game. The overlay appears after the game and ShellUI readiness checks.
 
 ## Features and settings
 
-- FPS for PS4 and PS5 games, with VideoOut sampling and an adaptive DCE fallback.
+- FPS display for supported PS4 and PS5 games using DCE flip counters or HEN-shared FPS samples. v1.2.5 disables VideoOut game-process memory scanning on all firmwares.
 - Compact bottom-left overlay by default: 22-unit font, purple label, white digits.
-- Startup settling and filtering of brief FPS spikes; sustained 120 FPS is supported.
+- Startup settling and filtering of brief FPS spikes; displayed readings are capped at 120 FPS. A DCE/video-output reading is **not a measurement of uncapped game-engine rendering FPS**.
 - Automatic game-process and ShellUI recovery on supported firmware.
 - Offline **Media → Common FPS** settings shortcut, checked on activation and
   installed when missing (firmware below 12).
@@ -40,17 +40,23 @@ is not queried. Other PUI canvas sizes still need hardware testing.
 
 | System software | Hardware validation |
 |---|---|
-| **11.60** | v1.2.3 tested by the user; working overlay and settings confirmed on 2026-10-16 |
-| **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.3 regression pending |
-| **9.x (reported 9.0; SDK 0x09050005)** | v1.2.4 FPS overlay confirmed working on 2026-11-20; other scenarios not newly tested |
-| **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.3 regression pending |
+| **11.60** | v1.2.3 tested by the user on 2026-10-16; v1.2.5 **not yet tested** |
+| **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.5 **not yet tested** |
+| **9.0 (user-reported; SDK 0x09050005 in logs)** | **v1.2.5 user-tested** on 2026-11-21 with GTA IV PS5 port, game's 120 FPS mode, 60 Hz TV; overlay and game reported working without the earlier crash |
+| **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.5 **not yet tested** |
 | **7.60** | Fresh hardware test pending |
 | **10.xx** | Experimental; hardware validation pending |
 
-The v1.2.4 confirmation covers the reported FW 9.x FPS display issue, not
-every game, display mode or Rest Mode scenario. FW 11.60 was last hardware
-validated with v1.2.3 and is not separately regression-tested on v1.2.4.
-See the [v1.2.4 release notes](release/RELEASE_NOTES_v1.2.4.md).
+**Scope of v1.2.5 confirmation:** the user tested the PS5 on firmware
+reported as 9.0, with SDK `0x09050005` in its logs, and a **60 Hz TV**.
+In GTA IV the game's selectable 120 FPS mode no longer crashed with the
+v1.2.5 overlay active. **This does not verify real 120 Hz video output,
+240 FPS, uncapped game-engine FPS, other firmware, or Rest Mode.** The
+DCE-only sampling change applies to every firmware in source, but display
+availability/accuracy is not proven on all of them. Firmware 11.60 was last
+tested with v1.2.3 (2026-10-16); the prior baselines for 4.51 and 9.60
+remain historical, not new v1.2.5 tests.
+See the [v1.2.5 release notes](release/RELEASE_NOTES_v1.2.5.md).
 
 ## Logs
 
