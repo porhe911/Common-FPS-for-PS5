@@ -1,0 +1,33 @@
+name: Sync Common FPS v1.2.5 release notes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "release/RELEASE_NOTES_v1.2.5.md"
+      - ".github/workflows/sync-release-notes-v1.2.5.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@v4
+
+      - name: Update existing release description only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view v1.2.5 >/dev/null
+          test "$(gh release view v1.2.5 --json assets --jq '.assets | length')" = "2"
+          gh release edit v1.2.5 \
+            --title "Common FPS for PS5 v1.2.5" \
+            --notes-file release/RELEASE_NOTES_v1.2.5.md
+          gh release view v1.2.5 --json url,isDraft,isPrerelease,assets

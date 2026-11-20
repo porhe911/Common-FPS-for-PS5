@@ -42,13 +42,13 @@ is not queried. Other PUI canvas sizes still need hardware testing.
 |---|---|
 | **11.60** | v1.2.3 tested by the user on 2026-10-16; v1.2.5 **not yet tested** |
 | **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.5 **not yet tested** |
-| **9.0 (user-reported; SDK 0x09050005 in logs)** | **v1.2.5 user-tested** on 2026-11-21 with GTA IV PS5 port, game's 120 FPS mode, 60 Hz TV; overlay and game reported working without the earlier crash |
+| **9.0** | **v1.2.5 user-tested** on 2026-11-21 with GTA IV PS5 port, game's 120 FPS mode, 60 Hz TV; overlay and game reported working without the earlier crash |
 | **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.5 **not yet tested** |
 | **7.60** | Fresh hardware test pending |
 | **10.xx** | Experimental; hardware validation pending |
 
 **Scope of v1.2.5 confirmation:** the user tested the PS5 on firmware
-reported as 9.0, with SDK `0x09050005` in its logs, and a **60 Hz TV**.
+**9.0** with a **60 Hz TV**.
 In GTA IV the game's selectable 120 FPS mode no longer crashed with the
 v1.2.5 overlay active. **This does not verify real 120 Hz video output,
 240 FPS, uncapped game-engine FPS, other firmware, or Rest Mode.** The

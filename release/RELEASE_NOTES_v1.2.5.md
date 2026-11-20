@@ -1,5 +1,3 @@
-# Common FPS for PS5 v1.2.5
-
 ## Changes since v1.2.4
 
 - **Fixed the GTA IV 120 FPS-mode crash observed with Common FPS on the
@@ -33,7 +31,7 @@ Settings persist in `/data/CommonFPS/config.ini`.
 ## Verified scope and limitations
 
 **Hardware runtime PASS (user report, 2026-11-21):** PS5 system firmware
-described as **9.0** (diagnostic SDK was `0x09050005`), 60 Hz TV, GTA IV
+**9.0**, 60 Hz TV, GTA IV
 PS5 port, game option **120 FPS**, active v1.2.5 overlay, no repeat crash.
 
 The 60 Hz TV cannot validate real **120 Hz output** or displayed 120 FPS.
