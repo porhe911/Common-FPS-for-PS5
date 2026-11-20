@@ -1,4 +1,4 @@
-## Changes since v1.2.4
+## What's New in v1.2.5
 
 - **Fixed the GTA IV 120 FPS-mode crash observed with Common FPS on the
   user's PS5 firmware 9.0.** The v1.2.5 DCE-only test build was reported
