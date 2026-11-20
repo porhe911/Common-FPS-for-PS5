@@ -1,4 +1,4 @@
-# Building Common FPS for PS5 v1.2.3
+# Building Common FPS for PS5 v1.2.4
 
 ## GitHub Actions
 
@@ -11,9 +11,9 @@ verifies the release boundary and generates checksums.
 The source-build artifact contains:
 
 ```text
-Common_FPS_PS5_v1.2.3.elf
-Common_FPS_PS5_etaHEN_v1.2.3.plugin
-Common_FPS_ShellUI_v1.2.3.elf
+Common_FPS_PS5_v1.2.4.elf
+Common_FPS_PS5_etaHEN_v1.2.4.plugin
+Common_FPS_ShellUI_v1.2.4.elf
 SHA256SUMS.txt
 RESOLVED_BUILD_DEPENDENCIES.txt
 ```
@@ -53,7 +53,7 @@ HTTP worker with controller/keyboard/native events and saved settings.
 
 ## Runtime model and validation
 
-The v1.2.3 controller tracks the active game, samples integer FPS and sends
+The v1.2.4 controller tracks the active game, samples integer FPS and sends
 state to the embedded ShellUI renderer. It follows game PID changes and
 supported ShellUI lifecycle changes. The sampler does not write game memory.
 
@@ -73,20 +73,22 @@ in `/data/CommonFPS/config.ini`. Both logs reset on activation and are bounded
 to 64 KiB each. Controller and renderer use wire version 2 (44 bytes); reboot
 before upgrading so that an older resident renderer is unloaded.
 
-The user confirmed the tested v1.2.3 build working on FW 11.60 on 2026-10-16
-and authorized publication. See the [console test report](docs/evidence/FW1160_V1_2_3_CONFIRMED_20261016.md)
-and [release notes](release/RELEASE_NOTES_v1.2.3.md).
-Earlier test reports remain in `docs/evidence`; the exact cause of a freeze
-reported in an earlier build was not proven.
+The user confirmed that the v1.2.4 test build displays FPS on the previously
+affected FW 9.x console (reported 9.0, SDK 0x09050005) on 2026-11-20.
+This validates the formerly missing overlay workflow, not all other firmware
+or Rest Mode scenarios. See [console evidence](docs/evidence/FW905_V1_2_4_CONFIRMED_20261120.md)
+and [v1.2.4 release notes](release/RELEASE_NOTES_v1.2.4.md).
+FW 11.60 was separately tested on v1.2.3 on 2026-10-16.
+The exact cause of an earlier unrelated game freeze was not proven.
 
 ## Stable publication
 
-Merging the v1.2.3 publication marker into `main` triggers
-**Publish Common FPS v1.2.3**. It builds and verifies the release, creates the
+Merging the v1.2.4 publication marker into `main` triggers
+**Publish Common FPS v1.2.4**. It builds and verifies the release, creates the
 new tag without moving existing tags, uploads only ELF/plugin to a draft,
 downloads and compares both files, then publishes it as the latest release.
 A retry checks existing tag and asset identities instead of replacing them.
 
-The **Update v1.2.3 release notes** workflow synchronizes the published title and
-description after changes to the current release notes. It preserves the
-release tag and assets.
+The v1.2.3 release and assets remain unchanged. For the v1.2.4 release,
+the workflow checks existing tag and asset identities before publishing,
+and produces only source-built controller ELF and etaHEN plugin.

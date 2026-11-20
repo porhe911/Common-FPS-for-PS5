@@ -10,6 +10,8 @@
 using namespace common_fps;
 
 int main() {
+    assert(std::string(kControllerLogPath) == "/data/CommonFPS/CommonFPS.log");
+    assert(std::string(kRendererLogPath) == "/data/CommonFPS/CommonFPS_shellui.log");
     char directory[] = "/tmp/commonfps-log-XXXXXX";
     assert(mkdtemp(directory));
     const std::string path = std::string(directory) + "/session.log";

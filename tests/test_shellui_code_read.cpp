@@ -118,6 +118,22 @@ static void test_fw1160_actual_efault_fallback() {
     assert(failed.rc == EFAULT && failed.fallback_attempted && zero(out));
 }
 
+static void test_fw905_mdbg_primary_read() {
+    reset(Mode::Complete);
+    unsigned ptrace_calls = 0;
+    std::array<unsigned char, 16> out{};
+    const auto result = read_shellui_code(
+        0x09050005U, ShellUiHookBackend::Mdbg, out.data(), out.size(),
+        [&](void*, std::size_t) { ++ptrace_calls; return EFAULT; },
+        [&](void* buffer, std::size_t size) {
+            return common_fps::ps5::shellui_mdbg_read_exact(58, kMethod, buffer, size);
+        });
+    assert(result.rc == 0 && result.primary_rc == 0);
+    assert(!result.fallback_attempted && result.fallback_rc == -1);
+    assert(ptrace_calls == 0 && state.calls == 1 && out == kCode);
+    assert(state.auth == kAuth && state.caps[0] == 0x5a);
+}
+
 static void test_checked_one_byte_writer() {
     for (Mode mode : {Mode::Complete, Mode::Chunked, Mode::StatusError,
                       Mode::NoProgress, Mode::Oversize, Mode::SyscallError,
@@ -163,6 +179,7 @@ int main() {
     test_checked_live_reader();
     test_checked_one_byte_writer();
     test_fw1160_actual_efault_fallback();
+    test_fw905_mdbg_primary_read();
     test_no_unrelated_fallback();
     std::cout << "FW1160 EFAULT recovery, exact MDBG I/O and credential restoration: PASS\n";
 }
