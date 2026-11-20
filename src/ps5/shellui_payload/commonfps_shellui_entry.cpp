@@ -30,7 +30,7 @@ void write_online_marker() {
     /*
      * Returning an injected ShellUI ELF thread can destabilize the console.
      * A compatibility or socket failure therefore remains inert and resident
-     * instead of returning through the loader. The v1.2.4 renderer preserves that proven
+     * instead of returning through the loader. The v1.2.5 renderer preserves that proven
      * lifecycle and patches a native hook only while ShellUI is stopped.
      */
     for (;;)
@@ -76,7 +76,7 @@ void* elf_main(void* payload_args) {
 
     common_fps::reset_session_log(common_fps::kRendererLogPath);
     common_fps::log_message(common_fps::kRendererLogPath,
-        "Common FPS for PS5 v1.2.4 renderer log_limit=65536");
+        "Common FPS for PS5 v1.2.5 renderer log_limit=65536");
 
 #if defined(COMMON_FPS_TEST23_PARK_BEFORE_RUNTIME)
     if (common_fps_test23_runtime_gate == 0) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Common FPS for PS5 v1.2.4 release boundary."""
+"""Verify the Common FPS for PS5 v1.2.5 release boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.24\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.25\0"
 
 
 def digest(data: bytes) -> str:
@@ -80,9 +80,9 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.4\n"
+            b"Common FPS for PS5 v1.2.5\n"
             in elf,
-            "v1.2.4 runtime marker missing",
+            "v1.2.5 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
@@ -90,8 +90,8 @@ def main() -> int:
          "FW 11.60 full-counter test path missing"),
         (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
         (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
-        (b"Common FPS for PS5 v1.2.4 renderer" in renderer,
-         "v1.2.4 renderer marker missing"),
+        (b"Common FPS for PS5 v1.2.5 renderer" in renderer,
+         "v1.2.5 renderer marker missing"),
         (b"ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3" in elf,
          "compact UI / settling filter marker missing"),
         (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,
@@ -125,8 +125,8 @@ def main() -> int:
             "deferred renderer injection marker missing",
         ),
         (
-            b"sampler=videoout_preferred+dce_auth_adaptive standby=60s_reprobe" in elf,
-            "DCE standby sampler marker missing",
+            b"sampler=dce_only_no_game_reads standby=disabled" in elf,
+            "game-memory-safe DCE sampler marker missing",
         ),
         (
             b"Sampler policy pid=%d state=%s backend=%s" in elf,
@@ -160,7 +160,12 @@ def main() -> int:
             b"highfw_guard=firmware_routed_1byte" in elf,
             "high firmware guard routing marker missing",
         ),
-        (b"read=mdbg" in elf, "MDBG read marker missing"),
+        (b"game_process_read=disabled" in elf,
+         "game-process memory access disable marker missing"),
+        (b"SAFETY_DIAGNOSTIC=1 game_memory_reads=0 game_memory_writes=0" in elf,
+         "DCE-only diagnostic marker missing"),
+        (b"VideoOut_scan=disabled source=dce_or_hen_shared" in elf,
+         "VideoOut scan disable marker missing"),
         (
             b"/data/CommonFPS/CommonFPS.log" in elf,
             "controller diagnostic log path missing",

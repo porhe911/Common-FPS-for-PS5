@@ -8,6 +8,7 @@ export COMMON_FPS_ETAHEN_SOURCE="${COMMON_FPS_ETAHEN_SOURCE:-${ROOT}/.deps/etahe
 export COMMON_FPS_SHSRV_SOURCE="${COMMON_FPS_SHSRV_SOURCE:-${ROOT}/.deps/shsrv}"
 
 python3 "${ROOT}/tests/test_plugin_wrapper.py"
+python3 "${ROOT}/tests/test_safe_dce_guard.py"
 
 # This CMake entry point is the canonical source-built PS5 target.
 "${PS5_PAYLOAD_SDK}/bin/prospero-cmake" \
@@ -21,9 +22,9 @@ cmake --build "${ROOT}/build-ps5" -j"$(nproc)"
 
 mkdir -p "${ROOT}/dist"
 
-ELF="${ROOT}/dist/Common_FPS_PS5_v1.2.4.elf"
-PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.4.plugin"
-RENDERER="${ROOT}/dist/Common_FPS_ShellUI_v1.2.4.elf"
+ELF="${ROOT}/dist/Common_FPS_PS5_v1.2.5.elf"
+PLUGIN="${ROOT}/dist/Common_FPS_PS5_etaHEN_v1.2.5.plugin"
+RENDERER="${ROOT}/dist/Common_FPS_ShellUI_v1.2.5.elf"
 
 test -f "${ELF}"
 test -f "${PLUGIN}"
