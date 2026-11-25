@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prevent accidental PS5 game-process reads in the v1.2.5 DCE-only A/B test."""
+"""Prevent accidental PS5 game-process reads in the v1.2.6 DCE-only A/B test."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -39,6 +39,6 @@ assert "DceFpsSampler dce_sampler(platform);" in main
 assert "dce_sampler.sample()" in main
 assert "SAFETY_DIAGNOSTIC=1 game_memory_reads=0 game_memory_writes=0" in main
 assert "test_safe_dce_guard.py" in script
-assert "Common_FPS_PS5_v1.2.5.elf" in cmake
-assert "--version 1.25" in cmake
-print("v1.2.5 DCE-only compile gate/source integration: PASS")
+assert "Common_FPS_PS5_v1.2.6.elf" in cmake
+assert "--version 1.26" in cmake
+print("v1.2.6 DCE-only compile gate/source integration: PASS")

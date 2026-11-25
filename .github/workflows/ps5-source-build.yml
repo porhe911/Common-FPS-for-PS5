@@ -52,12 +52,12 @@ jobs:
       - name: Upload PS5 build
         uses: actions/upload-artifact@v4
         with:
-          name: Common-FPS-v1.2.5-test
+          name: Common-FPS-v1.2.6-test
           path: |
-            dist/Common_FPS_PS5_v1.2.5.elf
-            dist/Common_FPS_PS5_etaHEN_v1.2.5.plugin
-            dist/Common_FPS_ShellUI_v1.2.5.elf
+            dist/Common_FPS_PS5_v1.2.6.elf
+            dist/Common_FPS_PS5_etaHEN_v1.2.6.plugin
+            dist/Common_FPS_ShellUI_v1.2.6.elf
             dist/SHA256SUMS.txt
-            release/TEST_NOTES_v1.2.5_SAFE_DCE.md
+            release/TEST_NOTES_v1.2.6_FW1300.md
             RESOLVED_BUILD_DEPENDENCIES.txt
           if-no-files-found: error
