@@ -40,7 +40,7 @@ constexpr const char* kPayloadProcessName = "CommonFPS.elf";
 // Diagnostic A/B: no cross-process memory reads from games on any firmware.
 // ShellUI initialization is independent and remains unchanged.
 #ifndef COMMON_FPS_SAFE_DCE_ONLY
-#error "v1.2.5 diagnostic must compile with COMMON_FPS_SAFE_DCE_ONLY"
+#error "v1.2.6 diagnostic must compile with COMMON_FPS_SAFE_DCE_ONLY"
 #endif
 constexpr bool kGameProcessMemoryReadsEnabled = false;
 
@@ -210,7 +210,7 @@ void write_worker_ready_record(
     const int record_size = std::snprintf(
         record,
         sizeof(record),
-        "Common FPS for PS5 v1.2.5\n"
+        "Common FPS for PS5 v1.2.6\n"
         "sdk=0x%08x fps_limit=120 log_limit=65536 log_reset=activation "
         "fw1160_guard=ptrace_vm_protection_1byte\n"
         "ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3\n"
@@ -341,6 +341,15 @@ void append_first_fps_record(
             "fw1160_code_read=ptrace_then_checked_mdbg_on_efault");
     }
 
+    if (common_fps::firmware_is_fw1300(
+            common_fps::ps5::stable_sampler::firmware_sdk_version())) {
+        common_fps::log_durable_message(common_fps::kControllerLogPath,
+            "fw1300_runtime=experimental "
+            "fw1300_probe=ptrace_then_checked_mdbg_on_efault "
+            "fw1300_guard=ptrace_vm_protection_1byte "
+            "game_memory_reads=0 hardware_validation=pending");
+    }
+
     common_fps::ps5::Ps5Platform platform;
     common_fps::SettingsStore settings(common_fps::kSettingsPath);
     if (!common_fps::ps5::ensure_media_launcher(
@@ -447,7 +456,7 @@ void append_first_fps_record(
 
         std::optional<int> process_fps;
         if (kGameProcessMemoryReadsEnabled) {
-            // Never reached in the v1.2.5 diagnostic on any firmware.
+            // Never reached in the v1.2.6 diagnostic on any firmware.
             // Retained only to compare with the stable VideoOut path.
             if (sampler.attached()) {
                 process_fps = sampler.sample();
@@ -461,7 +470,7 @@ void append_first_fps_record(
         }
 
         /*
-         * Diagnostic v1.2.5 never reads or scans game process memory.
+         * Diagnostic v1.2.6 never reads or scans game process memory.
          * DCE/HEN sampling, ShellUI renderer and settings remain active.
          * No game timing / FPS cap adjustments are performed here.
          */
