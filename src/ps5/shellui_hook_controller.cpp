@@ -158,8 +158,8 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         report.main_thread_guard &&
         firmware_uses_fw900_mdbg_guard(report.sdk_version) &&
         backend == ShellUiHookBackend::Mdbg;
-    const bool fw1160_guard_write = report.main_thread_guard &&
-        firmware_is_fw1160(report.sdk_version) &&
+    const bool protected_guard_write = report.main_thread_guard &&
+        firmware_uses_protected_ptrace_guard(report.sdk_version) &&
         backend == ShellUiHookBackend::PtraceIo;
     ShellUiGuardWriteState guard_write_state{};
     bool guard_write_attempted = false;
@@ -177,7 +177,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
                     static_cast<intptr_t>(request.method_address), out, count);
             },
             [&](void* out, std::size_t count) {
-                if (firmware_is_fw1160(report.sdk_version))
+                if (firmware_uses_protected_ptrace_guard(report.sdk_version))
                     return shellui_mdbg_read_exact(shellui_pid,
                         request.method_address, out, count);
                 return mdbg_copyout(shellui_pid,
@@ -192,7 +192,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
         return result.rc;
     };
     const auto write_target = [&](const std::uint8_t* bytes) {
-        if (fw1160_guard_write) {
+        if (protected_guard_write) {
             const bool first_write = !guard_write_attempted;
             guard_write_attempted = true;
             const int rc = shellui_write_guard_byte(shellui_pid,
@@ -323,7 +323,7 @@ ShellUiHookPollResult poll_and_apply_shellui_hook(
                         request.expected,
                         verified.size()) == 0;
                 if (still_original &&
-                    (!fw1160_guard_write || guard_write_state.protection_restored)) {
+                    (!protected_guard_write || guard_write_state.protection_restored)) {
                     report.restored = true;
                 } else {
                     const int restore_rc = write_target(request.expected);

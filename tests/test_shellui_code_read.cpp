@@ -99,11 +99,11 @@ static void test_checked_live_reader() {
     }
 }
 
-static void test_fw1160_actual_efault_fallback() {
+static void test_protected_ptrace_efault_fallback(std::uint32_t sdk) {
     reset(Mode::Complete);
     unsigned ptrace_calls = 0;
     std::array<unsigned char, 16> out{};
-    const auto result = read_shellui_code(0x11600005U, ShellUiHookBackend::PtraceIo,
+    const auto result = read_shellui_code(sdk, ShellUiHookBackend::PtraceIo,
         out.data(), out.size(),
         [&](void* p, std::size_t size) { ++ptrace_calls; std::memset(p, 0xee, size); return EFAULT; },
         [&](void* p, std::size_t size) { return common_fps::ps5::shellui_mdbg_read_exact(58, kMethod, p, size); });
@@ -112,7 +112,7 @@ static void test_fw1160_actual_efault_fallback() {
     assert(state.auth == kAuth && state.caps[0] == 0x5a);
 
     reset(Mode::StatusError); // syscall returns zero but reported read failed
-    const auto failed = read_shellui_code(0x11600005U, ShellUiHookBackend::PtraceIo,
+    const auto failed = read_shellui_code(sdk, ShellUiHookBackend::PtraceIo,
         out.data(), out.size(), [](void*, std::size_t) { return EFAULT; },
         [&](void* p, std::size_t size) { return common_fps::ps5::shellui_mdbg_read_exact(58, kMethod, p, size); });
     assert(failed.rc == EFAULT && failed.fallback_attempted && zero(out));
@@ -151,7 +151,7 @@ static void test_checked_one_byte_writer() {
 }
 
 static void test_no_unrelated_fallback() {
-    for (auto sdk : {0x09600005U, 0x10600005U, 0x11000005U, 0x12000005U}) {
+    for (auto sdk : {0x09600005U, 0x10600005U, 0x11000005U, 0x12000005U, 0x13200040U, 0x14000040U}) {
         unsigned fallback_calls = 0;
         std::array<unsigned char, 16> out{};
         const auto r = read_shellui_code(sdk, ShellUiHookBackend::PtraceIo,
@@ -178,7 +178,8 @@ static void test_no_unrelated_fallback() {
 int main() {
     test_checked_live_reader();
     test_checked_one_byte_writer();
-    test_fw1160_actual_efault_fallback();
+    test_protected_ptrace_efault_fallback(0x11600005U);
+    test_protected_ptrace_efault_fallback(0x13000040U);
     test_fw905_mdbg_primary_read();
     test_no_unrelated_fallback();
     std::cout << "FW1160 EFAULT recovery, exact MDBG I/O and credential restoration: PASS\n";

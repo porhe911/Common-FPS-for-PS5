@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the Common FPS for PS5 v1.2.5 release boundary."""
+"""Verify the Common FPS for PS5 v1.2.6 release boundary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import struct
 import sys
 
 
-PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.25\0"
+PLUGIN_HEADER = b"etaHEN_PLUGIN\0CFPS00060\0" + b"1.26\0"
 
 
 def digest(data: bytes) -> str:
@@ -80,18 +80,20 @@ def main() -> int:
         (renderer_offset > 0, "exact renderer ELF is not embedded"),
         (len(renderer) > 4096, "renderer ELF is unexpectedly small"),
         (
-            b"Common FPS for PS5 v1.2.5\n"
+            b"Common FPS for PS5 v1.2.6\n"
             in elf,
-            "v1.2.5 runtime marker missing",
+            "v1.2.6 runtime marker missing",
         ),
         (b"internal_fork=absent" in elf, "no-fork marker missing"),
         (b"fps_limit=120" in elf, "120 FPS display ceiling missing"),
+        (b"fw1300_runtime=experimental" in elf, "FW 13.0 experimental route missing"),
+        (b"fw1300_guard=ptrace_vm_protection_1byte" in elf, "FW 13.0 protected guard marker missing"),
         (b"fw1160_runtime=experimental_full_counter sampler=enabled" in elf,
          "FW 11.60 full-counter test path missing"),
         (b"blocked_pending_preflight" not in elf, "obsolete FW 11.60 hold remains"),
         (b"CFPSDiag.elf" not in elf, "diagnostic payload mixed into full controller"),
-        (b"Common FPS for PS5 v1.2.5 renderer" in renderer,
-         "v1.2.5 renderer marker missing"),
+        (b"Common FPS for PS5 v1.2.6 renderer" in renderer,
+         "v1.2.6 renderer marker missing"),
         (b"ui_font=22 ui_bottom_margin=4 fps_display_filter=startup5s_median3_up3" in elf,
          "compact UI / settling filter marker missing"),
         (b"fw1160_code_read=ptrace_then_checked_mdbg_on_efault" in elf,

@@ -530,6 +530,19 @@ static void test_shellui_hook_probe_request() {
     assert(shellui_hook_probe_backend(0x09600000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x10200000U) == ShellUiHookBackend::PtraceIo);
     assert(shellui_hook_probe_backend(0x11000000U) == ShellUiHookBackend::Unsupported);
+    assert(firmware_is_fw1300(0x13000040U));
+    assert(!firmware_is_fw1300(0x13200040U));
+    assert(firmware_uses_protected_ptrace_guard(0x11600005U));
+    assert(firmware_uses_protected_ptrace_guard(0x13000040U));
+    assert(!firmware_uses_protected_ptrace_guard(0x09050005U));
+    assert(shellui_hook_probe_backend(0x13000040U) == ShellUiHookBackend::PtraceIo);
+    assert(shellui_main_thread_guard_backend(0x13000040U) == ShellUiHookBackend::PtraceIo);
+    assert(shellui_hook_backend(0x13000040U, false) == ShellUiHookBackend::Unsupported);
+    assert(shellui_hook_backend(0x13000040U, true) == ShellUiHookBackend::Unsupported);
+    for (auto sdk : {0x12000040U, 0x12700040U, 0x13200040U, 0x13400040U, 0x14000040U}) {
+        assert(shellui_hook_probe_backend(sdk) == ShellUiHookBackend::Unsupported);
+        assert(shellui_main_thread_guard_backend(sdk) == ShellUiHookBackend::Unsupported);
+    }
 
     request.desired[0] = 1;
     request.checksum = shellui_hook_request_checksum(request);

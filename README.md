@@ -1,4 +1,4 @@
-# Common FPS for PS5 v1.2.5
+# Common FPS for PS5 v1.2.6
 
 Real-time integer FPS overlay for PS4 and PS5 games on a modified PlayStation 5.
 Available as a standalone ELF or etaHEN plugin.
@@ -7,8 +7,8 @@ Available as a standalone ELF or etaHEN plugin.
 
 Download **one** file from the [latest release](https://github.com/porhe911/Common-FPS-for-PS5/releases/latest):
 
-- `Common_FPS_PS5_v1.2.5.elf` — launch with your usual payload loader.
-- `Common_FPS_PS5_etaHEN_v1.2.5.plugin` — install and enable through etaHEN.
+- `Common_FPS_PS5_v1.2.6.elf` — launch with your usual payload loader.
+- `Common_FPS_PS5_etaHEN_v1.2.6.plugin` — install and enable through etaHEN.
 
 Reboot before replacing an older version, then start one ELF or plugin and
 launch a game. The overlay appears after the game and ShellUI readiness checks.
@@ -16,7 +16,7 @@ launch a game. The overlay appears after the game and ShellUI readiness checks.
 
 ## Features and settings
 
-- FPS display for supported PS4 and PS5 games using DCE flip counters or HEN-shared FPS samples. v1.2.5 disables VideoOut game-process memory scanning on all firmwares.
+- FPS display for supported PS4 and PS5 games using DCE flip counters or HEN-shared FPS samples. Game-process memory scanning remains disabled on all firmwares.
 - Compact bottom-left overlay by default: 22-unit font, purple label, white digits.
 - Startup settling and filtering of brief FPS spikes; displayed readings are capped at 120 FPS. A DCE/video-output reading is **not a measurement of uncapped game-engine rendering FPS**.
 - Automatic game-process and ShellUI recovery on supported firmware.
@@ -40,23 +40,22 @@ is not queried. Other PUI canvas sizes still need hardware testing.
 
 | System software | Hardware validation |
 |---|---|
-| **11.60** | v1.2.3 tested by the user on 2026-10-16; v1.2.5 **not yet tested** |
-| **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.5 **not yet tested** |
-| **9.0** | **v1.2.5 user-tested** on 2026-11-21 with GTA IV PS5 port, game's 120 FPS mode, 60 Hz TV; overlay and game reported working without the earlier crash |
-| **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.5 **not yet tested** |
+| **13.0** | **v1.2.6 tested on 2026-11-25:** FPS overlay working, ShellUI initialized, 60 FPS DCE samples and recovery after game PID change confirmed |
+| **11.60** | v1.2.3 tested by the user on 2026-10-16; v1.2.6 **not yet tested** |
+| **4.51** | Previously confirmed PS4/PS5 FPS, game switching and Rest Mode recovery; v1.2.6 **not yet tested** |
+| **9.0** | v1.2.5 tested with GTA IV's 120 FPS game option on a 60 Hz TV; v1.2.6 regression test pending |
+| **9.60** | Previously confirmed FPS/lifecycle baseline; v1.2.6 **not yet tested** |
 | **7.60** | Fresh hardware test pending |
 | **10.xx** | Experimental; hardware validation pending |
+| **12.xx / other 13.xx** | v1.2.6 hardware validation pending |
 
-**Scope of v1.2.5 confirmation:** the user tested the PS5 on firmware
-**9.0** with a **60 Hz TV**.
-In GTA IV the game's selectable 120 FPS mode no longer crashed with the
-v1.2.5 overlay active. **This does not verify real 120 Hz video output,
-240 FPS, uncapped game-engine FPS, other firmware, or Rest Mode.** The
-DCE-only sampling change applies to every firmware in source, but display
-availability/accuracy is not proven on all of them. Firmware 11.60 was last
-tested with v1.2.3 (2026-10-16); the prior baselines for 4.51 and 9.60
-remain historical, not new v1.2.5 tests.
-See the [v1.2.5 release notes](release/RELEASE_NOTES_v1.2.5.md).
+**Scope of v1.2.6 confirmation:** FPS display on firmware **13.0** is now
+confirmed, including successful renderer initialization and FPS sampling
+after a change of game process. Actual 120 Hz output, Rest Mode, etaHEN
+autoload and regression tests on older firmware remain unverified with this
+version. The 9.0 GTA IV result belongs to v1.2.5. The Media shortcut installer
+remains unavailable on firmware 12 and above. See the
+[v1.2.6 release notes](release/RELEASE_NOTES_v1.2.6.md).
 
 ## Logs
 

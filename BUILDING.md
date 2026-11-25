@@ -1,4 +1,4 @@
-# Building Common FPS for PS5 v1.2.5
+# Building Common FPS for PS5 v1.2.6
 
 ## DCE-only compatibility change (v1.2.5)
 
@@ -9,6 +9,16 @@ port using the game's 120 FPS setting on FW reported as 9.0 (SDK
 `0x09050005`) and a 60 Hz TV, with overlay present and no repeat crash.
 See `release/TEST_NOTES_v1.2.5_SAFE_DCE.md`. Hardware testing beyond this
 specific firmware/game/display remains outstanding.
+
+## Firmware 13.0 compatibility (v1.2.6)
+
+The FW 13.0 family now uses the existing protected ShellUI transaction
+with checked MDBG read fallback on EFAULT. User hardware log on 2026-11-25
+confirms successful probe, guard write, restoration of original protection,
+renderer startup and DCE sampling at 60 FPS. Sampling resumed after a
+game process change. Other firmware routes and DCE-only game sampling are
+unchanged. Firmware 12+ Media shortcut installation remains disabled.
+See `release/TEST_NOTES_v1.2.6_FW1300.md`.
 
 ## GitHub Actions
 
@@ -21,9 +31,9 @@ verifies the release boundary and generates checksums.
 The source-build artifact contains:
 
 ```text
-Common_FPS_PS5_v1.2.5.elf
-Common_FPS_PS5_etaHEN_v1.2.5.plugin
-Common_FPS_ShellUI_v1.2.5.elf
+Common_FPS_PS5_v1.2.6.elf
+Common_FPS_PS5_etaHEN_v1.2.6.plugin
+Common_FPS_ShellUI_v1.2.6.elf
 SHA256SUMS.txt
 RESOLVED_BUILD_DEPENDENCIES.txt
 ```
@@ -64,7 +74,7 @@ HTTP worker with controller/keyboard/native events and saved settings.
 
 ## Runtime model and validation
 
-The v1.2.5 controller tracks the active game and sends integer FPS from
+The v1.2.6 controller tracks the active game and sends integer FPS from
 the DCE/HEN-shared source to the embedded ShellUI renderer. It follows game
 PID changes and supported ShellUI lifecycle changes. The controller's FPS
 sampler neither reads nor writes game-process memory in v1.2.5, but ShellUI
@@ -98,10 +108,8 @@ FW 11.60 was previously tested on v1.2.3 on 2026-10-16.
 
 ## Stable publication
 
-Merging the `release/PUBLISH_v1.2.5` marker into `main` triggers
-**Publish Common FPS v1.2.5**. It builds and verifies the release, creates
-an immutable tag, uploads only the source-built ELF/plugin, downloads and
-compares them, and marks the release Latest. No prior tag or release assets
-are replaced. The user-authorized release is hardware-confirmed on the
-reported FW 9.0 console only; other platforms/firmwares remain unverified
-for v1.2.5.
+Merging `release/PUBLISH_v1.2.6` into main triggers
+**Publish Common FPS v1.2.6**. It builds and verifies the release, creates
+an immutable tag, uploads ELF/plugin, downloads and compares both files,
+and publishes the release as Latest. Previous tags and assets are not replaced.
+Hardware validation for v1.2.6 covers the reported FW 13.0 overlay workflow.
