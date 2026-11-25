@@ -77,7 +77,7 @@ ShellUiCodeReadResult read_shellui_code(
     // RC3 hardware evidence: PT_IO returned EFAULT at the ShellUI JIT address.
     // Only that error on this exact firmware family permits a read fallback.
     if (backend == ShellUiHookBackend::PtraceIo &&
-        firmware_is_fw1160(sdk) && result.primary_rc == EFAULT) {
+        firmware_uses_protected_ptrace_guard(sdk) && result.primary_rc == EFAULT) {
         result.fallback_attempted = true;
         std::memset(destination, 0, size);
         result.fallback_rc = mdbg_read(destination, size);

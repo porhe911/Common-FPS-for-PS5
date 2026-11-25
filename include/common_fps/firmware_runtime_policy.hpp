@@ -8,6 +8,15 @@ inline constexpr bool firmware_is_fw1160(std::uint32_t sdk) noexcept {
     return (sdk & 0xffff0000U) == 0x11600000U;
 }
 
+// FW 13.00: only the observed family is admitted. Hardware test pending.
+inline constexpr bool firmware_is_fw1300(std::uint32_t sdk) noexcept {
+    return (sdk & 0xffff0000U) == 0x13000000U;
+}
+
+inline constexpr bool firmware_uses_protected_ptrace_guard(std::uint32_t sdk) noexcept {
+    return firmware_is_fw1160(sdk) || firmware_is_fw1300(sdk);
+}
+
 // The submitted FW 9.x log reports SDK 0x09050005.
 // Keep the tested 9.00 MDBG branch and include only this observed variant.
 inline constexpr bool firmware_uses_fw900_mdbg_guard(std::uint32_t sdk) noexcept {

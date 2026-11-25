@@ -78,7 +78,7 @@ inline ShellUiHookBackend shellui_main_thread_guard_backend(
         (family > 0x09000000U && family < 0x09600000U &&
          !firmware_uses_fw900_mdbg_guard(sdk)) ||
         (family > 0x09600000U && family <= 0x10ff0000U) ||
-        family == 0x11600000U)
+        firmware_uses_protected_ptrace_guard(sdk))
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }
@@ -276,7 +276,7 @@ inline ShellUiHookBackend shellui_hook_probe_backend(
         firmware_uses_fw900_mdbg_guard(sdk))
         return ShellUiHookBackend::Mdbg;
     if ((family >= 0x08300000U && family <= 0x10ff0000U) ||
-        family == 0x11600000U)
+        firmware_uses_protected_ptrace_guard(sdk))
         return ShellUiHookBackend::PtraceIo;
     return ShellUiHookBackend::Unsupported;
 }
